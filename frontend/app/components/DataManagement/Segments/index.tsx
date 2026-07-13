@@ -1,7 +1,7 @@
 import { PlusOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import withPermissions from 'HOCs/withPermissions';
-import { Button, Input, Tabs } from 'antd';
+import { Button, Input } from 'antd';
 import { Album } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
@@ -15,18 +15,21 @@ import { debounce } from 'App/utils';
 import SegmentDrawer from 'Components/Issues/segments/SegmentDrawer';
 
 import SegmentsList from './SegmentsList';
-import TrafficSegmentsTab from './TrafficSegmentsTab';
 import { fetchSegments } from './api';
 
-/* Segments home (Mehdi 07-07, Data Management integration):
-   · tab menu — Session segments (the classic saved-search list) / Traffic
-     segments (capture management, same set the Issues popover drives);
+/* Segments home (Mehdi 07-07 Data Management integration, 07-13 merge):
+   · ONE list — the old Session/Traffic tab split is gone; capture is a
+     property of a segment (Traffic % + Capture switch columns), the same
+     shared flag the Issues popover drives. No capture-mode banner here
+     (Gabriel 07-13): the mode lives with the Issues pill, this page just
+     manages segments;
    · create/edit happens in the shared SegmentDrawer (the same slide-out used
      in Issues — instructions only exist there); the old full-page editor
      stays routed but nothing links to it anymore.
    In the mock demo the list is the shared issuesStore dataset, so a segment
-   created from Issues appears here immediately; outside mock the session tab
-   keeps its original API path. */
+   created from Issues appears here immediately; outside mock the list keeps
+   its original API path (capture columns show a dash — the store doesn't
+   know those rows). */
 
 const IS_MOCK = process.env.MOCK === '1';
 
@@ -55,7 +58,6 @@ function SegmentsListPage() {
   const siteId = projectsStore.activeSiteId;
   const history = useHistory();
 
-  const [tab, setTab] = React.useState<'session' | 'traffic'>('session');
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<SavedSegment | null>(null);
 
@@ -194,37 +196,17 @@ function SegmentsListPage() {
         </div>
       </div>
 
-      <Tabs
-        activeKey={tab}
-        onChange={(k) => setTab(k as 'session' | 'traffic')}
-        tabBarStyle={{ paddingLeft: 16, paddingRight: 16, marginBottom: 0 }}
-        items={[
-          {
-            key: 'session',
-            label: t('Session segments'),
-            children: (
-              <SegmentsList
-                list={data.segments}
-                page={page}
-                limit={limit}
-                total={data.total}
-                listLen={data.segments.length}
-                isPending={IS_MOCK ? false : isPending}
-                onPageChange={onPageChange}
-                onSortChange={onSortChange}
-                toSegment={toSegment}
-                toCreate={toCreate}
-              />
-            ),
-          },
-          {
-            key: 'traffic',
-            label: t('Traffic segments'),
-            children: (
-              <TrafficSegmentsTab query={debouncedQuery} onOpen={openSegment} />
-            ),
-          },
-        ]}
+      <SegmentsList
+        list={data.segments}
+        page={page}
+        limit={limit}
+        total={data.total}
+        listLen={data.segments.length}
+        isPending={IS_MOCK ? false : isPending}
+        onPageChange={onPageChange}
+        onSortChange={onSortChange}
+        toSegment={toSegment}
+        toCreate={toCreate}
       />
 
       <SegmentDrawer

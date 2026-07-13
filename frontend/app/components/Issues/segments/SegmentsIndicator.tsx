@@ -6,7 +6,6 @@ import {
   EllipsisVertical,
   Globe,
   Info,
-  ListX,
   Lock,
   Pencil,
   Plus,
@@ -28,11 +27,14 @@ import './captureSwitch.css';
    capture is a project-wide setting, not a view filter, and sitting next to
    Tags/Display made it read as one. The popover has two views:
    · main — the big capture-mode toggle (segments REPLACE full traffic), then
-     the capture set: Yours / Team, a switch per segment (anyone can toggle:
-     it's the project's shared capture setting), edit/remove/delete on your
-     own, "Add segment" at the bottom;
+     the capturing segments: Yours / Team, a switch per segment (anyone can
+     toggle: it's the project's shared capture setting), edit/delete on your
+     own, "Add segment" at the bottom. Capture is ONE flag (07-13 category
+     merge): switching a row off removes it from this list — but only on the
+     next open; while the popover stays open, rows are pinned so a toggle
+     can be undone in place;
    · picker — "Add segment" swaps the content in place (back arrow): existing
-     segments to enable. Segments = the same saved segments Data Management
+     segments to switch on. Segments = the same saved segments Data Management
      lists; only team-visible ones are eligible (everyone must be able to stop
      a capture), private ones show locked. "New segment" opens the shared
      create drawer. */
@@ -92,16 +94,11 @@ function SegmentRow({
             trigger={['click']}
             placement="bottomRight"
             menu={{
+              // no "remove from list" (07-13 merge): capture is one flag,
+              // so the row switch IS the removal — an off row leaves the
+              // list on the next open
               items: [
                 { key: 'edit', icon: <Pencil size={14} />, label: 'Edit' },
-                {
-                  // NOT about stopping capture (the row switch does that) —
-                  // this just declutters: the saved segment lives on in
-                  // Data Management and can be re-added via "Add segment"
-                  key: 'remove',
-                  icon: <ListX size={14} />,
-                  label: 'Remove from list',
-                },
                 { type: 'divider' as const },
                 {
                   key: 'delete',
@@ -112,10 +109,7 @@ function SegmentRow({
               ],
               onClick: ({ key }) => {
                 if (key === 'edit') onEdit(segment);
-                else if (key === 'remove') {
-                  if (issuesStore.removeFromTraffic(segment.id))
-                    message.info(FELL_BACK_MSG);
-                } else if (key === 'delete') {
+                else if (key === 'delete') {
                   if (issuesStore.deleteSegment(segment.id))
                     message.info(FELL_BACK_MSG);
                 }
@@ -197,24 +191,32 @@ function SegmentsIndicator() {
   const [pickerQuery, setPickerQuery] = React.useState('');
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<SavedSegment | null>(null);
+  // rows pinned for this open: capture is one flag, so a switched-off row
+  // would otherwise vanish mid-interaction — pin what was listed (or added)
+  // while the popover is open, so a toggle can be undone in place
+  const [pinned, setPinned] = React.useState<number[]>([]);
 
-  const traffic = issuesStore.trafficSegments;
-  const mine = traffic.filter((s) => s.mine);
-  const team = traffic.filter((s) => !s.mine);
+  const listed = issuesStore.segments.filter(
+    (s) => s.active || pinned.includes(s.id),
+  );
+  const mine = listed.filter((s) => s.mine);
+  const team = listed.filter((s) => !s.mine);
   const activeCount = issuesStore.activeSegmentCount;
   const segmentsMode = issuesStore.captureMode === 'segments';
 
-  // every visible-to-me segment not yet in the capture set; eligible (team)
-  // ones first, private ones locked at the bottom as a teaching moment
+  // every visible-to-me segment not currently listed; eligible (team) ones
+  // first, private ones locked at the bottom as a teaching moment
   const q = pickerQuery.trim().toLowerCase();
   const candidates = issuesStore.segments
-    .filter((s) => (s.isPublic || s.mine) && !s.isTrafficSegment)
+    .filter((s) => (s.isPublic || s.mine) && !s.active && !pinned.includes(s.id))
     .filter((s) => !q || s.name.toLowerCase().includes(q))
     .sort((a, b) => Number(b.isPublic) - Number(a.isPublic));
 
   const onOpenChange = (o: boolean) => {
     setOpen(o);
-    if (!o) {
+    if (o) {
+      setPinned(issuesStore.capturingSegments.map((s) => s.id));
+    } else {
       setView('main');
       setPickerQuery('');
     }
@@ -231,9 +233,11 @@ function SegmentsIndicator() {
     setDrawerOpen(true);
   };
 
-  // enabling an existing segment recomputes its estimate from the live pool
+  // switching an existing segment on recomputes its estimate from the live
+  // pool; pin it so it stays listed even if toggled back off before closing
   const enable = (s: SavedSegment) => {
-    issuesStore.enableTraffic(s.id, estimateFromSeeds(s.seeds));
+    issuesStore.enableCapture(s.id, estimateFromSeeds(s.seeds));
+    setPinned((p) => (p.includes(s.id) ? p : [...p, s.id]));
     setView('main');
     setPickerQuery('');
     message.success(`${s.name} added to traffic segments.`);
@@ -311,10 +315,10 @@ function SegmentsIndicator() {
         </span>
       </div>
 
-      {traffic.length === 0 ? (
+      {listed.length === 0 ? (
         <div className="text-sm py-3" style={{ color: 'var(--color-gray-medium)' }}>
-          No traffic segments yet — the agent captures the full traffic sample.
-          Add one to capture only the part you care about.
+          No capturing segments yet — the agent captures the full traffic
+          sample. Add one to capture only the part you care about.
         </div>
       ) : (
         /* in Full traffic mode the capture set is dormant — fade the list so

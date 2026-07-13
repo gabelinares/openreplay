@@ -420,7 +420,7 @@ function IssuesList() {
             allTags={issuesStore.allTags}
             labels={issuesStore.labels}
             match={issuesStore.match}
-            segments={issuesStore.trafficSegments.map((s) => ({ id: s.id, name: s.name, mine: s.mine }))}
+            segments={issuesStore.originSegments.map((s) => ({ id: s.id, name: s.name, mine: s.mine }))}
             origins={issuesStore.origins}
             onToggle={issuesStore.toggleLabel}
             onToggleOrigin={issuesStore.toggleOrigin}

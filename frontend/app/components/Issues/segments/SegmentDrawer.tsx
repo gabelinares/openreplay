@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Button, Drawer, Input, Segmented, Tooltip } from 'antd';
+import { Alert, Button, Drawer, Input, Segmented, Switch, Tooltip, message } from 'antd';
 import { Check, Info, Lock, Plus, Users } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import { useStore } from 'App/mstore';
@@ -45,6 +45,9 @@ function SegmentDrawer({ open, segment, source, onClose }: Props) {
   const [name, setName] = React.useState('');
   const [instructions, setInstructions] = React.useState('');
   const [isPublic, setIsPublic] = React.useState(true);
+  // capture is explicit in the drawer (07-13 category merge — one flag, no
+  // hidden per-source defaults beyond the initial value)
+  const [capture, setCapture] = React.useState(false);
   // instructions hidden behind a blue "Add instructions" link (Mehdi 07-07);
   // auto-expanded when editing a segment that already has some
   const [showInstructions, setShowInstructions] = React.useState(false);
@@ -61,6 +64,9 @@ function SegmentDrawer({ open, segment, source, onClose }: Props) {
       setName(segment?.name ?? '');
       setInstructions(segment?.instructions ?? '');
       setIsPublic(fromIssues ? true : (segment?.isPublic ?? true));
+      // editing keeps the live flag; a new segment from Issues starts
+      // capturing (that's what you came for), from DM it's a plain segment
+      setCapture(segment?.active ?? fromIssues);
       setShowInstructions(Boolean(segment?.instructions));
     } else if (snapshot.current) {
       searchStore.edit({ filters: snapshot.current });
@@ -76,22 +82,28 @@ function SegmentDrawer({ open, segment, source, onClose }: Props) {
     : { pct: 0, perDay: 0 };
   const narrowed = filters.length > 0;
 
+  const publicNow = fromIssues ? true : isPublic;
+  // capture eligibility follows visibility live: flipping to Private while
+  // capture is on silently can't hold — the switch drops with it
+  const captureNow = capture && publicNow;
+
   const save = () => {
     const live = searchStore.instance.filters;
-    issuesStore.saveSegment({
+    const fellBack = issuesStore.saveSegment({
       id: segment?.id,
       name: name.trim() || 'Untitled segment',
-      // from Issues a new segment goes straight into the capture set, on;
-      // from DM it's a plain saved segment until someone enables capture
-      isTrafficSegment: segment?.isTrafficSegment ?? fromIssues,
-      active: segment?.active ?? fromIssues,
-      isPublic: fromIssues ? true : isPublic,
+      active: captureNow,
+      isPublic: publicNow,
       seeds: serialize(live),
       summary: summarize(live),
       trafficPct: pct,
       sessionsPerDay: perDay,
       instructions: instructions.trim() || undefined,
     });
+    if (fellBack)
+      message.info(
+        'No active segments left — capture switched to full traffic.',
+      );
     onClose();
   };
 
@@ -180,14 +192,32 @@ function SegmentDrawer({ open, segment, source, onClose }: Props) {
               ]}
               className="self-start"
             />
-            {!isPublic && (
-              <span className="text-xs" style={{ color: 'var(--color-gray-medium)' }}>
-                Private segments can’t capture traffic — only team-visible ones
-                are eligible.
-              </span>
-            )}
           </div>
         )}
+
+        {/* capture, explicit (07-13 merge — one flag, the same setting the
+            DM list and the Issues popover toggle); follows visibility live */}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Switch
+              size="small"
+              checked={captureNow}
+              disabled={readOnly || !publicNow}
+              onChange={setCapture}
+              aria-label={`Capture traffic ${captureNow ? 'on' : 'off'}`}
+            />
+            <span className="text-sm font-medium" style={{ color: 'var(--color-gray-darkest)' }}>
+              Capture traffic
+            </span>
+          </div>
+          <span className="text-xs" style={{ color: 'var(--color-gray-medium)' }}>
+            {!publicNow
+              ? 'Private segments can’t capture traffic — only team-visible ones are eligible.'
+              : captureNow
+                ? 'The agent captures sessions matching this segment while the project is in segment capture.'
+                : 'Off — saved for session search only until someone switches it on.'}
+          </span>
+        </div>
 
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5">
