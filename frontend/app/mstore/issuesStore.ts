@@ -156,12 +156,13 @@ export interface SegmentFilterSeed {
   value: string[];
 }
 
-/* ONE entity across the whole app (Mehdi 07-07, Data Management integration):
-   a saved segment (the classic "saved search" in Data Management) that CAN be
-   used as a traffic segment. Two independent capture flags:
-     · isTrafficSegment — picked into the capture set (listed in the Issues
-       popover and in DM's Traffic tab controls);
-     · active           — its capture switch is on.
+/* ONE entity across the whole app (Mehdi 07-07 Data Management integration,
+   07-13 category merge): a saved segment (the classic "saved search" in Data
+   Management) with ONE capture flag — `active`: its capture switch is on, so
+   the agent captures it while the project is in segments mode. There is no
+   separate "capture set" anymore (the old isTrafficSegment): a segment either
+   captures or it doesn't, and every surface (the DM list, the Issues popover)
+   is a view over the same flag.
    Only team-visible (isPublic) segments are eligible for capture — everyone
    must be able to stop them. Segments created from Issues are forced
    team-visible; instructions only exist when created from Issues. */
@@ -173,9 +174,7 @@ export interface SavedSegment {
   mine: boolean;
   /** team-visible vs private-to-owner; capture eligibility requires team */
   isPublic: boolean;
-  /** picked as a traffic segment (in the capture set) */
-  isTrafficSegment: boolean;
-  /** capture switch — meaningful while isTrafficSegment */
+  /** the capture switch — capturing while the project is in segments mode */
   active: boolean;
   /** serialized omni-search query (rebuilt into real filters on edit) */
   seeds: SegmentFilterSeed[];
@@ -213,7 +212,6 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
     createdBy: 'You',
     mine: true,
     isPublic: true,
-    isTrafficSegment: true,
     active: true,
     seeds: [
       { name: 'LOCATION', isEvent: true, autoCaptured: true, operator: 'contains', value: ['/checkout'] },
@@ -234,7 +232,6 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
     createdBy: 'Mehdi',
     mine: false,
     isPublic: true,
-    isTrafficSegment: true,
     active: true,
     seeds: [
       { name: 'LOCATION', isEvent: true, autoCaptured: true, operator: 'contains', value: ['/pricing'] },
@@ -253,7 +250,6 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
     createdBy: 'Nikita',
     mine: false,
     isPublic: true,
-    isTrafficSegment: true,
     active: false,
     seeds: [
       { name: 'userDevice', isEvent: false, operator: 'is', value: ['mobile'] },
@@ -271,7 +267,6 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
     createdBy: 'Sarah',
     mine: false,
     isPublic: true,
-    isTrafficSegment: false,
     active: false,
     seeds: [
       { name: 'LOCATION', isEvent: true, autoCaptured: true, operator: 'contains', value: ['/cart'] },
@@ -289,7 +284,6 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
     createdBy: 'You',
     mine: true,
     isPublic: true,
-    isTrafficSegment: false,
     active: false,
     seeds: [
       { name: 'CLICK', isEvent: true, autoCaptured: true, value: [''] },
@@ -308,7 +302,6 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
     createdBy: 'You',
     mine: true,
     isPublic: false,
-    isTrafficSegment: false,
     active: false,
     seeds: [
       { name: 'LOCATION', isEvent: true, autoCaptured: true, operator: 'contains', value: ['/signup'] },
@@ -326,7 +319,6 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
     createdBy: 'Mehdi',
     mine: false,
     isPublic: true,
-    isTrafficSegment: false,
     active: false,
     seeds: [
       { name: 'userCountry', isEvent: false, operator: 'is', value: ['DE'] },
@@ -344,7 +336,6 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
     createdBy: 'Nikita',
     mine: false,
     isPublic: true,
-    isTrafficSegment: false,
     active: false,
     seeds: [
       { name: 'userBrowser', isEvent: false, operator: 'is', value: ['Safari'] },
@@ -868,10 +859,10 @@ export default class IssuesStore {
     this.mine = this.mine.filter((x) => x !== id);
   };
 
-  // ---- saved / traffic segments ----
-  /** the capture set — what the Issues popover lists */
-  get trafficSegments(): SavedSegment[] {
-    return this.segments.filter((s) => s.isTrafficSegment);
+  // ---- saved segments (capture = the `active` flag) ----
+  /** segments currently capturing — what the Issues popover lists */
+  get capturingSegments(): SavedSegment[] {
+    return this.segments.filter((s) => s.active);
   }
 
   /** what I can see in Data Management: everything team-visible + my private */
@@ -879,19 +870,18 @@ export default class IssuesStore {
     return this.segments.filter((s) => s.isPublic || s.mine);
   }
 
-  /** DM Traffic tab: every capture-eligible segment (team-visible only —
-      everyone must be able to stop a capture) */
-  get captureEligible(): SavedSegment[] {
-    return this.segments.filter((s) => s.isPublic);
-  }
-
-  /** the Issues "Add segment" picker: eligible but not yet in the capture set */
-  get enableCandidates(): SavedSegment[] {
-    return this.segments.filter((s) => s.isPublic && !s.isTrafficSegment);
+  /** the Tags "found in" options: capturing segments plus anything an issue
+      on the list is attributed to (so origin filtering keeps working after a
+      segment's capture is switched off) */
+  get originSegments(): SavedSegment[] {
+    const referenced = new Set(
+      this.all.map((i) => i.segmentId).filter((x): x is number => x != null),
+    );
+    return this.segments.filter((s) => s.active || referenced.has(s.id));
   }
 
   get activeSegmentCount(): number {
-    return this.segments.filter((s) => s.isTrafficSegment && s.active).length;
+    return this.segments.filter((s) => s.active).length;
   }
 
   /** guarded in the UI too: segments mode needs at least one active segment */
@@ -923,26 +913,23 @@ export default class IssuesStore {
 
   clearOrigins = () => { this.origins = []; };
 
-  /** anyone can toggle any segment — it's the project's shared capture setting.
-      Switching ON a segment that wasn't in the capture set (DM Traffic tab)
-      also adds it to the set, so the Issues popover picks it up. */
+  /** anyone can toggle any segment — it's the project's shared capture
+      setting. Returns true when switching the last one off fell the project
+      back to full traffic (the UI toasts it). */
   toggleSegment = (id: number, active: boolean): boolean => {
     this.segments = this.segments.map((f) =>
-      f.id === id
-        ? { ...f, active, isTrafficSegment: f.isTrafficSegment || active }
-        : f,
+      f.id === id ? { ...f, active } : f,
     );
     return this.fallBackIfEmpty();
   };
 
-  /** "Add segment" picker — pull an existing team-visible segment into the
-      capture set, switched on, with a freshly computed estimate. */
-  enableTraffic = (id: number, est?: { pct: number; perDay: number }) => {
+  /** switch capture on with a freshly computed estimate — the "Add segment"
+      picker and the DM capture switch both land here */
+  enableCapture = (id: number, est?: { pct: number; perDay: number }) => {
     this.segments = this.segments.map((f) =>
       f.id === id
         ? {
             ...f,
-            isTrafficSegment: true,
             active: true,
             trafficPct: est?.pct ?? f.trafficPct,
             sessionsPerDay: est?.perDay ?? f.sessionsPerDay,
@@ -951,21 +938,15 @@ export default class IssuesStore {
     );
   };
 
-  /** drop a segment from the capture set (it stays a saved segment in DM) */
-  removeFromTraffic = (id: number): boolean => {
-    this.segments = this.segments.map((f) =>
-      f.id === id ? { ...f, isTrafficSegment: false, active: false } : f,
-    );
-    return this.fallBackIfEmpty();
-  };
-
-  /** create (no id) or update (id) — editing is gated to `mine` in the UI */
+  /** create (no id) or update (id) — editing is gated to `mine` in the UI.
+      Returns true when the edit switched the last capturing segment off and
+      the project fell back to full traffic (the UI toasts it). */
   saveSegment = (
     segment: Omit<
       SavedSegment,
       'id' | 'createdBy' | 'mine' | 'sessionsCount' | 'usersCount' | 'updatedAt'
     > & { id?: number },
-  ) => {
+  ): boolean => {
     const now = Date.now();
     if (segment.id != null) {
       this.segments = this.segments.map((f) =>
@@ -996,6 +977,7 @@ export default class IssuesStore {
         ...this.segments,
       ];
     }
+    return this.fallBackIfEmpty();
   };
 
   deleteSegment = (id: number): boolean => {
