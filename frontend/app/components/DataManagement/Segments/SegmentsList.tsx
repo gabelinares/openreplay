@@ -1,7 +1,7 @@
 import withPageTitle from '@/components/hocs/withPageTitle';
 import { PlusOutlined } from '@ant-design/icons';
 import withPermissions from 'HOCs/withPermissions';
-import { Button, Empty, Table, type TableProps, Tag, Tooltip } from 'antd';
+import { Button, Empty, Switch, Table, type TableProps, Tag, Tooltip, message } from 'antd';
 import type { SorterResult } from 'antd/es/table/interface';
 import { Lock, Star, Users } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from 'App/mstore';
 import { sessions } from 'App/routes';
 import SimpleEmptyImage from 'Components/DataManagement/SimpleEmptyImage';
+import { estimateFromSeeds } from 'Components/Issues/segments/segmentUtils';
 import { CopyButton, TextEllipsis } from 'UI';
 
 import FullPagination from 'Shared/FullPagination';
@@ -51,7 +52,7 @@ function SegmentsList({
   toCreate: () => void;
 }) {
   const { t } = useTranslation();
-  const { projectsStore, userStore } = useStore();
+  const { projectsStore, userStore, issuesStore } = useStore();
   const siteId = projectsStore.activeSiteId;
   const currentUserId = userStore.account.id;
   const buildShareUrl = (id: string) =>
@@ -138,6 +139,64 @@ function SegmentsList({
       className: 'cursor-pointer!',
       render: (text: number) =>
         text ? new Date(text).toLocaleDateString() : '—',
+    },
+    /* capture columns (Mehdi 07-13: one merged list, no Traffic tab) — the
+       same shared flag the Issues popover toggles. Sourced from issuesStore
+       by id; rows the store doesn't know (non-mock API data) show a dash. */
+    {
+      title: t('Traffic'),
+      key: 'traffic',
+      width: 110,
+      render: (_: unknown, record: Segment) => {
+        const s = issuesStore.segmentById(Number(record.id));
+        return s?.active ? (
+          <Tooltip
+            title={`~${s.sessionsPerDay.toLocaleString()} sessions analysed per day`}
+          >
+            <span className="tabular-nums cursor-help">~{s.trafficPct}%</span>
+          </Tooltip>
+        ) : (
+          <span style={{ color: 'var(--color-gray-medium)' }}>—</span>
+        );
+      },
+    },
+    {
+      title: t('Capture'),
+      key: 'capture',
+      width: 90,
+      render: (_: unknown, record: Segment) => {
+        const s = issuesStore.segmentById(Number(record.id));
+        if (!s) return <span style={{ color: 'var(--color-gray-medium)' }}>—</span>;
+        const control = (
+          <div onClick={(e) => e.stopPropagation()} className="inline-flex">
+            <Switch
+              size="small"
+              checked={s.active}
+              disabled={!s.isPublic}
+              aria-label={`${s.name} — capture ${s.active ? 'on' : 'off'}`}
+              onChange={(on) => {
+                // switching on recomputes the estimate from the live pool
+                if (on) issuesStore.enableCapture(s.id, estimateFromSeeds(s.seeds));
+                else if (issuesStore.toggleSegment(s.id, false))
+                  message.info(
+                    t('No active segments left — capture switched to full traffic.'),
+                  );
+              }}
+            />
+          </div>
+        );
+        return s.isPublic ? (
+          control
+        ) : (
+          <Tooltip
+            title={t(
+              'Private segments can’t capture traffic — only team-visible ones are eligible (everyone must be able to stop a capture).',
+            )}
+          >
+            {control}
+          </Tooltip>
+        );
+      },
     },
     {
       title: '',
