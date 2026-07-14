@@ -34,7 +34,7 @@ export const MOCK_AUDITS: Audit[] = [
   {
     id: 3,
     name: 'Mobile visitors — July',
-    scope: ['Segment: Mobile visitors'],
+    scope: ['Mobile visitors'],
     periodDays: 7,
     matched: 5320,
     sampleSize: 1000,
@@ -48,7 +48,7 @@ export const MOCK_AUDITS: Audit[] = [
   {
     id: 2,
     name: 'Checkout & billing — July',
-    scope: ['Segment: Billing & checkout', 'Last 30 days'],
+    scope: ['Billing & checkout', 'Last 30 days'],
     periodDays: 30,
     matched: 8140,
     sampleSize: 2000,
@@ -119,13 +119,17 @@ export const auditsStore = {
   },
 
   /** demo liveness — the list page ticks running audits forward; returns the
-      audits that finished on this tick so the UI can announce them */
+      audits that finished on this tick so the UI can announce them.
+      Progress EASES (Mehdi 07-13): a job's duration is unknowable, so the
+      bar moves fast early and crawls near the end like every honest fake
+      loader — and the UI never prints a percentage. */
   advance(): Audit[] {
     const finished: Audit[] = [];
     const audits = state.audits.map((a) => {
       if (a.status !== 'running') return a;
-      const progress = Math.min(100, a.progress + 2 + Math.round(Math.random() * 5));
-      if (progress >= 100) {
+      const step = Math.max(0.6, (100 - a.progress) * 0.09) + Math.random();
+      const progress = Math.min(100, a.progress + step);
+      if (progress >= 99.5) {
         const done: Audit = {
           ...a,
           progress: 100,
