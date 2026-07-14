@@ -3,7 +3,8 @@ import { PlusOutlined } from '@ant-design/icons';
 import withPermissions from 'HOCs/withPermissions';
 import { Button, Empty, Switch, Table, type TableProps, Tag, Tooltip, message } from 'antd';
 import type { SorterResult } from 'antd/es/table/interface';
-import { Lock, Star, Users } from 'lucide-react';
+import { Lock, Users } from 'lucide-react';
+import { DateTime } from 'luxon';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,6 @@ type SortOrder = 'asc' | 'desc';
 
 const columnKeyToSortBy: Record<string, SortBy> = {
   name: 'name',
-  updatedAt: 'updatedAt',
 };
 
 function SegmentsList({
@@ -52,11 +52,17 @@ function SegmentsList({
   toCreate: () => void;
 }) {
   const { t } = useTranslation();
-  const { projectsStore, userStore, issuesStore } = useStore();
+  const { projectsStore, issuesStore } = useStore();
   const siteId = projectsStore.activeSiteId;
-  const currentUserId = userStore.account.id;
   const buildShareUrl = (id: string) =>
     `https://${ENV.ORIGIN}/${siteId}${sessions()}?sid=${id}`;
+  // same compact notation as the Events page (Mehdi 07-13: tables read in K,
+  // exact numbers live in the detail view)
+  const numberFormatter = Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    compactDisplay: 'short',
+  });
+
   const columns: TableProps<Segment>['columns'] = [
     {
       title: t('Name'),
@@ -65,80 +71,70 @@ function SegmentsList({
       sorter: true,
       showSorterTooltip: false,
       className: 'cursor-pointer!',
-      render: (text: string) => (
-        <TextEllipsis maxWidth={'320px'} text={text} className="link" />
-      ),
-    },
-    {
-      title: t('Visibility'),
-      key: 'visibility',
-      render: (_: unknown, record: Segment) => {
-        const isOwner =
-          record.userId !== undefined &&
-          String(record.userId) === String(currentUserId);
+      // one meta line replaces the Conditions and Updated At columns (Mehdi
+      // 07-13: fewer numbers) — creator (teammates' segments only; "shared
+      // by" phrasing pending Mehdi) + relative update time
+      render: (text: string, record: Segment) => {
+        const s = issuesStore.segmentById(Number(record.id));
+        const rel = record.updatedAt
+          ? DateTime.fromMillis(record.updatedAt).toRelative()
+          : null;
+        const meta = [
+          s && !s.mine ? s.createdBy : null,
+          rel ? `updated ${rel}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ');
         return (
-          <div className="flex items-center gap-1">
-            {/* @ts-ignore */}
-            <Tooltip
-              title={
-                record.isPublic
-                  ? t('Visible to everyone on your team')
-                  : t('Only visible to the segment owner')
-              }
-            >
-              <Tag
-                icon={
-                  record.isPublic ? <Users size={12} /> : <Lock size={12} />
-                }
-                color="default"
-                className="text-xs! px-2! py-0.5! m-0! whitespace-nowrap inline-flex! items-center! gap-1! cursor-help"
-              >
-                {record.isPublic ? t('Team') : t('Private')}
-              </Tag>
-            </Tooltip>
-            {isOwner && (
-              // @ts-ignore
-              <Tooltip title={t("You're this segment's owner")}>
-                <Tag
-                  icon={<Star size={12} />}
-                  color="gold"
-                  className="text-xs! px-2! py-0.5! m-0! whitespace-nowrap inline-flex! items-center! gap-1! cursor-help"
-                >
-                  {t('Owner')}
-                </Tag>
-              </Tooltip>
+          <div className="flex flex-col">
+            <TextEllipsis maxWidth={'320px'} text={text} className="link" />
+            {meta && (
+              <span className="text-xs" style={{ color: 'var(--color-gray-medium)' }}>
+                {meta}
+              </span>
             )}
           </div>
         );
       },
     },
     {
-      title: t('Conditions'),
-      dataIndex: 'filters',
-      key: 'complexity',
-      render: (filters: any[]) => (filters ? filters.length : 0),
+      // Team/Private only — no Owner tag (Mehdi 07-13: "owner" is reserved
+      // jargon for the account owner; the name meta line already says whose
+      // segment it is)
+      title: t('Visibility'),
+      key: 'visibility',
+      render: (_: unknown, record: Segment) => (
+        <div className="flex items-center gap-1">
+          {/* @ts-ignore */}
+          <Tooltip
+            title={
+              record.isPublic
+                ? t('Visible to everyone on your team')
+                : t('Only visible to its creator')
+            }
+          >
+            <Tag
+              icon={record.isPublic ? <Users size={12} /> : <Lock size={12} />}
+              color="default"
+              className="text-xs! px-2! py-0.5! m-0! whitespace-nowrap inline-flex! items-center! gap-1! cursor-help"
+            >
+              {record.isPublic ? t('Team') : t('Private')}
+            </Tag>
+          </Tooltip>
+        </div>
+      ),
     },
     {
       title: t('# Sessions'),
       dataIndex: 'sessionsCount',
       key: 'sessionsCount',
-      render: (count: number) => (count ?? 0).toLocaleString(),
+      render: (count: number) => numberFormatter.format(count ?? 0),
     },
     {
       title: t('# Users'),
       dataIndex: 'usersCount',
       key: 'usersCount',
-      render: (count: number) => (count ?? 0).toLocaleString(),
-    },
-    {
-      title: t('Updated At'),
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
-      sorter: true,
-      showSorterTooltip: false,
-      className: 'cursor-pointer!',
-      render: (text: number) =>
-        text ? new Date(text).toLocaleDateString() : '—',
+      render: (count: number) => numberFormatter.format(count ?? 0),
     },
     /* capture columns (Mehdi 07-13: one merged list, no Traffic tab) — the
        same shared flag the Issues popover toggles. Sourced from issuesStore

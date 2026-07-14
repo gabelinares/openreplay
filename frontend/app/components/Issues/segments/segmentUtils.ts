@@ -23,10 +23,14 @@ export function serialize(filters: any[]): SegmentFilterSeed[] {
 export function hydrate(seeds: SegmentFilterSeed[]): any[] {
   return seeds
     .map((s) => {
+      // only match on autoCaptured when the seed carries it: findEvent
+      // requires every queried key to EXIST on the catalog entry, and
+      // property filters have no autoCaptured key — passing undefined made
+      // the lookup miss and lose the displayName ("userCountry" vs "Country")
       const found = filterStore.findEvent({
         name: s.name,
         isEvent: s.isEvent,
-        autoCaptured: s.autoCaptured,
+        ...(s.autoCaptured != null ? { autoCaptured: s.autoCaptured } : {}),
       });
       if (!found) return null;
       return {

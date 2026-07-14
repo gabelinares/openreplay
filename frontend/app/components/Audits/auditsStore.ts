@@ -68,7 +68,7 @@ export const MOCK_AUDITS: Audit[] = [
     sampleSize: 2000,
     status: 'ready',
     progress: 100,
-    createdBy: 'Mehdi',
+    createdBy: 'Mehdi O.',
     mine: false,
     createdAt: JUL(1, 11),
     healthScore: 71,
