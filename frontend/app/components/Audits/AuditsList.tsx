@@ -97,10 +97,13 @@ function AuditsList() {
       width: 190,
       render: (_: unknown, a) =>
         a.status === 'running' ? (
+          // no percentage (Mehdi 07-13): the duration is unknowable, so the
+          // bar just eases forward — a number would be a made-up promise
           <div className="flex items-center gap-2" style={{ maxWidth: 160 }}>
             <Progress
               percent={a.progress}
               size="small"
+              showInfo={false}
               strokeColor="var(--color-main)"
             />
           </div>
@@ -130,17 +133,23 @@ function AuditsList() {
         ),
     },
     {
+      // percentage, not raw counts (Mehdi 07-13: "avoid having to guess
+      // 1,000 is 20% of 5,000") — exact numbers stay one hover away
       title: 'Sample',
       dataIndex: 'sampleSize',
-      width: 170,
-      render: (n: number, a) => (
-        <span className="tabular-nums text-sm">
-          {n.toLocaleString()}{' '}
-          <span style={{ color: 'var(--color-gray-medium)' }}>
-            of {a.matched.toLocaleString()}
-          </span>
-        </span>
-      ),
+      width: 100,
+      render: (n: number, a) => {
+        const pct = a.matched
+          ? Math.max(1, Math.round((n / a.matched) * 100))
+          : 0;
+        return (
+          <Tooltip
+            title={`${n.toLocaleString()} of ${a.matched.toLocaleString()} matched sessions`}
+          >
+            <span className="tabular-nums text-sm cursor-help">~{pct}%</span>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Created',
