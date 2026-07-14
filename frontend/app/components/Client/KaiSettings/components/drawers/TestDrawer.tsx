@@ -54,6 +54,8 @@ interface Props {
   /** creation mode: footer "Create test" instead of header run controls */
   creating?: boolean;
   onCreate?: () => void;
+  /** Cancel merge — the list restores the absorbed tests (TestsTab owns them) */
+  onCancelMerge?: (tc: TestCase) => void;
 }
 
 /** A live, approved test. Single-column control panel; the row's actions live in the
@@ -71,6 +73,7 @@ function TestDrawer({
   onViewRun,
   creating,
   onCreate,
+  onCancelMerge,
 }: Props) {
   const { t } = useTranslation();
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -84,6 +87,10 @@ function TestDrawer({
   const [reviewItems, setReviewItems] = useState<StepItem[] | null>(null);
   // version switcher: non-null = viewing an older read-only snapshot
   const [viewVersion, setViewVersion] = useState<number | null>(null);
+  // merge review: the SAME EditableSteps list, with each source test's steps
+  // under a draggable group label — full editing (add/remove/rename/drag)
+  // stays available; the labels drop away when the merge is accepted
+  const [mergeItems, setMergeItems] = useState<StepItem[] | null>(null);
   useEffect(() => {
     setReviewItems(
       test?.pendingRevision
@@ -91,7 +98,15 @@ function TestDrawer({
         : null,
     );
     setViewVersion(null);
-  }, [test?.key, test?.pendingRevision]);
+    setMergeItems(
+      test?.pendingMerge
+        ? test.pendingMerge.groups.flatMap((g) => [
+            { text: g.title, kind: 'group' as const },
+            ...g.steps.map((text) => ({ text })),
+          ])
+        : null,
+    );
+  }, [test?.key, test?.pendingRevision, test?.pendingMerge]);
 
   // jump to the schedule when opened via the Schedule action
   useEffect(() => {
@@ -111,6 +126,7 @@ function TestDrawer({
 
   const paused = test.status === 'paused';
   const revision = test.pendingRevision;
+  const merge = test.pendingMerge;
   const version = testVersion(test);
   const history = test.history ?? [];
   const viewedSnapshot =
@@ -180,6 +196,48 @@ function TestDrawer({
     if (!revision) return;
     onChange(keepCurrentVersion(test));
     message.success(t('Kept v{{v}}', { v: version }));
+    onClose();
+  };
+
+  // ---- pending merge (Mehdi 07-13) --------------------------------------
+  // accepting flattens the arranged groups into ONE plain step list and bumps
+  // the version (old steps snapshot into history, like a revision). Status:
+  // a previously-ACTIVE test stays paused — resuming a freshly combined test
+  // is a deliberate act, not a side effect; approved/draft return as they were.
+  const mergedSteps =
+    mergeItems?.filter((it) => it.kind !== 'group' && it.text.trim()) ?? [];
+  const mergedStepCount = mergedSteps.length;
+  const mergedGroupCount =
+    mergeItems?.filter((it) => it.kind === 'group').length ?? 0;
+  const acceptMerge = () => {
+    if (!merge || !mergeItems) return;
+    const steps = mergedSteps.map((it) => it.text);
+    onChange({
+      ...test,
+      steps,
+      status: merge.prevStatus === 'active' ? 'paused' : merge.prevStatus,
+      pendingMerge: undefined,
+      version: version + 1,
+      history: [
+        ...(test.history ?? []),
+        { version, savedAt: Date.now(), steps: test.steps },
+      ],
+    });
+    message.success(
+      merge.prevStatus === 'active'
+        ? t('Combined into {{n}} steps (v{{v}}) — resume when ready', {
+            n: steps.length,
+            v: version + 1,
+          })
+        : t('Combined into {{n}} steps (v{{v}})', {
+            n: steps.length,
+            v: version + 1,
+          }),
+    );
+    onClose();
+  };
+  const cancelMerge = () => {
+    onCancelMerge?.(test);
     onClose();
   };
 
@@ -264,20 +322,29 @@ function TestDrawer({
       eyebrow={
         creating
           ? `${t('Test')} · ${t('New')}`
-          : revision && pauseOnRevision
-            ? `${t('Test')} · ${t('Needs review')}`
-            : `${t('Test')} · ${
-                paused
-                  ? t('Paused')
-                  : test.status === 'approved'
-                    ? t('Approved')
-                    : t('Active')
-              }${version > 1 ? ` · v${version}` : ''}${
-                revision ? ` · ${t('Needs review')}` : ''
-              }`
+          : merge
+            ? `${t('Test')} · ${t('Merge review')}`
+            : revision && pauseOnRevision
+              ? `${t('Test')} · ${t('Needs review')}`
+              : `${t('Test')} · ${
+                  paused
+                    ? t('Paused')
+                    : test.status === 'approved'
+                      ? t('Approved')
+                      : t('Active')
+                }${version > 1 ? ` · v${version}` : ''}${
+                  revision ? ` · ${t('Needs review')}` : ''
+                }`
       }
       headerActions={
-        creating ? undefined : revision && pauseOnRevision ? (
+        creating ? undefined : merge ? (
+          // mid-merge nothing runs — same suspended posture as pause-on-revision
+          <Tooltip title={t('Runs are paused until the merged steps are accepted.')}>
+            <Button size="small" disabled icon={<Play size={13} />}>
+              {t('Run now')}
+            </Button>
+          </Tooltip>
+        ) : revision && pauseOnRevision ? (
           // pause-on-revision is ON: nothing runs until the review is done
           <Tooltip title={t('Runs are paused until the new version is reviewed.')}>
             <Button size="small" disabled icon={<Play size={13} />}>
@@ -329,6 +396,21 @@ function TestDrawer({
               {t('Create test')}
             </Button>
           </div>
+        ) : merge ? (
+          // merge review: cancel restores the absorbed tests; accepting
+          // flattens the groups in their arranged order
+          <div className="flex items-center justify-between">
+            <Button type="text" onClick={cancelMerge}>
+              {t('Cancel merge')}
+            </Button>
+            <Button
+              type="primary"
+              icon={<Check size={15} />}
+              onClick={acceptMerge}
+            >
+              {t('Combine {{n}} steps', { n: mergedStepCount })}
+            </Button>
+          </div>
         ) : revision ? (
           // reviewing: stay on the current version, or save the reviewed one
           <div className="flex items-center justify-between">
@@ -361,7 +443,23 @@ function TestDrawer({
       {/* the steps section wears three hats: reviewing a proposed version (the same
           fully-editable list, with the proposal's add/remove rows dressed as a
           diff), viewing an older snapshot (read-only), or plain editing */}
-      {revision && reviewItems ? (
+      {merge && mergeItems ? (
+        // the regular steps editor, group labels included — dragging a label
+        // moves its whole block; steps edit/insert/delete/drag as always
+        <EditableSteps
+          steps={[]}
+          bounded
+          title={`${t('Steps')} · ${t('merge review')}`}
+          headerAction={
+            <span className="text-sm text-disabled-text">
+              {mergedGroupCount} {t('groups')} · {mergedStepCount} {t('steps')}
+            </span>
+          }
+          reviewItems={mergeItems}
+          onItemsChange={setMergeItems}
+          onStepsChange={() => {}}
+        />
+      ) : revision && reviewItems ? (
         <EditableSteps
           steps={[]}
           bounded

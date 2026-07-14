@@ -3,6 +3,7 @@ import {
   Button,
   Dropdown,
   Input,
+  Modal,
   Segmented,
   Select,
   Table,
@@ -11,7 +12,7 @@ import {
   message,
 } from 'antd';
 import type { TableColumnsType } from 'antd';
-import { Calendar, EllipsisVertical, Play, Plus, Radar } from 'lucide-react';
+import { Calendar, EllipsisVertical, Merge, Play, Plus, Radar } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -84,7 +85,15 @@ function TestsTab() {
     );
   const removeMany = (keys: React.Key[]) => {
     const set = new Set(keys);
-    setTests((prev) => prev.filter((tc) => !set.has(tc.key)));
+    setTests((prev) => {
+      // deleting a merge-in-review kills the base only — the absorbed tests
+      // were separate tests moments ago, so they come back instead of dying
+      // as silent collateral
+      const restored = prev
+        .filter((tc) => set.has(tc.key) && tc.pendingMerge)
+        .flatMap((tc) => tc.pendingMerge!.sources);
+      return [...restored, ...prev.filter((tc) => !set.has(tc.key))];
+    });
     setSelectedKeys((prev) => prev.filter((k) => !set.has(k)));
     setOpenKey((k) => (k && set.has(k) ? null : k));
   };
@@ -189,8 +198,13 @@ function TestsTab() {
     // needs-attention rows float to the top by default — drafts first, then tests
     // waiting on a revision review; column sort overrides this on click
     const drafts = arr.filter((tc) => tc.status === 'draft');
-    const review = arr.filter((tc) => tc.status !== 'draft' && needsReview(tc));
-    const rest = arr.filter((tc) => tc.status !== 'draft' && !needsReview(tc));
+    // pending merges float with pending revisions — both are waiting on you
+    const review = arr.filter(
+      (tc) => tc.status !== 'draft' && (needsReview(tc) || tc.pendingMerge),
+    );
+    const rest = arr.filter(
+      (tc) => tc.status !== 'draft' && !needsReview(tc) && !tc.pendingMerge,
+    );
     return [...drafts, ...review, ...rest];
   }, [tests, query, statusTab, envFilter, tagFilter]);
 
@@ -204,8 +218,10 @@ function TestsTab() {
   // drawer (Mehdi 07-07)
   const selected = tests.filter((tc) => selectedKeys.includes(tc.key));
   const selActive = selected.filter((tc) => tc.status === 'active').length;
+  // merge-pending tests are paused by construction — bulk Resume skips them
+  // (accepting the combined steps is the only way to wake them)
   const selPaused = selected.filter(
-    (tc) => tc.status === 'paused' && !hasNoEnvironment(tc),
+    (tc) => tc.status === 'paused' && !hasNoEnvironment(tc) && !tc.pendingMerge,
   ).length;
 
   const bulkSet = (
@@ -225,10 +241,77 @@ function TestsTab() {
     bulkSet((tc) => tc.status === 'active', { status: 'paused' });
   // paused tests with no environment left can't resume — nothing to run against
   const resumeSelected = () =>
-    bulkSet((tc) => tc.status === 'paused' && !hasNoEnvironment(tc), {
-      status: 'active',
-    });
+    bulkSet(
+      (tc) =>
+        tc.status === 'paused' && !hasNoEnvironment(tc) && !tc.pendingMerge,
+      { status: 'active' },
+    );
   const deleteSelected = () => removeMany(selectedKeys);
+
+  // ---- merge (Mehdi 07-13): combine tests, steps arrive as groups -------
+  // Base = FIRST selected: the merged test keeps its name, settings, tags,
+  // schedule and (runs are linked by name) its run history. Everyone's steps
+  // become reorderable groups pending review; nothing runs until accepted,
+  // so a non-draft base parks at `paused`. Tests mid-review can't merge.
+  const mergeBlocked = selected.some((tc) => needsReview(tc) || tc.pendingMerge);
+  const doMerge = (base: TestCase, rest: TestCase[]) => {
+    const merged: TestCase = {
+      ...base,
+      status: base.status === 'draft' ? 'draft' : 'paused',
+      pendingMerge: {
+        groups: [base, ...rest].map((tcx) => ({
+          title: tcx.title,
+          steps: [...tcx.steps],
+        })),
+        sources: rest,
+        prevStatus: base.status,
+      },
+    };
+    const dropped = new Set(rest.map((r) => r.key));
+    setTests((prev) =>
+      prev
+        .filter((tc) => !dropped.has(tc.key))
+        .map((tc) => (tc.key === base.key ? merged : tc)),
+    );
+    setSelectedKeys([]);
+    setFocusSchedule(false);
+    setCreating(false);
+    setOpenKey(base.key);
+  };
+  const confirmMerge = () => {
+    const sel = selectedKeys
+      .map((k) => tests.find((tc) => tc.key === k))
+      .filter(Boolean) as TestCase[];
+    if (sel.length < 2) return;
+    const [base, ...rest] = sel;
+    Modal.confirm({
+      title: t('Merge {{n}} tests into “{{name}}”?', {
+        n: sel.length,
+        name: base.title,
+      }),
+      content: t(
+        'Steps combine as groups you arrange first — nothing runs until you accept. “{{name}}” keeps its name and settings; the rest fold into it.',
+        { name: base.title },
+      ),
+      okText: t('Merge'),
+      cancelText: t('Cancel'),
+      onOk: () => doMerge(base, rest),
+    });
+  };
+  // cancel from the drawer: the absorbed tests return untouched
+  const cancelMerge = (tc: TestCase) => {
+    const pm = tc.pendingMerge;
+    if (!pm) return;
+    setTests((prev) => [
+      ...pm.sources,
+      ...prev.map((x) =>
+        x.key === tc.key
+          ? { ...tc, status: pm.prevStatus, pendingMerge: undefined }
+          : x,
+      ),
+    ]);
+    message.info(t('Merge cancelled — the original tests are back.'));
+  };
 
   const runNow = (tc: TestCase) =>
     message.success(`${tc.title} — ${t('run started, see Runs')}`);
@@ -301,9 +384,18 @@ function TestsTab() {
 
   const rowMenu = (tc: TestCase) => {
     let items;
-    if (tc.status === 'draft') {
+    if (tc.pendingMerge) {
+      // merge review pending — arranging + accepting is the only way forward;
+      // Delete restores the absorbed tests (see removeMany)
+      items = [
+        { key: 'open', label: t('Review merge') },
+        { type: 'divider' as const },
+        { key: 'delete', label: t('Delete'), danger: true },
+      ];
+    } else if (tc.status === 'draft') {
       items = [
         { key: 'open', label: t('Review draft') },
+        { key: 'merge', label: t('Merge with…') },
         { type: 'divider' as const },
         { key: 'dismiss', label: t('Dismiss'), danger: true },
       ];
@@ -355,6 +447,8 @@ function TestsTab() {
           label: needsReview(tc) ? t('Review changes') : t('Settings'),
         },
         { key: 'duplicate', label: t('Duplicate') },
+        // Mehdi 07-13 — enters selection with this row, finish in the toolbar
+        { key: 'merge', label: t('Merge with…') },
         { type: 'divider' as const },
         { key: 'delete', label: t('Delete'), danger: true },
       ];
@@ -367,6 +461,14 @@ function TestsTab() {
         else if (key === 'schedule') openSchedule(tc);
         else if (key === 'unschedule') unschedule(tc);
         else if (key === 'duplicate') duplicateTest(tc);
+        else if (key === 'merge') {
+          setSelectedKeys((prev) =>
+            prev.includes(tc.key) ? prev : [...prev, tc.key],
+          );
+          message.info(
+            t('Select the tests to merge with, then hit Merge in the toolbar.'),
+          );
+        }
         else if (key === 'pause') updateTest({ ...tc, status: 'paused' });
         else if (key === 'resume') updateTest({ ...tc, status: 'active' });
         else if (key === 'dismiss' || key === 'delete') removeTest(tc.key);
@@ -386,12 +488,16 @@ function TestsTab() {
           <VersionLabel version={tc.version} />
           {/* the same "something new is waiting" dot as new drafts — a pending
               revision is new until reviewed (no row tint here, though) */}
-          {(needsReview(tc) || (tc.status === 'draft' && tc.isNew)) && (
+          {(needsReview(tc) ||
+            tc.pendingMerge ||
+            (tc.status === 'draft' && tc.isNew)) && (
             <Tooltip
               title={
-                needsReview(tc)
-                  ? t('New version — not reviewed yet')
-                  : t('New — not reviewed yet')
+                tc.pendingMerge
+                  ? t('Merged — arrange and accept the combined steps')
+                  : needsReview(tc)
+                    ? t('New version — not reviewed yet')
+                    : t('New — not reviewed yet')
               }
             >
               <span className="shrink-0 flex items-center">
@@ -472,14 +578,16 @@ function TestsTab() {
           {tc.status !== 'draft' && (
             <Tooltip
               title={
-                pauseOnRevision && needsReview(tc)
-                  ? t('Paused until the new version is reviewed')
-                  : t('Run now')
+                tc.pendingMerge
+                  ? t('Paused until the merged steps are accepted')
+                  : pauseOnRevision && needsReview(tc)
+                    ? t('Paused until the new version is reviewed')
+                    : t('Run now')
               }
             >
               <Button
                 type="text"
-                disabled={pauseOnRevision && needsReview(tc)}
+                disabled={(pauseOnRevision && needsReview(tc)) || !!tc.pendingMerge}
                 icon={<Play size={16} />}
                 aria-label={t('Run now')}
                 onClick={(e) => {
@@ -562,6 +670,24 @@ function TestsTab() {
               <Button size="small" onClick={resumeSelected}>
                 {t('Resume')} ({selPaused})
               </Button>
+            )}
+            {selectedKeys.length >= 2 && (
+              <Tooltip
+                title={
+                  mergeBlocked
+                    ? t('A selected test has a review pending — resolve it first.')
+                    : undefined
+                }
+              >
+                <Button
+                  size="small"
+                  disabled={mergeBlocked}
+                  icon={<Merge size={13} />}
+                  onClick={confirmMerge}
+                >
+                  {t('Merge')} ({selectedKeys.length})
+                </Button>
+              </Tooltip>
             )}
             <Button size="small" danger onClick={deleteSelected}>
               {t('Delete')} ({selectedKeys.length})
@@ -665,17 +791,28 @@ function TestsTab() {
         </div>
       )}
 
-      {/* one drawer instance; draft vs test is decided by the opened row's status */}
+      {/* one drawer instance; draft vs test is decided by the opened row's
+          status — except a pending merge, which always reviews in TestDrawer
+          (the draft wizard has no group arranging) */}
       <DraftDrawer
-        test={openTest?.status === 'draft' ? openTest : null}
-        open={openTest?.status === 'draft'}
+        test={
+          openTest?.status === 'draft' && !openTest.pendingMerge
+            ? openTest
+            : null
+        }
+        open={openTest?.status === 'draft' && !openTest.pendingMerge}
         onClose={() => setOpenKey(null)}
         onChange={updateTest}
         onRemove={removeTest}
       />
       <TestDrawer
-        test={openTest && openTest.status !== 'draft' ? openTest : null}
-        open={!!openTest && openTest.status !== 'draft'}
+        test={
+          openTest && (openTest.status !== 'draft' || openTest.pendingMerge)
+            ? openTest
+            : null
+        }
+        open={!!openTest && (openTest.status !== 'draft' || !!openTest.pendingMerge)}
+        onCancelMerge={cancelMerge}
         focusSchedule={focusSchedule}
         creating={creating}
         onCreate={() => {
