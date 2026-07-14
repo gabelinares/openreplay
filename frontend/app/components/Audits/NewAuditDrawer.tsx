@@ -21,7 +21,8 @@ import { auditsStore } from './auditsStore';
    (Traffic Segments and Audits share the same query language). */
 
 const PERIODS = [7, 30, 90] as const;
-const SAMPLES = [500, 1000, 2000];
+// up to 10k (Mehdi 07-13); per-run cost appears here once pricing exists
+const SAMPLES = [500, 1000, 2000, 5000, 10000];
 
 function NewAuditDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { issuesStore } = useStore();
@@ -57,9 +58,9 @@ function NewAuditDrawer({ open, onClose }: { open: boolean; onClose: () => void 
   };
 
   const filters = searchStore.instance.filters;
-  const { perDay } = open
+  const { pct, perDay } = open
     ? estimateFromSeeds(serialize(filters))
-    : { perDay: 0 };
+    : { pct: 0, perDay: 0 };
   const matched = perDay * periodDays;
   const analysed = Math.min(sampleSize, matched);
 
@@ -70,8 +71,9 @@ function NewAuditDrawer({ open, onClose }: { open: boolean; onClose: () => void 
       name:
         name.trim() ||
         `${segment?.name ?? (filters.length ? scopeSummary : 'Full traffic')} — ${new Date().toLocaleDateString('en-US', { month: 'long' })}`,
+      // chip is just the name — no "Segment:" prefix (Mehdi 07-13)
       scope: [
-        segment ? `Segment: ${segment.name}` : filters.length ? scopeSummary : 'Full traffic',
+        segment ? segment.name : filters.length ? scopeSummary : 'Full traffic',
         `Last ${periodDays} days`,
       ],
       periodDays,
@@ -122,7 +124,7 @@ function NewAuditDrawer({ open, onClose }: { open: boolean; onClose: () => void 
             <span className="text-sm font-medium" style={{ color: 'var(--color-gray-darkest)' }}>
               What to audit
             </span>
-            <Tooltip title="The slice of traffic the agent reads. Start from a saved segment or build the scope with the same events and filters as the Sessions search. Leave empty to audit full traffic.">
+            <Tooltip title="Start from a segment or build a scope with the Sessions filters. Empty = full traffic.">
               <span className="flex items-center cursor-help" style={{ color: 'var(--color-gray-medium)' }}>
                 <Info size={13} />
               </span>
@@ -172,18 +174,19 @@ function NewAuditDrawer({ open, onClose }: { open: boolean; onClose: () => void 
           </div>
         </div>
 
+        {/* one line, with the traffic share (Mehdi 07-13: less text) */}
         <Alert
           type="info"
           showIcon
           className="border-transparent rounded-lg"
-          title={`≈${matched.toLocaleString()} sessions match this scope over the last ${periodDays} days — the agent will read a sample of ${analysed.toLocaleString()}. Expect the report in a few hours.`}
+          title={`≈${matched.toLocaleString()} sessions (~${pct}% of traffic) in the last ${periodDays} days — the agent reads ${analysed.toLocaleString()}.`}
         />
 
         <Checkbox
           checked={emailWhenDone}
           onChange={(e) => setEmailWhenDone(e.target.checked)}
         >
-          Email me when the report is ready
+          Notify me
         </Checkbox>
       </div>
     </Drawer>
