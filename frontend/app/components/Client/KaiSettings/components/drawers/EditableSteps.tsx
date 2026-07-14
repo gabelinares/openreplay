@@ -1,6 +1,7 @@
 import { Popover, Tooltip } from 'antd';
 import {
   Check,
+  ChevronRight,
   Circle,
   CornerDownLeft,
   GitBranch,
@@ -260,6 +261,10 @@ interface StepRowProps {
   onRestoreText?: (idx: number, text: string) => void;
   /** version review: decide this row's suggestion */
   onDecide?: (idx: number, decision: StepDecision) => void;
+  /** group label rows (merge review): collapse state + toggle + "· N steps" */
+  groupCollapsed?: boolean;
+  groupMeta?: string;
+  onToggleGroup?: () => void;
 }
 
 /** One step. Drag the grip (it replaces the number on hover) to reorder. Click the
@@ -287,6 +292,9 @@ function StepRow({
   historyEntries,
   onRestoreText,
   onDecide,
+  groupCollapsed,
+  groupMeta,
+  onToggleGroup,
 }: StepRowProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
@@ -294,6 +302,9 @@ function StepRow({
 
   const step = item.text;
   const struck = isStruck(item);
+  // merge-review group label: unnumbered bold row, drags its whole block,
+  // not editable inline (the label IS the source test's name)
+  const isGroup = item.kind === 'group';
   // a standing addition = green row; a standing removal = red row (git-style).
   // A rejected suggestion loses its tint — the step list stays as-is.
   const addedOn = item.kind === 'added' && item.decision !== 'rejected';
@@ -319,6 +330,7 @@ function StepRow({
       <div
         ref={ref}
         data-step-row
+        onClick={isGroup ? onToggleGroup : undefined}
         style={{
           opacity: isDragging ? 0.4 : 1,
           ...(!editing && addedOn ? { background: ADDED_BG } : {}),
@@ -326,7 +338,7 @@ function StepRow({
         }}
         className={`group flex items-start gap-2.5 rounded px-1 -mx-1 py-1.5 ${
           editing ? 'bg-active-blue' : struck ? '' : 'hover:bg-gray-lightest'
-        }`}
+        }${isGroup ? ' cursor-pointer select-none' : ''}`}
       >
         {reviewable ? (
           <span className="h-6 flex items-center shrink-0">
@@ -359,14 +371,31 @@ function StepRow({
               } ${addedOn ? '' : 'text-disabled-text'}`}
               style={addedOn ? { color: 'var(--color-green-dark)' } : undefined}
             >
-              {number}
+              {isGroup ? (
+                // the collapse chevron lives where a number would — and swaps
+                // to the grip on hover, exactly like the numbers do
+                <ChevronRight
+                  size={15}
+                  className="transition-transform text-gray-medium"
+                  style={
+                    groupCollapsed ? undefined : { transform: 'rotate(90deg)' }
+                  }
+                />
+              ) : (
+                number
+              )}
             </span>
             {!editing && (
               <Tooltip title={t('Drag to reorder')}>
+                {/* opacity (NOT display:none): if the handle leaves the layout
+                    mid-drag — hover drops the moment the pointer moves — the
+                    drag source turns display:none and Chromium CANCELS the
+                    native drag. That was the "reorder barely works" bug. */}
                 <span
                   ref={handleRef}
                   aria-label={t('Drag to reorder')}
-                  className="absolute inset-0 hidden group-hover:flex items-center justify-center cursor-grab text-gray-medium hover:text-gray-darkest"
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute inset-0 flex opacity-0 group-hover:opacity-100 items-center justify-center cursor-grab text-gray-medium hover:text-gray-darkest"
                 >
                   <GripVertical size={15} />
                 </span>
@@ -390,6 +419,13 @@ function StepRow({
             }}
             className="flex-1 text-[15px] leading-6 bg-transparent outline-none border-0 p-0 m-0 text-black placeholder:text-disabled-text"
           />
+        ) : isGroup ? (
+          <span className="flex-1 text-left text-[15px] leading-6 break-words font-medium">
+            {step}
+            {groupMeta && (
+              <span className="font-normal text-disabled-text"> · {groupMeta}</span>
+            )}
+          </span>
         ) : (
           <button
             type="button"
@@ -440,7 +476,7 @@ function StepRow({
           // jumps between suggestion rows (the decision pill) and plain rows (the
           // hover-revealed history/delete)
           <div className="flex items-center justify-end gap-0.5 shrink-0 self-start min-w-[60px]">
-            {item.kind && onDecide ? (
+            {item.kind && !isGroup && onDecide ? (
               /* a suggestion asks for exactly one decision — the ✓/✕ pair carries
                  both actions and shows the current side; nothing else competes */
               <DecisionButtons
@@ -455,11 +491,20 @@ function StepRow({
                     onRestore={(text) => onRestoreText(idx, text)}
                   />
                 )}
-                <Tooltip title={t('Delete step')}>
+                <Tooltip
+                  title={
+                    isGroup
+                      ? t('Remove label — its steps join the group above')
+                      : t('Delete step')
+                  }
+                >
                   <button
                     type="button"
-                    aria-label={t('Delete step')}
-                    onClick={() => onRemove(idx)}
+                    aria-label={isGroup ? t('Remove group label') : t('Delete step')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(idx);
+                    }}
                     className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 w-6 h-6 rounded flex items-center justify-center text-gray-medium hover:text-red hover:bg-red-lightest"
                   >
                     <Trash2 size={14} />
@@ -522,6 +567,26 @@ function EditableSteps({
   const emit = (next: StepItem[]) =>
     review ? onItemsChange?.(next) : onStepsChange(next.map((i) => i.text));
 
+  // group collapse (merge review) — keyed by label text so state follows a
+  // group through reorders; the STANDARD view is collapsed (Gabriel 07-14),
+  // expand to edit inside. Collapsed steps stay rendered (display:none), so
+  // indices, numbering and the drop-gap math never notice.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    () =>
+      new Set(
+        (reviewItems ?? [])
+          .filter((it) => it.kind === 'group')
+          .map((it) => it.text),
+      ),
+  );
+  const toggleGroup = (title: string) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+
   // drag-reorder state. Refs mirror state so the (single) drop handler reads fresh values.
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const [dropAt, setDropAt] = useState<number | null>(null);
@@ -554,6 +619,7 @@ function EditableSteps({
     });
 
   const startEdit = (idx: number) => {
+    if (items[idx]?.kind === 'group') return; // labels aren't editable
     editingIsNew.current = false;
     setDraft(items[idx]?.text ?? '');
     setEditingIdx(idx);
@@ -639,8 +705,12 @@ function EditableSteps({
   const onDragStart = (idx: number) => {
     dragRef.current = idx;
     dropRef.current = null;
-    setDraggingIdx(idx);
-    setDropAt(null);
+    // state (→ re-render) deferred out of the dragstart tick: DOM mutations
+    // while Chrome is capturing the drag snapshot abort the native drag
+    window.setTimeout(() => {
+      setDraggingIdx(idx);
+      setDropAt(null);
+    }, 0);
   };
   const onDragEnd = () => {
     dragRef.current = null;
@@ -648,15 +718,24 @@ function EditableSteps({
     setDraggingIdx(null);
     setDropAt(null);
   };
+  // a group label owns every step until the next label — dragging it moves
+  // the whole block; a plain step is a block of one
+  const blockOf = (from: number): [number, number] => {
+    if (items[from]?.kind !== 'group') return [from, from + 1];
+    let end = from + 1;
+    while (end < items.length && items[end].kind !== 'group') end += 1;
+    return [from, end];
+  };
   const commitDrop = () => {
     const from = dragRef.current;
     const gap = dropRef.current;
     if (from == null || gap == null) return;
+    const [s, e] = blockOf(from);
+    if (gap >= s && gap <= e) return; // dropped onto itself
     const next = [...items];
-    const [moved] = next.splice(from, 1);
-    const at = gap > from ? gap - 1 : gap;
-    if (at === from) return;
-    next.splice(at, 0, moved);
+    const block = next.splice(s, e - s);
+    const at = gap > e ? gap - (e - s) : gap;
+    next.splice(at, 0, ...block);
     setIgnored(new Set());
     emit(next);
   };
@@ -675,11 +754,28 @@ function EditableSteps({
       );
       let gap = rows.length;
       for (let i = 0; i < rows.length; i += 1) {
+        // collapsed rows are mounted but clipped (their rects still report
+        // full height!) — the wrapper's marker is the reliable signal that
+        // they're invisible to the pointer and must be to the gap math too
+        if (rows[i].closest('[data-collapsed-row="true"]')) continue;
         const r = rows[i].getBoundingClientRect();
         if (y < r.top + r.height / 2) {
           gap = i;
           break;
         }
+      }
+      // dragging a GROUP: groups don't split other groups — snap the target
+      // to the nearest group boundary (a label position or the list end)
+      const from = dragRef.current;
+      if (from != null && items[from]?.kind === 'group') {
+        const bounds = items
+          .map((it, i) => (it.kind === 'group' ? i : -1))
+          .filter((i) => i >= 0)
+          .concat(items.length);
+        gap = bounds.reduce(
+          (best, b) => (Math.abs(b - gap) < Math.abs(best - gap) ? b : best),
+          bounds[0],
+        );
       }
       if (dropRef.current !== gap) {
         dropRef.current = gap;
@@ -691,6 +787,11 @@ function EditableSteps({
   drop(listRef);
 
   const dragging = draggingIdx != null;
+  // dragging a group label tidies the list: every group collapses for the
+  // duration of the drag (animated) and the user's expansion state returns
+  // untouched on drop — an override, not a mutation of collapsedGroups
+  const groupDragging =
+    draggingIdx != null && items[draggingIdx]?.kind === 'group';
   const includedCount = items.length - ignored.size;
   const sectionTitle =
     title ??
@@ -703,6 +804,27 @@ function EditableSteps({
   // live numbering over the steps the list would actually keep — struck rows
   // (accepted removals, rejected additions) don't count
   let liveNo = 0;
+
+  // which group label owns each row + how many steps each label holds —
+  // drives collapse (hidden rows) and the "· N steps" suffix on labels
+  const groupOf: (string | null)[] = [];
+  const groupCounts = new Map<number, number>();
+  {
+    let current: string | null = null;
+    let currentIdx = -1;
+    items.forEach((it, i) => {
+      if (it.kind === 'group') {
+        current = it.text;
+        currentIdx = i;
+        groupCounts.set(i, 0);
+        groupOf[i] = null;
+      } else {
+        groupOf[i] = current;
+        if (currentIdx >= 0)
+          groupCounts.set(currentIdx, (groupCounts.get(currentIdx) ?? 0) + 1);
+      }
+    });
+  }
 
   return (
     <Section title={sectionTitle} action={headerAction}>
@@ -718,18 +840,51 @@ function EditableSteps({
           ref={listRef}
         >
           {items.map((item, idx) => {
-            const number = isStruck(item) ? null : (liveNo += 1);
+            const number =
+              item.kind === 'group' || isStruck(item) ? null : (liveNo += 1);
+            const isGroupRow = item.kind === 'group';
+            // rows of a collapsed group stay MOUNTED at zero height: indices,
+            // live numbering and the drop-gap math keep working untouched,
+            // and the grid-rows transition gives the collapse its animation
+            const hidden =
+              !isGroupRow &&
+              groupOf[idx] != null &&
+              (collapsedGroups.has(groupOf[idx]!) || groupDragging);
+            const count = isGroupRow ? (groupCounts.get(idx) ?? 0) : 0;
             return (
-              <React.Fragment key={idx}>
-                <Gap
-                  onInsert={() => insertAt(idx)}
-                  dragging={dragging}
-                  isDropTarget={dropAt === idx}
-                />
-                <StepRow
-                  idx={idx}
-                  item={item}
-                  number={number}
+              <div
+                key={idx}
+                aria-hidden={hidden || undefined}
+                data-collapsed-row={hidden ? 'true' : undefined}
+                style={{
+                  display: 'grid',
+                  gridTemplateRows: hidden ? '0fr' : '1fr',
+                  transition: 'grid-template-rows 0.18s ease',
+                }}
+              >
+                <div style={{ overflow: 'hidden', minHeight: 0 }}>
+                  <Gap
+                    onInsert={() => insertAt(idx)}
+                    dragging={dragging}
+                    isDropTarget={dropAt === idx}
+                  />
+                  <StepRow
+                    idx={idx}
+                    item={item}
+                    number={number}
+                    groupCollapsed={
+                      isGroupRow
+                        ? collapsedGroups.has(item.text) || groupDragging
+                        : undefined
+                    }
+                  groupMeta={
+                    isGroupRow
+                      ? `${count} ${count === 1 ? t('step') : t('steps')}`
+                      : undefined
+                  }
+                  onToggleGroup={
+                    isGroupRow ? () => toggleGroup(item.text) : undefined
+                  }
                   editing={editingIdx === idx}
                   reviewable={reviewable}
                   isIgnored={ignored.has(idx)}
@@ -748,8 +903,9 @@ function EditableSteps({
                   historyEntries={historyFor?.(idx)}
                   onRestoreText={historyFor ? restoreText : undefined}
                   onDecide={onDecide}
-                />
-              </React.Fragment>
+                  />
+                </div>
+              </div>
             );
           })}
           <Gap

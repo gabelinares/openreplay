@@ -90,6 +90,23 @@ export interface PendingRevision {
   changes: StepChange[];
 }
 
+/* Merging tests (Mehdi 07-13, "stupid UI merge"): the participants' steps are
+   held as reorderable GROUPS until the user accepts — then they flatten into
+   one plain list and the version bumps. While pending, the merged test cannot
+   run (status parks at `paused`); the absorbed tests are snapshotted in
+   `sources` so Cancel-merge restores them untouched. */
+export interface MergeGroup {
+  title: string;
+  steps: string[];
+}
+export interface PendingMerge {
+  groups: MergeGroup[];
+  /** full snapshots of the absorbed tests — Cancel restores them to the list */
+  sources: TestCase[];
+  /** the base test's status before the merge parked it, restored on cancel */
+  prevStatus: TestLifecycle;
+}
+
 export interface TestCase {
   key: string;
   title: string;
@@ -115,6 +132,8 @@ export interface TestCase {
   version?: number;
   history?: TestVersion[];
   pendingRevision?: PendingRevision;
+  /** a merge waiting to be arranged + accepted (see PendingMerge above) */
+  pendingMerge?: PendingMerge;
 }
 
 export interface TestStep {
