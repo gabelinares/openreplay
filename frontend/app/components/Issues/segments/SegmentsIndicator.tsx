@@ -1,9 +1,8 @@
 import React from 'react';
-import { Button, Dropdown, Input, Popover, Segmented, Switch, Tooltip, message } from 'antd';
+import { Button, Input, Popover, Segmented, Switch, Tooltip, message } from 'antd';
 import {
   ChevronDown,
   ChevronLeft,
-  EllipsisVertical,
   Globe,
   Info,
   Lock,
@@ -11,11 +10,11 @@ import {
   Plus,
   Search,
   Split,
-  Trash2,
 } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import { useStore } from 'App/mstore';
 import type { SavedSegment } from 'App/mstore/issuesStore';
+import SegmentConditions from './SegmentConditions';
 import SegmentDrawer from './SegmentDrawer';
 import { estimateFromSeeds } from './segmentUtils';
 import './captureSwitch.css';
@@ -51,24 +50,33 @@ function SegmentRow({
 }) {
   const { issuesStore } = useStore();
   // row meta = the traffic % only (Mehdi 07-07: "the 2%, that's it");
-  // the query summary and author stay one hover away
-  const tip = segment.mine
-    ? segment.summary
-    : `${segment.summary} · by ${segment.createdBy}`;
+  // the query (organized chips), share and author stay one hover away,
+  // behind the SAME Info-icon affordance as the picker rows (Gabriel 07-14)
   return (
-    <div className="flex items-center gap-3 py-2 px-2 -mx-2 rounded-lg group hover:bg-gray-lightest transition-colors">
-      <Tooltip title={tip} placement="left">
+    <div className="flex items-center gap-2 py-2 px-2 -mx-2 rounded-lg group hover:bg-gray-lightest transition-colors">
+      <span
+        className="text-sm font-medium truncate min-w-0 flex-1 cursor-default"
+        style={{
+          color: segment.active
+            ? 'var(--color-gray-darkest)'
+            : 'var(--color-gray-dark)',
+        }}
+      >
+        {segment.name}
+      </span>
+      <Popover
+        content={<SegmentConditions segment={segment} />}
+        placement="left"
+        trigger="hover"
+        mouseEnterDelay={0.45}
+      >
         <span
-          className="text-sm font-medium truncate min-w-0 flex-1 cursor-default"
-          style={{
-            color: segment.active
-              ? 'var(--color-gray-darkest)'
-              : 'var(--color-gray-dark)',
-          }}
+          className="shrink-0 flex items-center cursor-help"
+          style={{ color: 'var(--color-gray-medium)' }}
         >
-          {segment.name}
+          <Info size={13} />
         </span>
-      </Tooltip>
+      </Popover>
 
       <span
         className="text-sm tabular-nums shrink-0"
@@ -87,51 +95,47 @@ function SegmentRow({
         }}
       />
 
-      {/* far-right actions slot — constant width so every switch shares one edge */}
+      {/* far-right actions slot — constant width so every switch shares one
+          edge. Edit is the ONLY action left (Mehdi 07-13: deletion lives in
+          the DM page; the row switch replaced "remove from list"), so it's a
+          direct pencil, not a one-item ellipsis menu (Gabriel 07-14). On
+          teammates' rows the pencil shows disabled and the tooltip names who
+          CAN edit, so the rule teaches instead of just refusing. */}
       <span className="w-6 shrink-0 flex items-center justify-center">
-        {segment.mine && (
-          <Dropdown
-            trigger={['click']}
-            placement="bottomRight"
-            menu={{
-              // no "remove from list" (07-13 merge): capture is one flag,
-              // so the row switch IS the removal — an off row leaves the
-              // list on the next open
-              items: [
-                { key: 'edit', icon: <Pencil size={14} />, label: 'Edit' },
-                { type: 'divider' as const },
-                {
-                  key: 'delete',
-                  icon: <Trash2 size={14} />,
-                  label: 'Delete segment',
-                  danger: true,
-                },
-              ],
-              onClick: ({ key }) => {
-                if (key === 'edit') onEdit(segment);
-                else if (key === 'delete') {
-                  if (issuesStore.deleteSegment(segment.id))
-                    message.info(FELL_BACK_MSG);
-                }
-              },
-            }}
-          >
+        {segment.mine ? (
+          <Tooltip title="Edit" placement="top">
             <button
               type="button"
-              aria-label="Segment actions"
+              aria-label="Edit segment"
+              onClick={() => onEdit(segment)}
               className="w-6 h-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               style={{ color: 'var(--color-gray-medium)' }}
             >
-              <EllipsisVertical size={15} />
+              <Pencil size={14} />
             </button>
-          </Dropdown>
+          </Tooltip>
+        ) : (
+          <Tooltip
+            title={`Only ${segment.createdBy} can edit this segment.`}
+            placement="top"
+          >
+            <span
+              aria-label={`Only ${segment.createdBy} can edit this segment`}
+              className="w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-40 transition-opacity cursor-not-allowed"
+              style={{ color: 'var(--color-gray-medium)' }}
+            >
+              <Pencil size={14} />
+            </span>
+          </Tooltip>
         )}
       </span>
     </div>
   );
 }
 
-/** picker row — an existing saved segment that can be pulled into capture */
+/** picker row — title only (Mehdi 07-13); the conditions live behind the
+    same Info-icon + tooltip affordance the rest of the app uses, and the
+    private explanation sits on the lock itself (one short sentence) */
 function CandidateRow({
   segment,
   onEnable,
@@ -140,47 +144,52 @@ function CandidateRow({
   onEnable: (s: SavedSegment) => void;
 }) {
   const eligible = segment.isPublic;
-  const row = (
+  return (
     <div
       role={eligible ? 'button' : undefined}
       onClick={eligible ? () => onEnable(segment) : undefined}
-      className={`flex items-center gap-3 py-2 px-2 -mx-2 rounded-lg transition-colors${
+      className={`flex items-center gap-2 py-2 px-2 -mx-2 rounded-lg transition-colors${
         eligible ? ' cursor-pointer hover:bg-gray-lightest group' : ''
       }`}
       style={eligible ? undefined : { opacity: 0.55 }}
     >
-      <div className="flex flex-col min-w-0 flex-1">
-        <span className="text-sm font-medium truncate" style={{ color: 'var(--color-gray-darkest)' }}>
-          {segment.name}
+      <span className="text-sm font-medium truncate min-w-0 flex-1" style={{ color: 'var(--color-gray-darkest)' }}>
+        {segment.name}
+      </span>
+      {/* conditions as organized chips (Gabriel 07-14), light card — a dark
+          text tooltip can't hold a 4-condition query */}
+      <Popover
+        content={<SegmentConditions segment={segment} />}
+        placement="left"
+        trigger="hover"
+        mouseEnterDelay={0.45}
+      >
+        <span
+          className="shrink-0 flex items-center cursor-help"
+          style={{ color: 'var(--color-gray-medium)' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Info size={13} />
         </span>
-        <span className="text-xs truncate" style={{ color: 'var(--color-gray-medium)' }}>
-          {segment.summary}
-          {!segment.mine && ` · by ${segment.createdBy}`}
-        </span>
-      </div>
+      </Popover>
       {eligible ? (
         <span
-          className="shrink-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity"
+          className="w-4 shrink-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ color: 'var(--color-main)' }}
         >
           <Plus size={15} />
         </span>
       ) : (
-        <span className="shrink-0 flex items-center" style={{ color: 'var(--color-gray-medium)' }}>
-          <Lock size={13} />
-        </span>
+        <Tooltip
+          title="Private — make it team-visible to capture traffic."
+          placement="left"
+        >
+          <span className="w-4 shrink-0 flex items-center cursor-help" style={{ color: 'var(--color-gray-medium)' }}>
+            <Lock size={13} />
+          </span>
+        </Tooltip>
       )}
     </div>
-  );
-  return eligible ? (
-    row
-  ) : (
-    <Tooltip
-      title="Private — only team-visible segments can capture traffic (everyone must be able to stop them). Make it team-visible in Data Management first."
-      placement="left"
-    >
-      {row}
-    </Tooltip>
   );
 }
 
@@ -205,12 +214,19 @@ function SegmentsIndicator() {
   const segmentsMode = issuesStore.captureMode === 'segments';
 
   // every visible-to-me segment not currently listed; eligible (team) ones
-  // first, private ones locked at the bottom as a teaching moment
+  // first, private ones locked at the bottom as a teaching moment. At rest
+  // only the 5 most recently updated show (Mehdi 07-13: keep the list short,
+  // make the order legible — the caption states the sort); search reaches
+  // everything else.
   const q = pickerQuery.trim().toLowerCase();
-  const candidates = issuesStore.segments
+  const allCandidates = issuesStore.segments
     .filter((s) => (s.isPublic || s.mine) && !s.active && !pinned.includes(s.id))
     .filter((s) => !q || s.name.toLowerCase().includes(q))
-    .sort((a, b) => Number(b.isPublic) - Number(a.isPublic));
+    .sort(
+      (a, b) =>
+        Number(b.isPublic) - Number(a.isPublic) || b.updatedAt - a.updatedAt,
+    );
+  const candidates = q ? allCandidates : allCandidates.slice(0, 5);
 
   const onOpenChange = (o: boolean) => {
     setOpen(o);
@@ -327,7 +343,8 @@ function SegmentsIndicator() {
         <div
           className={`transition-opacity duration-200${segmentsMode ? '' : ' opacity-50'}`}
         >
-          {mine.length > 0 && sectionTitle('Yours')}
+          {/* "Mine" (Gabriel 07-14) — matches the app's created-by-me jargon */}
+          {mine.length > 0 && sectionTitle('Mine')}
           {mine.map((s) => (
             <SegmentRow key={s.id} segment={s} onEdit={startEdit} />
           ))}
@@ -379,6 +396,9 @@ function SegmentsIndicator() {
           onChange={(e) => setPickerQuery(e.target.value)}
         />
       </div>
+
+      {/* the caption states the sort, so rows don't need a meta line */}
+      {!q && candidates.length > 0 && sectionTitle('Recently updated')}
 
       <div className="overflow-y-auto mt-1 -mx-1 px-1" style={{ maxHeight: 264 }}>
         {candidates.length ? (

@@ -21,8 +21,8 @@ import {
    its filters are snapshotted on open and restored on close, so the Sessions
    page never notices.
 
-   Per-source differences (Mehdi 07-07):
-   · instructions exist only when creating/editing from Issues;
+   One per-source difference left (Mehdi 07-13 — instructions now exist in
+   BOTH sources):
    · visibility: DM shows the Team/Private control; Issues hides it — segments
      created from Issues are forced team-visible (only team-visible segments
      are capture-eligible, everyone must be able to stop them). */
@@ -195,28 +195,39 @@ function SegmentDrawer({ open, segment, source, onClose }: Props) {
           </div>
         )}
 
-        {/* capture, explicit (07-13 merge — one flag, the same setting the
-            DM list and the Issues popover toggle); follows visibility live */}
-        <div className="flex flex-col gap-1">
+        {/* Issues Agent, explicit (07-13 merge — one flag, the same setting
+            the DM list and the Issues popover toggle). Named after the agent,
+            not "capture traffic" (Mehdi 07-13): the switch enables the agent
+            on this segment. Same section grammar as Name/Visibility; follows
+            visibility live. */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-medium" style={{ color: 'var(--color-gray-darkest)' }}>
+              Issues Agent
+            </span>
+            <Tooltip title="The agent reviews sessions matching this segment and reports what it finds on the Issues page. Anyone on the team can switch it off.">
+              <span className="flex items-center cursor-help" style={{ color: 'var(--color-gray-medium)' }}>
+                <Info size={13} />
+              </span>
+            </Tooltip>
+          </div>
           <div className="flex items-center gap-2">
             <Switch
               size="small"
               checked={captureNow}
               disabled={readOnly || !publicNow}
               onChange={setCapture}
-              aria-label={`Capture traffic ${captureNow ? 'on' : 'off'}`}
+              aria-label={`Issues agent ${captureNow ? 'on' : 'off'}`}
             />
-            <span className="text-sm font-medium" style={{ color: 'var(--color-gray-darkest)' }}>
-              Capture traffic
+            <span className="text-sm" style={{ color: 'var(--color-gray-darkest)' }}>
+              Identify issues in this segment
             </span>
           </div>
-          <span className="text-xs" style={{ color: 'var(--color-gray-medium)' }}>
-            {!publicNow
-              ? 'Private segments can’t capture traffic — only team-visible ones are eligible.'
-              : captureNow
-                ? 'The agent captures sessions matching this segment while the project is in segment capture.'
-                : 'Off — saved for session search only until someone switches it on.'}
-          </span>
+          {!publicNow && (
+            <span className="text-xs" style={{ color: 'var(--color-gray-medium)' }}>
+              Private — make it team-visible to enable the agent.
+            </span>
+          )}
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -249,26 +260,29 @@ function SegmentDrawer({ open, segment, source, onClose }: Props) {
           }
         />
 
-        {/* instructions exist only in the Issues context (Mehdi 07-07) */}
-        {fromIssues &&
-          (showInstructions ? (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium" style={{ color: 'var(--color-gray-darkest)' }}>
-                Instructions{' '}
-                <span className="font-normal" style={{ color: 'var(--color-gray-medium)' }}>
-                  (optional)
-                </span>
+        {/* instructions live in BOTH sources (Mehdi 07-13 — was Issues-only
+            per 07-07; the drawer is one component, the fields match). Shown
+            read-only on teammates' segments when they exist. */}
+        {showInstructions ? (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium" style={{ color: 'var(--color-gray-darkest)' }}>
+              Instructions{' '}
+              <span className="font-normal" style={{ color: 'var(--color-gray-medium)' }}>
+                (optional)
               </span>
-              <Input.TextArea
-                rows={3}
-                maxLength={500}
-                autoFocus={!segment?.instructions}
-                placeholder='Extra context for the agent — e.g. "pay special attention to coupon and card-validation errors"'
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-              />
-            </div>
-          ) : (
+            </span>
+            <Input.TextArea
+              rows={3}
+              maxLength={500}
+              autoFocus={!readOnly && !segment?.instructions}
+              disabled={readOnly}
+              placeholder='Extra context for the agent — e.g. "pay special attention to coupon and card-validation errors"'
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+            />
+          </div>
+        ) : (
+          !readOnly && (
             <Button
               type="link"
               size="small"
@@ -278,7 +292,8 @@ function SegmentDrawer({ open, segment, source, onClose }: Props) {
             >
               Add instructions
             </Button>
-          ))}
+          )
+        )}
       </div>
     </Drawer>
   );

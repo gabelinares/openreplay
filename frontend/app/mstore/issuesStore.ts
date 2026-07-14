@@ -229,7 +229,7 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
   {
     id: 2,
     name: 'Pricing · France',
-    createdBy: 'Mehdi',
+    createdBy: 'Mehdi O.',
     mine: false,
     isPublic: true,
     active: true,
@@ -247,7 +247,7 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
   {
     id: 3,
     name: 'Mobile visitors',
-    createdBy: 'Nikita',
+    createdBy: 'Nikita M.',
     mine: false,
     isPublic: true,
     active: false,
@@ -264,7 +264,7 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
   {
     id: 4,
     name: 'Checkout drop-off',
-    createdBy: 'Sarah',
+    createdBy: 'Sarah K.',
     mine: false,
     isPublic: true,
     active: false,
@@ -316,7 +316,7 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
   {
     id: 7,
     name: 'German traffic',
-    createdBy: 'Mehdi',
+    createdBy: 'Mehdi O.',
     mine: false,
     isPublic: true,
     active: false,
@@ -333,7 +333,7 @@ export const MOCK_SEGMENTS: SavedSegment[] = [
   {
     id: 8,
     name: 'Safari sessions',
-    createdBy: 'Nikita',
+    createdBy: 'Nikita M.',
     mine: false,
     isPublic: true,
     active: false,
