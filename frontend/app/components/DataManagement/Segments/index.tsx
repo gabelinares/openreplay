@@ -19,7 +19,8 @@ import { fetchSegments } from './api';
 
 /* Segments home (Mehdi 07-07 Data Management integration, 07-13 merge):
    · ONE list — the old Session/Traffic tab split is gone; capture is a
-     property of a segment (Traffic % + Capture switch columns), the same
+     property of a segment (traffic share folded into the # Sessions column,
+     Capture switch column), the same
      shared flag the Issues popover drives. No capture-mode banner here
      (Gabriel 07-13): the mode lives with the Issues pill, this page just
      manages segments;
