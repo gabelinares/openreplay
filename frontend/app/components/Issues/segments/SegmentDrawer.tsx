@@ -1,9 +1,11 @@
 import React from 'react';
 import { Alert, Button, Drawer, Input, Segmented, Switch, Tooltip, message } from 'antd';
 import { Check, Info, Lock, Plus, Users } from 'lucide-react';
+import { DateTime } from 'luxon';
 import { observer } from 'mobx-react-lite';
 import { useStore } from 'App/mstore';
 import { searchStore } from 'App/mstore';
+import NameAvatar from 'Shared/NameAvatar';
 import SessionFilters from 'Shared/SessionFilters';
 import type { SavedSegment } from 'App/mstore/issuesStore';
 import {
@@ -112,13 +114,7 @@ function SegmentDrawer({ open, segment, source, onClose }: Props) {
       open={open}
       onClose={onClose}
       placement="right"
-      title={
-        readOnly
-          ? `${segment?.name} — by ${segment?.createdBy}`
-          : segment
-            ? 'Edit segment'
-            : 'New segment'
-      }
+      title={readOnly ? segment?.name : segment ? 'Edit segment' : 'New segment'}
       styles={{ wrapper: { width: 560 }, footer: { padding: '12px 24px' } }}
       footer={
         readOnly ? (
@@ -138,6 +134,28 @@ function SegmentDrawer({ open, segment, source, onClose }: Props) {
       }
     >
       <div className="flex flex-col gap-4" onKeyUp={() => setTick((t) => t + 1)} onClick={() => setTick((t) => t + 1)}>
+        {/* creator block (Mehdi 07-15: creator inside the drawer, readable —
+            not crammed into the title). NameAvatar is the app's standard
+            person affordance (SessionItem, DM Users); update time rides along
+            as the second line. The table's Name meta line moved here. */}
+        {segment && (
+          <div className="flex items-center gap-3 pb-4 border-b">
+            <NameAvatar name={segment.createdBy} size={36} />
+            <div className="flex flex-col">
+              <span
+                className="text-base font-medium leading-snug"
+                style={{ color: 'var(--color-gray-darkest)' }}
+              >
+                {segment.createdBy}
+              </span>
+              <span className="text-xs" style={{ color: 'var(--color-gray-medium)' }}>
+                Created this segment · updated{' '}
+                {DateTime.fromMillis(segment.updatedAt).toRelative()}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-medium" style={{ color: 'var(--color-gray-darkest)' }}>
             Name
