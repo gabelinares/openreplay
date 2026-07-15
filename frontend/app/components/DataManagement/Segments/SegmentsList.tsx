@@ -104,10 +104,36 @@ function SegmentsList({
       ),
     },
     {
-      title: t('# Sessions'),
+      // Sessions + Traffic merged, one column one line (Mehdi + Gabriel
+      // 07-15): compact count first, the segment's traffic share after it in
+      // gray — SAME font size, so it reads as one value pair ("6.8K · ~34%")
+      // under a header that names both. The share is an estimate from the
+      // segment's conditions (not a capture artifact), so every store-known
+      // row shows it and the column stays uniform. Tooltip spells the share
+      // out; no per-day figure (Gabriel 07-15). Rows the issuesStore doesn't
+      // know (non-mock API data) show the count alone.
+      title: `${t('# Sessions')} · ${t('Traffic')}`,
       dataIndex: 'sessionsCount',
       key: 'sessionsCount',
-      render: (count: number) => numberFormatter.format(count ?? 0),
+      render: (count: number, record: Segment) => {
+        const s = issuesStore.segmentById(Number(record.id));
+        return (
+          <span className="tabular-nums whitespace-nowrap">
+            {numberFormatter.format(count ?? 0)}
+            {s && (
+              <Tooltip title={`Matches ~${s.trafficPct}% of your traffic`}>
+                <span
+                  className="cursor-help"
+                  style={{ color: 'var(--color-gray-medium)' }}
+                >
+                  {' '}
+                  · ~{s.trafficPct}%
+                </span>
+              </Tooltip>
+            )}
+          </span>
+        );
+      },
     },
     {
       title: t('# Users'),
@@ -116,16 +142,12 @@ function SegmentsList({
       render: (count: number) => numberFormatter.format(count ?? 0),
     },
     /* capture column (Mehdi 07-13: one merged list, no Traffic tab) — the
-       same shared flag the Issues popover toggles. The traffic share sits
-       next to the switch (Gabriel 07-15): it only exists while capturing, so
-       it reads as the switch's own detail ("capturing ~6%") and # Sessions
-       stays a pure count like the other DM volume columns. Sourced from
-       issuesStore by id; rows the store doesn't know (non-mock API data)
-       show a dash. */
+       same shared flag the Issues popover toggles. Sourced from issuesStore
+       by id; rows the store doesn't know (non-mock API data) show a dash. */
     {
       title: t('Capture'),
       key: 'capture',
-      width: 120,
+      width: 90,
       render: (_: unknown, record: Segment) => {
         const s = issuesStore.segmentById(Number(record.id));
         if (!s) return <span style={{ color: 'var(--color-gray-medium)' }}>—</span>;
@@ -147,32 +169,16 @@ function SegmentsList({
             />
           </div>
         );
-        return (
-          <div className="flex items-center gap-2">
-            {s.isPublic ? (
-              control
-            ) : (
-              <Tooltip
-                title={t(
-                  'Private segments can’t capture traffic — only team-visible ones are eligible (everyone must be able to stop a capture).',
-                )}
-              >
-                {control}
-              </Tooltip>
+        return s.isPublic ? (
+          control
+        ) : (
+          <Tooltip
+            title={t(
+              'Private segments can’t capture traffic — only team-visible ones are eligible (everyone must be able to stop a capture).',
             )}
-            {s.active && (
-              <Tooltip
-                title={`~${s.trafficPct}% of your traffic · ~${s.sessionsPerDay.toLocaleString()} sessions analysed per day`}
-              >
-                <span
-                  className="text-xs tabular-nums cursor-help"
-                  style={{ color: 'var(--color-gray-medium)' }}
-                >
-                  ~{s.trafficPct}%
-                </span>
-              </Tooltip>
-            )}
-          </div>
+          >
+            {control}
+          </Tooltip>
         );
       },
     },
