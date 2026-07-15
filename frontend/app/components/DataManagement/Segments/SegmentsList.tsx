@@ -4,7 +4,6 @@ import withPermissions from 'HOCs/withPermissions';
 import { Button, Empty, Switch, Table, type TableProps, Tag, Tooltip, message } from 'antd';
 import type { SorterResult } from 'antd/es/table/interface';
 import { Lock, Users } from 'lucide-react';
-import { DateTime } from 'luxon';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -71,31 +70,11 @@ function SegmentsList({
       sorter: true,
       showSorterTooltip: false,
       className: 'cursor-pointer!',
-      // one meta line replaces the Conditions and Updated At columns (Mehdi
-      // 07-13: fewer numbers) — creator (teammates' segments only; "shared
-      // by" phrasing pending Mehdi) + relative update time
-      render: (text: string, record: Segment) => {
-        const s = issuesStore.segmentById(Number(record.id));
-        const rel = record.updatedAt
-          ? DateTime.fromMillis(record.updatedAt).toRelative()
-          : null;
-        const meta = [
-          s && !s.mine ? s.createdBy : null,
-          rel ? `updated ${rel}` : null,
-        ]
-          .filter(Boolean)
-          .join(' · ');
-        return (
-          <div className="flex flex-col">
-            <TextEllipsis maxWidth={'320px'} text={text} className="link" />
-            {meta && (
-              <span className="text-xs" style={{ color: 'var(--color-gray-medium)' }}>
-                {meta}
-              </span>
-            )}
-          </div>
-        );
-      },
+      // plain name — the creator + update-time meta line moved into the
+      // drawer's creator block (Mehdi 07-15: "inside the modal, bigger")
+      render: (text: string) => (
+        <TextEllipsis maxWidth={'320px'} text={text} className="link" />
+      ),
     },
     {
       // Team/Private only — no Owner tag (Mehdi 07-13: "owner" is reserved
@@ -125,10 +104,36 @@ function SegmentsList({
       ),
     },
     {
-      title: t('# Sessions'),
+      // Sessions + Traffic merged, one column one line (Mehdi + Gabriel
+      // 07-15): compact count first, the segment's traffic share after it in
+      // gray — SAME font size, so it reads as one value pair ("6.8K · ~34%")
+      // under a header that names both. The share is an estimate from the
+      // segment's conditions (not a capture artifact), so every store-known
+      // row shows it and the column stays uniform. Tooltip spells the share
+      // out; no per-day figure (Gabriel 07-15). Rows the issuesStore doesn't
+      // know (non-mock API data) show the count alone.
+      title: `${t('# Sessions')} · ${t('Traffic')}`,
       dataIndex: 'sessionsCount',
       key: 'sessionsCount',
-      render: (count: number) => numberFormatter.format(count ?? 0),
+      render: (count: number, record: Segment) => {
+        const s = issuesStore.segmentById(Number(record.id));
+        return (
+          <span className="tabular-nums whitespace-nowrap">
+            {numberFormatter.format(count ?? 0)}
+            {s && (
+              <Tooltip title={`Matches ~${s.trafficPct}% of your traffic`}>
+                <span
+                  className="cursor-help"
+                  style={{ color: 'var(--color-gray-medium)' }}
+                >
+                  {' '}
+                  · ~{s.trafficPct}%
+                </span>
+              </Tooltip>
+            )}
+          </span>
+        );
+      },
     },
     {
       title: t('# Users'),
@@ -136,26 +141,9 @@ function SegmentsList({
       key: 'usersCount',
       render: (count: number) => numberFormatter.format(count ?? 0),
     },
-    /* capture columns (Mehdi 07-13: one merged list, no Traffic tab) — the
+    /* capture column (Mehdi 07-13: one merged list, no Traffic tab) — the
        same shared flag the Issues popover toggles. Sourced from issuesStore
        by id; rows the store doesn't know (non-mock API data) show a dash. */
-    {
-      title: t('Traffic'),
-      key: 'traffic',
-      width: 110,
-      render: (_: unknown, record: Segment) => {
-        const s = issuesStore.segmentById(Number(record.id));
-        return s?.active ? (
-          <Tooltip
-            title={`~${s.sessionsPerDay.toLocaleString()} sessions analysed per day`}
-          >
-            <span className="tabular-nums cursor-help">~{s.trafficPct}%</span>
-          </Tooltip>
-        ) : (
-          <span style={{ color: 'var(--color-gray-medium)' }}>—</span>
-        );
-      },
-    },
     {
       title: t('Capture'),
       key: 'capture',
