@@ -104,39 +104,10 @@ function SegmentsList({
       ),
     },
     {
-      // Sessions + Traffic merged into one column (Mehdi 07-15): the compact
-      // count is the primary value (same as the other DM volume columns); the
-      // traffic share follows inline in gray — only while the segment is
-      // capturing, so idle rows stay a single clean number. One line, not
-      // stacked (Gabriel 07-15: keep the row height down). The per-day
-      // detail keeps living in the tooltip. Store lookup as before: rows the
-      // issuesStore doesn't know (non-mock API data) just show the count.
       title: t('# Sessions'),
       dataIndex: 'sessionsCount',
       key: 'sessionsCount',
-      render: (count: number, record: Segment) => {
-        const s = issuesStore.segmentById(Number(record.id));
-        return (
-          <span className="whitespace-nowrap">
-            <span className="tabular-nums">
-              {numberFormatter.format(count ?? 0)}
-            </span>
-            {s?.active && (
-              <Tooltip
-                title={`~${s.sessionsPerDay.toLocaleString()} sessions analysed per day`}
-              >
-                <span
-                  className="text-xs cursor-help"
-                  style={{ color: 'var(--color-gray-medium)' }}
-                >
-                  {' '}
-                  · ~{s.trafficPct}% {t('of traffic')}
-                </span>
-              </Tooltip>
-            )}
-          </span>
-        );
-      },
+      render: (count: number) => numberFormatter.format(count ?? 0),
     },
     {
       title: t('# Users'),
@@ -145,12 +116,16 @@ function SegmentsList({
       render: (count: number) => numberFormatter.format(count ?? 0),
     },
     /* capture column (Mehdi 07-13: one merged list, no Traffic tab) — the
-       same shared flag the Issues popover toggles. Sourced from issuesStore
-       by id; rows the store doesn't know (non-mock API data) show a dash. */
+       same shared flag the Issues popover toggles. The traffic share sits
+       next to the switch (Gabriel 07-15): it only exists while capturing, so
+       it reads as the switch's own detail ("capturing ~6%") and # Sessions
+       stays a pure count like the other DM volume columns. Sourced from
+       issuesStore by id; rows the store doesn't know (non-mock API data)
+       show a dash. */
     {
       title: t('Capture'),
       key: 'capture',
-      width: 90,
+      width: 120,
       render: (_: unknown, record: Segment) => {
         const s = issuesStore.segmentById(Number(record.id));
         if (!s) return <span style={{ color: 'var(--color-gray-medium)' }}>—</span>;
@@ -172,16 +147,32 @@ function SegmentsList({
             />
           </div>
         );
-        return s.isPublic ? (
-          control
-        ) : (
-          <Tooltip
-            title={t(
-              'Private segments can’t capture traffic — only team-visible ones are eligible (everyone must be able to stop a capture).',
+        return (
+          <div className="flex items-center gap-2">
+            {s.isPublic ? (
+              control
+            ) : (
+              <Tooltip
+                title={t(
+                  'Private segments can’t capture traffic — only team-visible ones are eligible (everyone must be able to stop a capture).',
+                )}
+              >
+                {control}
+              </Tooltip>
             )}
-          >
-            {control}
-          </Tooltip>
+            {s.active && (
+              <Tooltip
+                title={`~${s.trafficPct}% of your traffic · ~${s.sessionsPerDay.toLocaleString()} sessions analysed per day`}
+              >
+                <span
+                  className="text-xs tabular-nums cursor-help"
+                  style={{ color: 'var(--color-gray-medium)' }}
+                >
+                  ~{s.trafficPct}%
+                </span>
+              </Tooltip>
+            )}
+          </div>
         );
       },
     },
