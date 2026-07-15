@@ -106,8 +106,9 @@ function SegmentsList({
     {
       // Sessions + Traffic merged into one column (Mehdi 07-15): the compact
       // count is the primary value (same as the other DM volume columns); the
-      // traffic share rides beneath as a meta line — only while the segment
-      // is capturing, so idle rows stay a single clean number. The per-day
+      // traffic share follows inline in gray — only while the segment is
+      // capturing, so idle rows stay a single clean number. One line, not
+      // stacked (Gabriel 07-15: keep the row height down). The per-day
       // detail keeps living in the tooltip. Store lookup as before: rows the
       // issuesStore doesn't know (non-mock API data) just show the count.
       title: t('# Sessions'),
@@ -116,7 +117,7 @@ function SegmentsList({
       render: (count: number, record: Segment) => {
         const s = issuesStore.segmentById(Number(record.id));
         return (
-          <div className="flex flex-col">
+          <span className="whitespace-nowrap">
             <span className="tabular-nums">
               {numberFormatter.format(count ?? 0)}
             </span>
@@ -128,11 +129,12 @@ function SegmentsList({
                   className="text-xs cursor-help"
                   style={{ color: 'var(--color-gray-medium)' }}
                 >
-                  ~{s.trafficPct}% {t('of traffic')}
+                  {' '}
+                  · ~{s.trafficPct}% {t('of traffic')}
                 </span>
               </Tooltip>
             )}
-          </div>
+          </span>
         );
       },
     },
