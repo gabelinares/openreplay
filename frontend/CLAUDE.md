@@ -39,3 +39,19 @@ Then open: **http://localhost:3334/client/test-agents**
   - `app/components/Client/Client.tsx` — `case CLIENT_TABS.TEST_AGENTS: return <KaiSettings />`
   - `app/layout/data.ts` — `PREFERENCES_MENU.TEST_AGENTS` nav entry (always visible here)
 - `app/dev/mockBootstrap.ts` / `app/initialize.tsx` — the no-backend auth/store seed
+
+## Deploying (two environments since 2026-07-20)
+
+Two Vercel projects, same repo, both built from `frontend/vercel.json` (MOCK build).
+No git auto-deploy on either — deploys are always manual:
+
+- **openreplay-main.vercel.app** — CANONICAL (Nikita implements from this).
+  Deploy ONLY from `main`, only after a PR merges: `yarn deploy:main`
+- **openreplay-design.vercel.app** — WIP (Mehdi reviews here).
+  Deploy the feature branch under review, as often as needed: `yarn deploy:design`
+  (targets the design project via VERCEL_PROJECT_ID override; the `.vercel/` link
+  stays pointed at openreplay-main)
+
+Flow: feature branch → `yarn deploy:design` → Mehdi approves → merge PR →
+`yarn deploy:main`. No long-lived design branch — the feature branch itself is
+the WIP source; throwaway integration branch only if two batches must demo together.

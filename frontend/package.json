@@ -19,6 +19,8 @@
     "start": "parcel app/index.html --port 3333 --open",
     "dev": "parcel app/index.html --port 3333 --open",
     "dev:mock": "MOCK=1 parcel app/index.html --port 3333 --open",
+    "deploy:main": "vercel deploy --prod",
+    "deploy:design": "VERCEL_ORG_ID=team_tqS86aOtH9881Yl07UP7kUy0 VERCEL_PROJECT_ID=prj_gKYEToVEqzwNdLcixLlC8cdVJv4Y vercel deploy --prod",
     "build": "yarn gen:icons && yarn gen:colors && rm -rf public && parcel build app/index.html --dist-dir public --no-source-maps && cp -r app/assets public/assets && yarn writeCommitHash",
     "upload:minio": "node ./scripts/upload-minio.js",
     "deploy:minio": "yarn build:minio && yarn upload:minio",
