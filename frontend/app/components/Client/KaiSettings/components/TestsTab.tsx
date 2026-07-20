@@ -31,6 +31,7 @@ import {
   displayStatus,
   getStatusTag,
   isScheduled,
+  relativeTime,
   scheduleLabel,
   scheduleShort,
 } from './shared/utils';
@@ -123,6 +124,7 @@ function TestsTab() {
     const tc: TestCase = {
       key: `test-manual-${(manualCounter += 1)}-${Date.now()}`,
       title: t('Untitled test'),
+      createdAt: Date.now(),
       steps: [],
       status: 'approved',
       schedule: null,
@@ -156,6 +158,7 @@ function TestsTab() {
       title: `${tc.title} (copy)`,
       steps: [...tc.steps],
       status: 'draft',
+      createdAt: Date.now(),
       isNew: true,
     };
     setTests((prev) => [copy, ...prev]);
@@ -181,6 +184,26 @@ function TestsTab() {
     new Set(tests.flatMap((tc) => tc.tags ?? [])),
   ).sort();
 
+  // ---- column sort ------------------------------------------------------
+  // an active header sort is FLAT: it re-orders the whole filtered list (not
+  // within groups) and the needs-attention grouping disappears until the sort
+  // is cleared again (third click on the header). Sorting must happen on the
+  // full list BEFORE pagination — antd only sees the current page.
+  type SortKey = 'title' | 'envNames' | 'schedule' | 'status' | 'createdAt';
+  const [sort, setSort] = useState<{
+    key: SortKey;
+    order: 'ascend' | 'descend';
+  } | null>(null);
+  const compare: Record<SortKey, (a: TestCase, b: TestCase) => number> = {
+    title: (a, b) => a.title.localeCompare(b.title),
+    envNames: (a, b) =>
+      (a.envNames?.[0] ?? '').localeCompare(b.envNames?.[0] ?? ''),
+    schedule: (a, b) =>
+      scheduleLabel(a.schedule).localeCompare(scheduleLabel(b.schedule)),
+    status: (a, b) => STATUS_ORDER[statusOf(a)] - STATUS_ORDER[statusOf(b)],
+    createdAt: (a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0),
+  };
+
   const visible = useMemo(() => {
     let arr = tests;
     if (query.trim())
@@ -195,8 +218,13 @@ function TestsTab() {
       arr = arr.filter((tc) => (tc.envNames ?? []).includes(envFilter));
     if (tagFilter !== 'all')
       arr = arr.filter((tc) => (tc.tags ?? []).includes(tagFilter));
-    // needs-attention rows float to the top by default — drafts first, then tests
-    // waiting on a revision review; column sort overrides this on click
+    if (sort) {
+      const sorted = [...arr].sort(compare[sort.key]);
+      if (sort.order === 'descend') sorted.reverse();
+      return sorted;
+    }
+    // no sort: needs-attention rows float to the top — drafts first, then tests
+    // waiting on a revision review
     const drafts = arr.filter((tc) => tc.status === 'draft');
     // pending merges float with pending revisions — both are waiting on you
     const review = arr.filter(
@@ -206,7 +234,7 @@ function TestsTab() {
       (tc) => tc.status !== 'draft' && !needsReview(tc) && !tc.pendingMerge,
     );
     return [...drafts, ...review, ...rest];
-  }, [tests, query, statusTab, envFilter, tagFilter]);
+  }, [tests, query, statusTab, envFilter, tagFilter, sort]);
 
   const pageItems = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const rangeStart = visible.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -471,7 +499,12 @@ function TestsTab() {
         }
         else if (key === 'pause') updateTest({ ...tc, status: 'paused' });
         else if (key === 'resume') updateTest({ ...tc, status: 'active' });
-        else if (key === 'dismiss' || key === 'delete') removeTest(tc.key);
+        else if (key === 'dismiss') {
+          // same announcement as the drawer's Dismiss — a row that vanishes
+          // silently reads as lost (report 2.4)
+          removeTest(tc.key);
+          message.success(t('Draft dismissed'));
+        } else if (key === 'delete') removeTest(tc.key);
       },
     };
   };
@@ -558,6 +591,29 @@ function TestsTab() {
               <span className="truncate">{scheduleShort(tc.schedule)}</span>
             </span>
           </Tooltip>
+        ),
+    },
+    {
+      title: t('Created'),
+      dataIndex: 'createdAt',
+      width: 110,
+      // newest first on the first click — the order people reach for
+      sortDirections: ['descend', 'ascend'],
+      sorter: (a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0),
+      showSorterTooltip: false,
+      render: (ts?: number) =>
+        ts ? (
+          <Tooltip
+            title={new Date(ts).toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}
+          >
+            <span className="text-gray-dark">{relativeTime(ts)}</span>
+          </Tooltip>
+        ) : (
+          <span className="text-disabled-text">—</span>
         ),
     },
     {
@@ -758,6 +814,17 @@ function TestsTab() {
         rowClassName={(tc) =>
           `cursor-pointer${tc.status === 'draft' && tc.isNew ? ' kai-row-new' : ''}`
         }
+        // header sorts re-order the FULL filtered list (see the `sort` state);
+        // antd itself only ever sees one page of rows
+        onChange={(_, __, sorter) => {
+          const s = Array.isArray(sorter) ? sorter[0] : sorter;
+          setSort(
+            s?.order
+              ? { key: s.field as SortKey, order: s.order }
+              : null,
+          );
+          setPage(1);
+        }}
         onRow={(tc) => ({
           onClick: (e) => {
             const el = e.target as HTMLElement;

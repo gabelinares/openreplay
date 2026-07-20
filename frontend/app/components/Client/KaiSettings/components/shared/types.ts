@@ -112,6 +112,8 @@ export interface TestCase {
   title: string;
   steps: string[];
   status: TestLifecycle;
+  /** when the test (or draft) appeared — the Created column and its sort */
+  createdAt?: number; // epoch ms
   // an unreviewed draft the user hasn't opened yet — drives the "new" dot in the table
   isNew?: boolean;
   // a test can target a matrix of environments / resolutions / regions; each run

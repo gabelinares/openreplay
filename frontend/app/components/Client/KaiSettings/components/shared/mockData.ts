@@ -3,6 +3,9 @@ import { Environment, RunData, TestCase } from './types';
 const HOUR = 3600000;
 const NOW = Date.now();
 const ago = (hours: number) => NOW - hours * HOUR;
+// creation dates spread across ~3 months so the Created sort visibly
+// interleaves drafts, active and paused tests when the grouping flattens
+const daysAgo = (days: number) => NOW - days * 24 * HOUR;
 
 const EVERY_DAY = { days: [0, 1, 2, 3, 4, 5, 6], time: '06:00' };
 const WEEKDAYS = { days: [1, 2, 3, 4, 5], time: '09:00' };
@@ -63,6 +66,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   // ---- drafts ----------------------------------------------------------
   {
     key: 'tc-signup',
+    createdAt: daysAgo(1),
     title: 'New sign-up flow',
     status: 'draft',
     isNew: true,
@@ -81,6 +85,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-byoc',
+    createdAt: daysAgo(2),
     title: 'BYOC setup flow',
     status: 'draft',
     isNew: true,
@@ -94,6 +99,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-reset',
+    createdAt: daysAgo(4),
     title: 'Password reset',
     status: 'draft',
     steps: [
@@ -107,6 +113,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-coupon',
+    createdAt: daysAgo(9),
     title: 'Apply coupon at checkout',
     status: 'draft',
     isNew: true,
@@ -119,6 +126,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-invite',
+    createdAt: daysAgo(13),
     title: 'Add a team member',
     status: 'draft',
     steps: [
@@ -135,6 +143,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   // demand or to be scheduled. No run history because they haven't run.
   {
     key: 'tc-export',
+    createdAt: daysAgo(3),
     title: 'Export report to CSV',
     status: 'approved',
     tags: ['Reporting'],
@@ -152,6 +161,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-2fa',
+    createdAt: daysAgo(16),
     title: 'Enable two-factor auth',
     status: 'approved',
     tags: ['Auth', 'Security'],
@@ -173,6 +183,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
     // the flow changed in real sessions → a v2 is proposed and waits for review;
     // covers all three change kinds (added / removed / updated) in one diff
     key: 'tc-checkout',
+    createdAt: daysAgo(62),
     title: 'Checkout flow',
     status: 'active',
     tags: ['Checkout'],
@@ -210,6 +221,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-login',
+    createdAt: daysAgo(88),
     title: 'Login flow',
     status: 'active',
     tags: ['Auth'],
@@ -230,6 +242,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   {
     // already revised once (v2) — shows the version label + switcher with one snapshot
     key: 'tc-search',
+    createdAt: daysAgo(45),
     title: 'Search & filter',
     status: 'active',
     tags: ['Search'],
@@ -261,6 +274,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
     // twice-revised (v3) — exercises the full version dropdown and the per-step
     // history popover (several steps changed wording across v1 → v2 → v3)
     key: 'tc-billing',
+    createdAt: daysAgo(30),
     title: 'Update billing card',
     status: 'active',
     tags: ['Billing'],
@@ -301,6 +315,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-create-project',
+    createdAt: daysAgo(6),
     title: 'Create project',
     status: 'active',
     tags: ['Projects'],
@@ -318,6 +333,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-invite-active',
+    createdAt: daysAgo(52),
     title: 'Invite teammate',
     status: 'active',
     tags: ['Settings'],
@@ -335,6 +351,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   {
     // (was a duplicate of the approved tc-2fa key — antd Table needs unique rowKeys)
     key: 'tc-2fa-active',
+    createdAt: daysAgo(24),
     title: 'Enable two-factor auth',
     status: 'active',
     tags: ['Auth'],
@@ -352,6 +369,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-invoice',
+    createdAt: daysAgo(71),
     title: 'Download invoice',
     status: 'active',
     tags: ['Billing'],
@@ -366,6 +384,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
     // v2 with ANOTHER revision pending (v3) — versioned tests keep evolving; this
     // one's diff is a single added step, so reviews aren't always multi-change
     key: 'tc-profile',
+    createdAt: daysAgo(11),
     title: 'Upload profile photo',
     status: 'active',
     tags: ['Profile'],
@@ -400,6 +419,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   // ---- paused ----------------------------------------------------------
   {
     key: 'tc-onboarding-tour',
+    createdAt: daysAgo(95),
     title: 'Onboarding tour',
     status: 'paused',
     tags: ['Onboarding'],
@@ -416,6 +436,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-bulk-export',
+    createdAt: daysAgo(58),
     title: 'Bulk data export',
     status: 'paused',
     tags: ['Settings'],
@@ -435,6 +456,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   // ---- more approved/paused tests (volume, to exercise pagination) -----
   {
     key: 'tc-logout',
+    createdAt: daysAgo(19),
     title: 'Logout flow',
     status: 'active',
     tags: ['Auth'],
@@ -447,6 +469,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-add-payment',
+    createdAt: daysAgo(27),
     title: 'Add a payment method',
     status: 'active',
     tags: ['Billing'],
@@ -459,6 +482,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-remove-item',
+    createdAt: daysAgo(34),
     title: 'Remove item from cart',
     status: 'active',
     tags: ['Checkout'],
@@ -471,6 +495,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-change-password',
+    createdAt: daysAgo(41),
     title: 'Change password',
     status: 'active',
     tags: ['Auth'],
@@ -487,6 +512,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-export-csv',
+    createdAt: daysAgo(76),
     title: 'Export report as CSV',
     status: 'paused',
     tags: ['Settings'],
@@ -499,6 +525,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-filter-dashboard',
+    createdAt: daysAgo(8),
     title: 'Filter the dashboard',
     status: 'active',
     tags: ['Search'],
@@ -515,6 +542,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-share-report',
+    createdAt: daysAgo(22),
     title: 'Share a report',
     status: 'active',
     tags: ['Settings'],
@@ -527,6 +555,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-delete-account',
+    createdAt: daysAgo(66),
     title: 'Delete account',
     status: 'paused',
     tags: ['Settings'],
@@ -539,6 +568,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-apply-theme',
+    createdAt: daysAgo(37),
     title: 'Switch to dark mode',
     status: 'active',
     tags: ['Profile'],
@@ -551,6 +581,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-resend-invite',
+    createdAt: daysAgo(49),
     title: 'Resend a team invite',
     status: 'active',
     tags: ['Settings'],
@@ -567,6 +598,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-upgrade-plan',
+    createdAt: daysAgo(83),
     title: 'Upgrade plan',
     status: 'active',
     tags: ['Billing'],
@@ -579,6 +611,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
   {
     key: 'tc-search-empty',
+    createdAt: daysAgo(15),
     title: 'Search with no results',
     status: 'active',
     tags: ['Search'],
@@ -592,6 +625,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
   {
     // a deliberately long test (50 steps) — exercises the bounded step lists
     key: 'tc-regression',
+    createdAt: daysAgo(5),
     title: 'Full regression sweep',
     status: 'active',
     tags: ['Regression'],
