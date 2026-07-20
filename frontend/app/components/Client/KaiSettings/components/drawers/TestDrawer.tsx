@@ -319,6 +319,7 @@ function TestDrawer({
       onClose={onClose}
       title={test.title}
       onTitleChange={(title) => onChange({ ...test, title })}
+      autoEditTitle={creating}
       eyebrow={
         creating
           ? `${t('Test')} · ${t('New')}`
