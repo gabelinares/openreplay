@@ -204,7 +204,8 @@ function EditableTitle({
     <Tooltip mouseEnterDelay={0.4} title={t('Click to edit')}>
       <div
         onClick={() => setEditing(true)}
-        className="group mt-1 h-8 flex items-center gap-2 min-w-0 mr-4 cursor-pointer select-none rounded-lg px-2 -mx-2 hover:bg-teal/10 transition"
+        // w-fit: the tint hugs the title + pencil instead of filling the header row
+        className="group mt-1 h-8 w-fit max-w-full flex items-center gap-2 min-w-0 mr-4 cursor-pointer select-none rounded-lg px-2 -mx-2 hover:bg-teal/10 transition"
       >
         <span className="text-xl font-semibold text-black leading-tight truncate">
           {title}

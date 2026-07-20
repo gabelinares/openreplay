@@ -1,5 +1,11 @@
-import { Button } from 'antd';
-import { ArrowLeft, ArrowRight, CalendarClock, Check } from 'lucide-react';
+import { Button, message } from 'antd';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarClock,
+  Check,
+  X,
+} from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -93,8 +99,11 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
     onChange(draft);
     onClose();
   };
+  // dismissing rejects the agent's proposal and removes it from the list — the
+  // removal announces itself (report 2.4: a silently vanishing row reads as lost)
   const dismiss = () => {
     onRemove(draft.key);
+    message.success(t('Draft dismissed'));
     onClose();
   };
   // X / mask: if the steps were approved, persist as approved (or active if scheduled)
@@ -114,8 +123,12 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
   const footer =
     step === 0 ? (
       <div className="flex items-center justify-between">
-        {/* dismiss is a quiet gray — red is reserved for Delete */}
-        <Button type="text" onClick={dismiss}>
+        {/* Dismiss removes the proposal, so it's red — but its icon is the X,
+            not the bin (Gabriel 07-20): X is this product's "reject a suggestion"
+            grammar (the per-line review reject), while the bin means deleting
+            something the user built (TestDrawer's "Delete test"). The word stays
+            "Dismiss" here and in the row menu for the same reason. */}
+        <Button type="text" danger icon={<X size={15} />} onClick={dismiss}>
           {t('Dismiss')}
         </Button>
         <div className="flex items-center gap-2">
