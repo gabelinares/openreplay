@@ -69,8 +69,10 @@ function Environments({ environments, setEnvironments }: Props) {
       okText: toPause.length ? t('Pause tests & delete') : t('Delete'),
       okButtonProps: { danger: true },
       cancelText: t('Cancel'),
-      width: 480,
-      centered: true,
+      // the app's dialog look (Gabriel 07-21) — no exclamation icon, default
+      // width/position, same as the Issues Hide modal and shared/confirms
+      icon: null,
+      width: 520,
       content: (
         <div className="flex flex-col gap-4 py-2">
           {toPause.length > 0 ? (

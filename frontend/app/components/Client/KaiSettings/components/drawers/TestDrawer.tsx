@@ -1,4 +1,4 @@
-import { Button, Dropdown, Modal, Popconfirm, Tooltip, message } from 'antd';
+import { Button, Dropdown, Modal, Tooltip, message } from 'antd';
 import {
   Check,
   CheckCheck,
@@ -14,6 +14,7 @@ import {
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { confirmDelete } from '../shared/confirms';
 import { MOCK_RUNS } from '../shared/mockData';
 import {
   StepItem,
@@ -462,17 +463,16 @@ function TestDrawer({
           // Save is the primary action (Mehdi 07-20; there was no Save before) —
           // Run now rides second and commits pending edits before running
           <div className="flex items-center justify-between">
-            <Popconfirm
-              title={t('Delete this test?')}
-              okText={t('Delete')}
-              okButtonProps={{ danger: true }}
-              cancelText={t('Cancel')}
-              onConfirm={remove}
+            <Button
+              type="text"
+              danger
+              icon={<Trash2 size={15} />}
+              onClick={() =>
+                confirmDelete({ what: t('test'), name: view.title, onOk: remove })
+              }
             >
-              <Button type="text" danger icon={<Trash2 size={15} />}>
-                {t('Delete test')}
-              </Button>
-            </Popconfirm>
+              {t('Delete test')}
+            </Button>
             <div className="flex items-center gap-2">
               <Tooltip
                 title={dirty ? t('Saves your changes, then runs') : undefined}

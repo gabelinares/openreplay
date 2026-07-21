@@ -524,11 +524,11 @@ function TestsTab() {
         else if (key === 'pause') updateTest({ ...tc, status: 'paused' });
         else if (key === 'resume') updateTest({ ...tc, status: 'active' });
         else if (key === 'dismiss')
-          // the reason is agent food — the mock discards it, production sends it
-          confirmDismissSuggestion(() => removeTest(tc.key));
+          confirmDismissSuggestion(tc.title, () => removeTest(tc.key));
         else if (key === 'delete')
           confirmDelete({
             what: tc.status === 'draft' ? t('draft') : t('test'),
+            name: tc.title,
             consequence: tc.pendingMerge
               ? t('The absorbed tests will be restored to your list.')
               : undefined,
