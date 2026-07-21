@@ -11,6 +11,7 @@ import {
   User,
   Search,
   Play,
+  Split,
 } from 'lucide-react';
 import {
   MoreOutlined,
@@ -718,7 +719,9 @@ function IssueSessionPlayer() {
     (i.sessionIds ?? []).includes(sessionId),
   );
   const card: IssueSessionCard | undefined = issue
-    ? issuesStore.exampleSessions(issue).find((c) => c.sessionId === sessionId)
+    ? issuesStore
+        .exampleSessions(issue, { ignoreScope: true })
+        .find((c) => c.sessionId === sessionId)
     : undefined;
 
   // user metadata — customer-defined, can be many; shown as wrapping pills in
@@ -1248,6 +1251,22 @@ function IssueSessionPlayer() {
                   >
                     {card.variation}
                   </span>
+                  {/* which segments THIS session matches (Mehdi 07-20) —
+                      computed from segment conditions over the shared pool */}
+                  {issuesStore.sessionSegments(sessionId).length > 0 && (
+                    <div
+                      className="flex items-center gap-x-2 gap-y-1 flex-wrap text-sm"
+                      style={{ color: 'var(--color-gray-medium)' }}
+                    >
+                      {issuesStore.sessionSegments(sessionId).map((seg, i) => (
+                        <span key={seg.id} className="inline-flex items-center gap-1.5">
+                          {i > 0 && <span style={{ color: 'var(--color-gray-light)' }}>·</span>}
+                          <Split size={12} />
+                          {seg.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
