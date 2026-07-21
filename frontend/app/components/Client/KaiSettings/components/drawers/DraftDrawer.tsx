@@ -1,14 +1,16 @@
-import { Button, Popconfirm, Tooltip, message } from 'antd';
+import { Button, Popconfirm, Tooltip } from 'antd';
 import {
   ArrowLeft,
   ArrowRight,
   CalendarClock,
   Check,
+  Trash2,
   X,
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { confirmDismissSuggestion } from '../shared/confirms';
 import { kaiStore } from '../shared/store';
 import { TestCase } from '../shared/types';
 import { isScheduled } from '../shared/utils';
@@ -99,12 +101,21 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
     onChange(draft);
     onClose();
   };
-  // Dismiss NEVER deletes (Mehdi 07-20): it sets the proposal aside — the draft
-  // stays in the list with its "new" dot cleared, un-touched by any edits made
-  // here. Deleting is a separate act (row menu). Applies to duplicates AND
-  // agent proposals alike; one word, one behavior.
-  const dismiss = () => {
-    if (test) onChange({ ...test, isNew: false });
+  // The reject grammar (Gabriel 07-21, refining Mehdi 07-20): a SUGGESTION
+  // (agent draft) gets Dismiss — red, confirmed, optional reason the agent can
+  // learn from — and dismissing removes it. YOUR draft (duplicate, manual)
+  // never shows Dismiss at all; it gets Delete. The 07-20 accident (a
+  // duplicate silently deleted by "Dismiss") is impossible because the word
+  // doesn't exist in that context anymore.
+  const mine = draft.origin === 'user';
+  const dismiss = () =>
+    // the reason is agent food — the mock discards it, production sends it
+    confirmDismissSuggestion(() => {
+      onRemove(draft.key);
+      onClose();
+    });
+  const deleteDraft = () => {
+    onRemove(draft.key);
     onClose();
   };
   // X / mask: if the steps were approved, persist as approved (or active if scheduled)
@@ -124,22 +135,26 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
   const footer =
     step === 0 ? (
       <div className="flex items-center justify-between">
-        {/* Dismiss keeps the draft (Mehdi 07-20), so it's quiet gray — red is
-            reserved for Delete. The X icon stays: it's this product's
-            "set a suggestion aside" grammar (the per-line review reject),
-            while the bin means deleting something the user built. */}
-        {/* confirmed like every other consequential action (Gabriel 07-21) */}
-        <Popconfirm
-          title={t('Dismiss this draft?')}
-          description={t('It stays in your list — approve or delete it anytime.')}
-          okText={t('Dismiss')}
-          cancelText={t('Cancel')}
-          onConfirm={dismiss}
-        >
-          <Button type="text" icon={<X size={15} />}>
+        {/* X = reject a suggestion, bin = delete your work — never both.
+            Both are red (something goes away) and both confirm; Dismiss's
+            confirm carries the optional agent-learning reason. */}
+        {mine ? (
+          <Popconfirm
+            title={t('Delete this draft?')}
+            okText={t('Delete')}
+            okButtonProps={{ danger: true }}
+            cancelText={t('Cancel')}
+            onConfirm={deleteDraft}
+          >
+            <Button type="text" danger icon={<Trash2 size={15} />}>
+              {t('Delete draft')}
+            </Button>
+          </Popconfirm>
+        ) : (
+          <Button type="text" danger icon={<X size={15} />} onClick={dismiss}>
             {t('Dismiss')}
           </Button>
-        </Popconfirm>
+        )}
         <div className="flex items-center gap-2">
           <Button onClick={saveDraft}>{t('Save draft')}</Button>
           <Button

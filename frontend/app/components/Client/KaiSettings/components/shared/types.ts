@@ -117,6 +117,10 @@ export interface TestCase {
   status: TestLifecycle;
   /** when the test (or draft) appeared — the Created column and its sort */
   createdAt?: number; // epoch ms
+  /** who made it: the agent proposes drafts, people make their own (manual,
+   *  duplicate). Gates the reject grammar — you DISMISS a suggestion, you
+   *  DELETE your work. undefined reads as 'agent' (the seeded proposals). */
+  origin?: 'agent' | 'user';
   // an unreviewed draft the user hasn't opened yet — drives the "new" dot in the table
   isNew?: boolean;
   // a test can target a matrix of environments / resolutions / regions; each run

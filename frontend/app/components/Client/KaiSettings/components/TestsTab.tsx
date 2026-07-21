@@ -20,6 +20,7 @@ import { Pagination } from 'UI';
 
 import DraftDrawer from './drawers/DraftDrawer';
 import TestDrawer from './drawers/TestDrawer';
+import { confirmDelete, confirmDismissSuggestion } from './shared/confirms';
 import './kai-table.css';
 import { needsReview } from './shared/revisions';
 import { hasNoEnvironment, kaiStore, useKaiStore } from './shared/store';
@@ -125,6 +126,7 @@ function TestsTab() {
       key: `test-manual-${(manualCounter += 1)}-${Date.now()}`,
       title: t('Untitled test'),
       createdAt: Date.now(),
+      origin: 'user',
       steps: [],
       status: 'approved',
       schedule: null,
@@ -163,6 +165,7 @@ function TestsTab() {
         steps: [...tc.steps],
         status: 'draft',
         createdAt: Date.now(),
+        origin: 'user',
         isNew: true,
       };
       setTests((prev) => [copy, ...prev]);
@@ -280,7 +283,17 @@ function TestsTab() {
         tc.status === 'paused' && !hasNoEnvironment(tc) && !tc.pendingMerge,
       { status: 'active' },
     );
-  const deleteSelected = () => removeMany(selectedKeys);
+  const deleteSelected = () =>
+    confirmDelete({
+      what:
+        selectedKeys.length === 1
+          ? t('test')
+          : `${selectedKeys.length} ${t('tests')}`,
+      consequence: selected.some((tc) => tc.pendingMerge)
+        ? t('Tests absorbed by a pending merge will be restored to your list.')
+        : undefined,
+      onOk: () => removeMany(selectedKeys),
+    });
 
   // ---- merge (Mehdi 07-13): combine tests, steps arrive as groups -------
   // Base = FIRST selected: the merged test keeps its name, settings, tags,
@@ -427,14 +440,16 @@ function TestsTab() {
         { key: 'delete', label: t('Delete'), danger: true },
       ];
     } else if (tc.status === 'draft') {
-      // Dismiss keeps the draft (Mehdi 07-20) — it just clears the "new" dot,
-      // so it's quiet; Delete is the destructive one
+      // the reject grammar (Gabriel 07-21): a SUGGESTION gets Dismiss (red,
+      // confirmed, optional reason for the agent); YOUR draft gets Delete.
+      // Never both — that ambiguity is what got Mehdi's duplicate deleted.
       items = [
         { key: 'open', label: t('Review draft') },
         { key: 'merge', label: t('Merge with…') },
-        ...(tc.isNew ? [{ key: 'dismiss', label: t('Dismiss') }] : []),
         { type: 'divider' as const },
-        { key: 'delete', label: t('Delete'), danger: true },
+        tc.origin === 'user'
+          ? { key: 'delete', label: t('Delete'), danger: true }
+          : { key: 'dismiss', label: t('Dismiss'), danger: true },
       ];
     } else if (needsReview(tc) && pauseOnRevision) {
       // pause-on-revision: the run controls are suspended — reviewing is the only
@@ -508,11 +523,17 @@ function TestsTab() {
         }
         else if (key === 'pause') updateTest({ ...tc, status: 'paused' });
         else if (key === 'resume') updateTest({ ...tc, status: 'active' });
-        else if (key === 'dismiss') {
-          // Dismiss keeps the draft (Mehdi 07-20) — clears the "new" dot only
-          updateTest({ ...tc, isNew: false });
-          message.info(t('Draft kept in your list — approve or delete it anytime.'));
-        } else if (key === 'delete') removeTest(tc.key);
+        else if (key === 'dismiss')
+          // the reason is agent food — the mock discards it, production sends it
+          confirmDismissSuggestion(() => removeTest(tc.key));
+        else if (key === 'delete')
+          confirmDelete({
+            what: tc.status === 'draft' ? t('draft') : t('test'),
+            consequence: tc.pendingMerge
+              ? t('The absorbed tests will be restored to your list.')
+              : undefined,
+            onOk: () => removeTest(tc.key),
+          });
       },
     };
   };
