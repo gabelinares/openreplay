@@ -55,3 +55,20 @@ No git auto-deploy on either — deploys are always manual:
 Flow: feature branch → `yarn deploy:design` → Mehdi approves → merge PR →
 `yarn deploy:main`. No long-lived design branch — the feature branch itself is
 the WIP source; throwaway integration branch only if two batches must demo together.
+
+## UI consistency rules (Gabriel, 2026-07-21 — non-negotiable)
+
+The agent features graduate into a standalone product (Wrangler/Melanade), so
+everything must be built as reusable, theme-driven components:
+
+1. **NEVER call antd statics for themed UI** — `Modal.confirm`, `Modal.info`,
+   etc. mount OUTSIDE the `ConfigProvider` in `app/initialize.tsx` and silently
+   drop the app theme (corner radius, fonts, colors). Always use
+   `App.useApp()`'s `modal` (the tree is wrapped in antd `<App>`).
+2. **One dialog component, not per-callsite markup.** Confirms live in
+   `KaiSettings/components/shared/confirms.tsx` (`useConfirms()`); add new
+   confirm flavors THERE. The look reference is the Issues Hide modal: no
+   exclamation icon, default width/position, subject quoted in a gray body line.
+3. **Before building any new UI element, look for the existing component**
+   (in Kai shared/, Issues, or the app's UI kit) and reuse or extend it.
+   A lookalike rebuilt inline is a bug even when it renders identically today.
