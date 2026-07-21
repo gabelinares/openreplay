@@ -1,9 +1,9 @@
 import {
+  App,
   Badge,
   Button,
   Dropdown,
   Input,
-  Modal,
   Segmented,
   Select,
   Table,
@@ -20,7 +20,7 @@ import { Pagination } from 'UI';
 
 import DraftDrawer from './drawers/DraftDrawer';
 import TestDrawer from './drawers/TestDrawer';
-import { confirmDelete, confirmDismissSuggestion } from './shared/confirms';
+import { useConfirms } from './shared/confirms';
 import './kai-table.css';
 import { needsReview } from './shared/revisions';
 import { hasNoEnvironment, kaiStore, useKaiStore } from './shared/store';
@@ -55,6 +55,8 @@ function TestsTab() {
   // suspends the run controls, or the test keeps running while the review waits.
   const { tests, pauseOnRevision } = useKaiStore();
   const { setTests } = kaiStore;
+  const { confirmDelete, confirmDismissSuggestion } = useConfirms();
+  const { modal } = App.useApp();
   const statusOf = (tc: TestCase) => displayStatus(tc, pauseOnRevision);
   const [query, setQuery] = useState('');
   const [statusTab, setStatusTab] = useState<StatusTab>('all');
@@ -331,7 +333,9 @@ function TestsTab() {
       .filter(Boolean) as TestCase[];
     if (sel.length < 2) return;
     const [base, ...rest] = sel;
-    Modal.confirm({
+    modal.confirm({
+      icon: null,
+      width: 520,
       title: t('Merge {{n}} tests into “{{name}}”?', {
         n: sel.length,
         name: base.title,

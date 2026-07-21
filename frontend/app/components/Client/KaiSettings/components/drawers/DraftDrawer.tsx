@@ -10,7 +10,7 @@ import {
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { confirmDelete, confirmDismissSuggestion } from '../shared/confirms';
+import { useConfirms } from '../shared/confirms';
 import { kaiStore } from '../shared/store';
 import { TestCase } from '../shared/types';
 import { isScheduled } from '../shared/utils';
@@ -36,6 +36,7 @@ type WizStep = 0 | 1 | 2;
  *  after approving — in which case it lands as "approved"). */
 function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
   const { t } = useTranslation();
+  const { confirmDelete, confirmDismissSuggestion } = useConfirms();
   const [draft, setDraft] = useState<TestCase | null>(test);
   const [step, setStep] = useState<WizStep>(0);
   // true once the user has clicked "Approve steps" — closing now keeps it approved
