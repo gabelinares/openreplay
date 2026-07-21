@@ -1,59 +1,64 @@
-import { Input, Modal } from 'antd';
+import { Modal, type ModalFuncProps } from 'antd';
 import i18next from 'i18next';
 import React from 'react';
 
 const t = i18next.t.bind(i18next);
 
-/* One question, one wording, wherever an action fires (Gabriel 07-21).
-   Dropdown menus close on click, so anchored Popconfirms can't live there —
-   these centered modals carry the SAME copy a drawer's Popconfirm uses, so
-   the user always meets the same question.
+/* One question, one wording, ONE look wherever an action fires (Gabriel
+   07-21). The look is the app's dialog grammar — the Issues Hide modal:
+   a standard dialog (no exclamation icon, default width), the subject
+   quoted in a gray body line. Used from drawers AND row menus, so every
+   destructive confirm is the same centered dialog.
 
-   The grammar (approved 07-21):
-   · you DISMISS a suggestion (agent-proposed draft) — red, confirmed, with an
-     optional reason the agent can learn from (same pattern as the Issues
-     "Mark as not critical" and Hide reason modals);
-   · you DELETE your own work (tests, user drafts) — red, confirmed, no reason. */
+   The grammar: you DISMISS a suggestion (agent-proposed draft) — red,
+   confirmed, no reason (Gabriel 07-21 round 2: reason dropped); you DELETE
+   your own work (tests, user drafts). */
 
-export const confirmDismissSuggestion = (onOk: (reason: string) => void) => {
-  // uncontrolled on purpose: Modal.confirm re-renders nothing, the closure
-  // carries the reason out
-  let reason = '';
+const LOOK: ModalFuncProps = { icon: null, width: 520 };
+
+const body = (text: string) => (
+  <p className="mb-0" style={{ color: 'var(--color-gray-dark)' }}>
+    {text}
+  </p>
+);
+
+export const confirmDismissSuggestion = (title: string, onOk: () => void) =>
   Modal.confirm({
+    ...LOOK,
     title: t('Dismiss this suggestion?'),
-    content: (
-      <div className="flex flex-col gap-2">
-        <span>{t('It will be removed from your tests.')}</span>
-        <Input.TextArea
-          rows={2}
-          maxLength={200}
-          placeholder={t('Tell the agent why (optional)')}
-          onChange={(e) => {
-            reason = e.target.value;
-          }}
-        />
-      </div>
+    content: body(
+      t('“{{title}}” will be removed from your tests.', { title }),
     ),
     okText: t('Dismiss'),
     okButtonProps: { danger: true },
     cancelText: t('Cancel'),
-    onOk: () => onOk(reason.trim()),
+    onOk,
   });
-};
 
 export const confirmDelete = (opts: {
   /** "test" | "draft" | "3 tests" — slots into the title */
   what: string;
-  /** extra line when the deletion has side effects worth naming */
+  /** the item's name, quoted in the body like the Hide modal quotes the issue */
+  name?: string;
+  /** extra sentence when the deletion has side effects worth naming */
   consequence?: string;
   onOk: () => void;
 }) => {
+  const line = [
+    opts.name
+      ? t('“{{name}}” will be deleted.', { name: opts.name })
+      : undefined,
+    opts.consequence,
+  ]
+    .filter(Boolean)
+    .join(' ');
   Modal.confirm({
+    ...LOOK,
     // "Delete this test?" vs bulk "Delete 3 tests?"
     title: /^\d/.test(opts.what)
       ? t('Delete {{what}}?', { what: opts.what })
       : t('Delete this {{what}}?', { what: opts.what }),
-    content: opts.consequence,
+    content: line ? body(line) : undefined,
     okText: t('Delete'),
     okButtonProps: { danger: true },
     cancelText: t('Cancel'),

@@ -1,4 +1,4 @@
-import { Button, Popconfirm, Tooltip } from 'antd';
+import { Button, Tooltip } from 'antd';
 import {
   ArrowLeft,
   ArrowRight,
@@ -10,7 +10,7 @@ import {
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { confirmDismissSuggestion } from '../shared/confirms';
+import { confirmDelete, confirmDismissSuggestion } from '../shared/confirms';
 import { kaiStore } from '../shared/store';
 import { TestCase } from '../shared/types';
 import { isScheduled } from '../shared/utils';
@@ -102,22 +102,25 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
     onClose();
   };
   // The reject grammar (Gabriel 07-21, refining Mehdi 07-20): a SUGGESTION
-  // (agent draft) gets Dismiss — red, confirmed, optional reason the agent can
-  // learn from — and dismissing removes it. YOUR draft (duplicate, manual)
-  // never shows Dismiss at all; it gets Delete. The 07-20 accident (a
-  // duplicate silently deleted by "Dismiss") is impossible because the word
-  // doesn't exist in that context anymore.
+  // (agent draft) gets Dismiss — red, confirmed — and dismissing removes it.
+  // YOUR draft (duplicate, manual) never shows Dismiss at all; it gets
+  // Delete. The 07-20 accident (a duplicate silently deleted by "Dismiss")
+  // is impossible because the word doesn't exist in that context anymore.
   const mine = draft.origin === 'user';
   const dismiss = () =>
-    // the reason is agent food — the mock discards it, production sends it
-    confirmDismissSuggestion(() => {
+    confirmDismissSuggestion(draft.title, () => {
       onRemove(draft.key);
       onClose();
     });
-  const deleteDraft = () => {
-    onRemove(draft.key);
-    onClose();
-  };
+  const deleteDraft = () =>
+    confirmDelete({
+      what: t('draft'),
+      name: draft.title,
+      onOk: () => {
+        onRemove(draft.key);
+        onClose();
+      },
+    });
   // X / mask: if the steps were approved, persist as approved (or active if scheduled)
   const handleClose = () => {
     if (approved) finalize();
@@ -139,17 +142,14 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
             Both are red (something goes away) and both confirm; Dismiss's
             confirm carries the optional agent-learning reason. */}
         {mine ? (
-          <Popconfirm
-            title={t('Delete this draft?')}
-            okText={t('Delete')}
-            okButtonProps={{ danger: true }}
-            cancelText={t('Cancel')}
-            onConfirm={deleteDraft}
+          <Button
+            type="text"
+            danger
+            icon={<Trash2 size={15} />}
+            onClick={deleteDraft}
           >
-            <Button type="text" danger icon={<Trash2 size={15} />}>
-              {t('Delete draft')}
-            </Button>
-          </Popconfirm>
+            {t('Delete draft')}
+          </Button>
         ) : (
           <Button type="text" danger icon={<X size={15} />} onClick={dismiss}>
             {t('Dismiss')}
