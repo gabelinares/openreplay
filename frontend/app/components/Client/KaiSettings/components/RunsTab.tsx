@@ -70,6 +70,9 @@ function RunsTab() {
   const [tagFilter, setTagFilter] = useState('all');
   const [resFilter, setResFilter] = useState('all');
   const [regionFilter, setRegionFilter] = useState('all');
+  // period filter (Mehdi 07-20): useful HERE, not on Tests — recent runs are
+  // what you check; defaults to the last 7 days, not all time
+  const [period, setPeriod] = useState<'24h' | '7d' | '30d' | 'all'>('7d');
   const [page, setPage] = useState(1);
   const [openKey, setOpenKey] = useState<string | null>(null);
 
@@ -119,8 +122,15 @@ function RunsTab() {
       arr = arr.filter((r) => (r.resolution ?? 'desktop') === resFilter);
     if (regionFilter !== 'all')
       arr = arr.filter((r) => r.region === regionFilter);
+    if (period !== 'all') {
+      const HOUR = 3600000;
+      const cutoff =
+        Date.now() -
+        (period === '24h' ? 24 : period === '7d' ? 7 * 24 : 30 * 24) * HOUR;
+      arr = arr.filter((r) => r.date >= cutoff);
+    }
     return arr;
-  }, [query, statusTab, envFilter, tagFilter, resFilter, regionFilter]);
+  }, [query, statusTab, envFilter, tagFilter, resFilter, regionFilter, period]);
 
   const pageItems = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const rangeStart = visible.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -244,8 +254,10 @@ function RunsTab() {
       dataIndex: 'actions',
       width: 64,
       align: 'right',
+      // Rerun on FAILED runs only (Mehdi 07-20) — rerunning a pass has no
+      // purpose, the icon was noise on every row
       render: (_: unknown, run) =>
-        run.status === 'running' ? null : (
+        run.status !== 'failed' ? null : (
           <Tooltip title={t('Rerun')}>
             <Button
               type="text"
@@ -263,23 +275,27 @@ function RunsTab() {
 
   return (
     <div className="flex flex-col">
-      {/* controls bar — status tabs (left) + search & filters (right) */}
+      {/* controls bar — status tabs + search up front (left), filters trail
+          (right; same arrangement as Tests). Search moved out of the filter
+          cluster and got wider (Mehdi 07-20: the row was full of stuff). */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap">
-        <Segmented
-          size="small"
-          value={statusTab}
-          onChange={(v) => setStatusTab(v as StatusTab)}
-          options={statusOptions}
-        />
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Segmented
+            size="small"
+            value={statusTab}
+            onChange={(v) => setStatusTab(v as StatusTab)}
+            options={statusOptions}
+          />
           <Input.Search
             size="small"
             allowClear
             placeholder={t('Search runs')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            style={{ width: 170 }}
+            style={{ width: 220 }}
           />
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
           <Select
             size="small"
             value={envFilter}
@@ -324,6 +340,18 @@ function RunsTab() {
                 value: o.value,
                 label: o.label,
               })),
+            ]}
+          />
+          <Select
+            size="small"
+            value={period}
+            onChange={setPeriod}
+            style={{ width: 140 }}
+            options={[
+              { value: '24h', label: t('Last 24 hours') },
+              { value: '7d', label: t('Last 7 days') },
+              { value: '30d', label: t('Last 30 days') },
+              { value: 'all', label: t('All time') },
             ]}
           />
         </div>

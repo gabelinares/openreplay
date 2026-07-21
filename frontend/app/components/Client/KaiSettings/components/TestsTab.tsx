@@ -152,17 +152,23 @@ function TestsTab() {
 
   // Duplicate (row ellipsis): copies the steps only — no environment, schedule or
   // tags travel with it — and lands as a draft at v1, floating to the top.
+  // The brief pending toast models the async contract for production (report
+  // 2.5): the action acknowledges immediately, the row lands with a confirm.
   const duplicateTest = (tc: TestCase) => {
-    const copy: TestCase = {
-      key: `test-copy-${(manualCounter += 1)}-${Date.now()}`,
-      title: `${tc.title} (copy)`,
-      steps: [...tc.steps],
-      status: 'draft',
-      createdAt: Date.now(),
-      isNew: true,
-    };
-    setTests((prev) => [copy, ...prev]);
-    message.success(t('Duplicated as a draft'));
+    const hide = message.loading(t('Duplicating…'), 0);
+    window.setTimeout(() => {
+      const copy: TestCase = {
+        key: `test-copy-${(manualCounter += 1)}-${Date.now()}`,
+        title: `${tc.title} (copy)`,
+        steps: [...tc.steps],
+        status: 'draft',
+        createdAt: Date.now(),
+        isNew: true,
+      };
+      setTests((prev) => [copy, ...prev]);
+      hide();
+      message.success(t('Duplicated as a draft'));
+    }, 450);
   };
 
   const openTest = tests.find((tc) => tc.key === openKey) ?? null;
@@ -421,11 +427,14 @@ function TestsTab() {
         { key: 'delete', label: t('Delete'), danger: true },
       ];
     } else if (tc.status === 'draft') {
+      // Dismiss keeps the draft (Mehdi 07-20) — it just clears the "new" dot,
+      // so it's quiet; Delete is the destructive one
       items = [
         { key: 'open', label: t('Review draft') },
         { key: 'merge', label: t('Merge with…') },
+        ...(tc.isNew ? [{ key: 'dismiss', label: t('Dismiss') }] : []),
         { type: 'divider' as const },
-        { key: 'dismiss', label: t('Dismiss'), danger: true },
+        { key: 'delete', label: t('Delete'), danger: true },
       ];
     } else if (needsReview(tc) && pauseOnRevision) {
       // pause-on-revision: the run controls are suspended — reviewing is the only
@@ -500,10 +509,9 @@ function TestsTab() {
         else if (key === 'pause') updateTest({ ...tc, status: 'paused' });
         else if (key === 'resume') updateTest({ ...tc, status: 'active' });
         else if (key === 'dismiss') {
-          // same announcement as the drawer's Dismiss — a row that vanishes
-          // silently reads as lost (report 2.4)
-          removeTest(tc.key);
-          message.success(t('Draft dismissed'));
+          // Dismiss keeps the draft (Mehdi 07-20) — clears the "new" dot only
+          updateTest({ ...tc, isNew: false });
+          message.info(t('Draft kept in your list — approve or delete it anytime.'));
         } else if (key === 'delete') removeTest(tc.key);
       },
     };
@@ -702,14 +710,26 @@ function TestsTab() {
 
   return (
     <div className="flex flex-col">
-      {/* controls bar — status tabs (left) + search & filters (right) */}
+      {/* controls bar — status tabs + search up front (left), filters trail
+          (right). Search rides with the primary controls, wider (Mehdi 07-20:
+          the filter cluster was getting crowded; same arrangement as Runs). */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap">
-        <Segmented
-          size="small"
-          value={statusTab}
-          onChange={(v) => setStatusTab(v as StatusTab)}
-          options={statusOptions}
-        />
+        <div className="flex items-center gap-2">
+          <Segmented
+            size="small"
+            value={statusTab}
+            onChange={(v) => setStatusTab(v as StatusTab)}
+            options={statusOptions}
+          />
+          <Input.Search
+            size="small"
+            allowClear
+            placeholder={t('Search tests')}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ width: 220 }}
+          />
+        </div>
         {/* selecting rows swaps the filters out for bulk actions — same row, no
             extra banner; each button carries the count it will affect */}
         {selectedKeys.length > 0 ? (
@@ -758,14 +778,6 @@ function TestsTab() {
           </div>
         ) : (
           <div className="flex items-center gap-2 flex-wrap">
-            <Input.Search
-              size="small"
-              allowClear
-              placeholder={t('Search tests')}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              style={{ width: 170 }}
-            />
             <Select
               size="small"
               value={envFilter}

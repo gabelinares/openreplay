@@ -953,7 +953,8 @@ export const MOCK_RUNS: RunData[] = [
   {
     key: 'r6',
     testName: 'Checkout flow',
-    date: ago(30),
+    // beyond the Runs default period (last 7 days) — visible via "All time"
+    date: daysAgo(12),
     duration: 2400,
     status: 'passed',
     envName: 'Production',
@@ -969,7 +970,8 @@ export const MOCK_RUNS: RunData[] = [
   {
     key: 'r7',
     testName: 'Login flow',
-    date: ago(31),
+    // beyond the Runs default period (last 7 days) — visible via "All time"
+    date: daysAgo(20),
     duration: 1900,
     status: 'passed',
     envName: 'QA',
