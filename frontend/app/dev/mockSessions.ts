@@ -266,6 +266,16 @@ function matchNumber(n: number, f: any): boolean {
   }
 }
 
+/** does one pool session match a segment's seeds? (segment membership — the
+    issue page's "Found in" chips and scope filter, the player's chips) */
+export function sessionMatchesSeeds(
+  sessionId: string,
+  seeds: any[],
+): boolean {
+  const seed = MOCK_SESSION_POOL.find((s) => s.sessionId === sessionId);
+  return !!seed && seeds.every((f: any) => matchFilter(seed, f));
+}
+
 function matchFilter(seed: MockSessionSeed, f: any): boolean {
   if (!f || !f.name) return true;
   const values = cleanValues(f.value);

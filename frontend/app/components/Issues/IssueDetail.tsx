@@ -42,6 +42,11 @@ import {
   JOURNEY_SEARCH_SUGGESTIONS,
 } from 'App/mstore/issuesStore';
 import ProblemCard, { ReasonChip } from './ProblemCard';
+import {
+  FoundInChips,
+  SegmentScopeFilter,
+  syncScopeToUrl,
+} from './segments/SegmentScope';
 import { MOCK_THUMB } from './mockThumb';
 
 /* Issue detail — the intermediary page, built from real app primitives to keep
@@ -485,6 +490,24 @@ function IssueDetail() {
   const [visibleCount, setVisibleCount] = React.useState(3);
   const searchTimer = React.useRef<number | undefined>(undefined);
 
+  // segment scope arrival (Mehdi 07-20): a shared URL (?seg=) wins; otherwise
+  // the list's "found in" filter propagates in — removable here either way.
+  React.useEffect(() => {
+    const seg = new URLSearchParams(window.location.search).get('seg');
+    if (seg) {
+      issuesStore.setDetailScope(
+        seg.split(',').map(Number).filter((n) => Number.isFinite(n) && n > 0),
+      );
+    } else {
+      const fromList = issuesStore.origins.filter(
+        (o): o is number => o !== 'full',
+      );
+      issuesStore.setDetailScope(fromList);
+      syncScopeToUrl(issuesStore.detailScope);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [issue?.id]);
+
   const back = () => history.push(withSiteId(issuesRoute(), siteId));
   const openReplay = (s: IssueSessionCard) =>
     history.push(withSiteId(issueSessionRoute(s.sessionId), siteId));
@@ -587,6 +610,7 @@ function IssueDetail() {
 
       {/* issue card: title + actions header, full-width divider, then the rest */}
       <div className="rounded-lg border bg-white">
+        {/* "Found in" rides the card, under the meta (Gabriel 07-21: chips row) */}
         <ProblemCard
           framed
           issue={issue}
@@ -637,6 +661,9 @@ function IssueDetail() {
             </>
           }
         />
+        <div className="px-5 pb-4 -mt-1">
+          <FoundInChips issue={issue} />
+        </div>
       </div>
 
       {/* example sessions — a rotating sample (not the full set) + NL journey search */}
@@ -650,8 +677,11 @@ function IssueDetail() {
               <Info size={15} style={{ color: 'var(--color-gray-medium)' }} />
             </Tooltip>
           </div>
-          {/* no refresh button — "Load more" covers picking up other examples */}
-          <AutoComplete
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* sessions-only scope (Gabriel 07-21): headline stats stay global */}
+            <SegmentScopeFilter issue={issue} />
+            {/* no refresh button — "Load more" covers picking up other examples */}
+            <AutoComplete
             value={query}
             onChange={(v) => setQuery(v)}
             options={suggestions}
@@ -667,7 +697,8 @@ function IssueDetail() {
               placeholder="Describe the journey to find…"
               onSearch={runSearch}
             />
-          </AutoComplete>
+            </AutoComplete>
+          </div>
         </div>
 
         {searching ? (
@@ -686,10 +717,28 @@ function IssueDetail() {
           </div>
         ) : sessions.length === 0 ? (
           <div
-            className="p-6 text-center rounded-lg border bg-white text-sm"
+            className="p-6 text-center rounded-lg border bg-white text-sm flex flex-col items-center gap-2"
             style={{ color: 'var(--color-gray-medium)' }}
           >
-            No example sessions.
+            {issuesStore.detailScope.length > 0 ? (
+              <>
+                <span>
+                  No sampled sessions match the selected{' '}
+                  {issuesStore.detailScope.length === 1 ? 'segment' : 'segments'}.
+                </span>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    issuesStore.clearDetailScope();
+                    syncScopeToUrl([]);
+                  }}
+                >
+                  Clear segment filter
+                </Button>
+              </>
+            ) : (
+              'No example sessions.'
+            )}
           </div>
         ) : (
           <>
@@ -700,6 +749,16 @@ function IssueDetail() {
               <Typography.Text type="secondary" className="text-sm">
                 Sample of {issuesStore.journeyMatchTotal(issue)} matching
                 sessions
+                {issuesStore.detailScope.length > 0 && (
+                  <>
+                    {' '}
+                    · shown for{' '}
+                    {issuesStore.detailScope
+                      .map((id) => issuesStore.segmentById(id)?.name)
+                      .filter(Boolean)
+                      .join(', ')}
+                  </>
+                )}
               </Typography.Text>
               <div className="flex justify-center">
                 {canLoadMore && (

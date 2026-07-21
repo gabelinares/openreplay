@@ -20,7 +20,7 @@ import type { IssueOrigin } from 'App/mstore/issuesStore';
    and the rows even wear it as a chip in the Tags column. Display stays
    visibility-only. */
 
-function CheckRow({
+export function CheckRow({
   on,
   onClick,
   icon,
