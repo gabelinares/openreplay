@@ -1,4 +1,4 @@
-import { Button, Dropdown, Popconfirm, Tooltip, message } from 'antd';
+import { Button, Dropdown, Modal, Popconfirm, Tooltip, message } from 'antd';
 import {
   Check,
   CheckCheck,
@@ -58,10 +58,14 @@ interface Props {
   onCancelMerge?: (tc: TestCase) => void;
 }
 
-/** A live, approved test. Single-column control panel; the row's actions live in the
- *  header (Run now / Pause) next to the close icon, Delete sits in the footer danger
- *  zone. Edits persist live. Statuses: approved (no schedule) · active (scheduled) ·
- *  paused. Adding a schedule activates the test; clearing it returns to approved. */
+/** A live, approved test. Single-column control panel. Save is the drawer's PRIMARY
+ *  action (Mehdi 07-20) — plain edits (title, steps, run settings, tags) buffer
+ *  locally and commit on Save; Run now rides second in the footer and commits
+ *  pending edits before running. Pause/Resume stays an immediate header control.
+ *  Special modes (creating, merge review, revision review, old-version view) keep
+ *  their own commit actions and don't buffer. Statuses: approved (no schedule) ·
+ *  active (scheduled) · paused. A schedule activates the test; clearing it returns
+ *  to approved — resolved when the buffer saves. */
 function TestDrawer({
   test,
   open,
@@ -91,7 +95,11 @@ function TestDrawer({
   // under a draggable group label — full editing (add/remove/rename/drag)
   // stays available; the labels drop away when the merge is accepted
   const [mergeItems, setMergeItems] = useState<StepItem[] | null>(null);
+  // the Save-primary buffer: plain edits land here and commit on Save (null =
+  // no pending edits, render the live test)
+  const [pending, setPending] = useState<TestCase | null>(null);
   useEffect(() => {
+    setPending(null);
     setReviewItems(
       test?.pendingRevision
         ? buildReviewItems(test.steps, test.pendingRevision.changes)
@@ -124,9 +132,13 @@ function TestDrawer({
 
   if (!test) return null;
 
-  const paused = test.status === 'paused';
   const revision = test.pendingRevision;
   const merge = test.pendingMerge;
+  // plain editing buffers; the special modes commit through their own actions
+  const buffered = !creating && !merge && !revision && viewVersion == null;
+  // what the drawer renders: pending edits when they exist, the live test otherwise
+  const view = pending && buffered ? pending : test;
+  const paused = view.status === 'paused';
   const version = testVersion(test);
   const history = test.history ?? [];
   const viewedSnapshot =
@@ -256,8 +268,11 @@ function TestDrawer({
         })),
     ],
     selectedKeys: [String(viewVersion ?? version)],
-    onClick: ({ key }: { key: string }) =>
-      setViewVersion(Number(key) === version ? null : Number(key)),
+    onClick: ({ key }: { key: string }) => {
+      // switching versions leaves plain-edit mode — drop any pending edits
+      setPending(null);
+      setViewVersion(Number(key) === version ? null : Number(key));
+    },
   };
   // the version chip + dropdown next to the Steps title — only once v2 exists
   const versionSwitcher =
@@ -289,24 +304,66 @@ function TestDrawer({
     .sort((a, b) => a.date - b.date)
     .slice(-10);
   const settings: RunSettings = {
-    envNames: test.envNames,
-    resolutions: test.resolutions,
-    regions: test.regions,
-    schedule: test.schedule,
+    envNames: view.envNames,
+    resolutions: view.resolutions,
+    regions: view.regions,
+    schedule: view.schedule,
   };
 
-  // run settings persist live; a schedule activates the test, clearing it drops it back
-  // to approved. (Pause/Resume is a separate, explicit control below.)
+  // plain edits buffer until Save (Mehdi 07-20); special modes stay live. A
+  // schedule still activates the test, clearing it drops it back to approved —
+  // resolved in the buffer, committed on Save.
+  const edit = (p: Partial<TestCase>) =>
+    buffered ? setPending({ ...view, ...p }) : onChange({ ...test, ...p });
   const patch = (p: Partial<RunSettings>) => {
-    const next: TestCase = { ...test, ...p };
+    const next: TestCase = { ...view, ...p };
     if ('schedule' in p) next.status = isScheduled(p.schedule) ? 'active' : 'approved';
-    onChange(next);
+    if (buffered) setPending(next);
+    else onChange(next);
   };
 
-  const runNow = () =>
-    message.success(`${test.title} — ${t('run started, see Runs')}`);
-  const togglePause = () =>
-    onChange({ ...test, status: paused ? 'active' : 'paused' });
+  const dirty =
+    pending != null && buffered && JSON.stringify(pending) !== JSON.stringify(test);
+  const save = () => {
+    if (dirty) onChange(pending!);
+    setPending(null);
+    message.success(t('Saved'));
+    onClose();
+  };
+  // Run now commits pending edits first — running an unsaved state would lie
+  // about what actually ran
+  const runNow = () => {
+    if (dirty) {
+      onChange(pending!);
+      setPending(null);
+    }
+    message.success(`${view.title} — ${t('run started, see Runs')}`);
+  };
+  // Pause/Resume stays immediate (it's a state control, not an edit); a live
+  // buffer follows along so Save doesn't undo the toggle
+  const togglePause = () => {
+    const status = paused ? 'active' : 'paused';
+    onChange({ ...test, status });
+    if (pending) setPending({ ...pending, status });
+  };
+  // closing with unsaved edits asks — silent discard reads as data loss
+  const handleDrawerClose = () => {
+    if (dirty) {
+      Modal.confirm({
+        title: t('Discard unsaved changes?'),
+        okText: t('Discard'),
+        okButtonProps: { danger: true },
+        cancelText: t('Keep editing'),
+        onOk: () => {
+          setPending(null);
+          onClose();
+        },
+      });
+      return;
+    }
+    setPending(null);
+    onClose();
+  };
   const remove = () => {
     onRemove(test.key);
     onClose();
@@ -316,9 +373,9 @@ function TestDrawer({
     <EntityDrawer
       type="test"
       open={open}
-      onClose={onClose}
-      title={test.title}
-      onTitleChange={(title) => onChange({ ...test, title })}
+      onClose={handleDrawerClose}
+      title={view.title}
+      onTitleChange={(title) => edit({ title })}
       autoEditTitle={creating}
       eyebrow={
         creating
@@ -330,7 +387,7 @@ function TestDrawer({
               : `${t('Test')} · ${
                   paused
                     ? t('Paused')
-                    : test.status === 'approved'
+                    : view.status === 'approved'
                       ? t('Approved')
                       : t('Active')
                 }${version > 1 ? ` · v${version}` : ''}${
@@ -338,52 +395,27 @@ function TestDrawer({
                 }`
       }
       headerActions={
-        creating ? undefined : merge ? (
-          // mid-merge nothing runs — same suspended posture as pause-on-revision
-          <Tooltip title={t('Runs are paused until the merged steps are accepted.')}>
-            <Button size="small" disabled icon={<Play size={13} />}>
-              {t('Run now')}
-            </Button>
-          </Tooltip>
-        ) : revision && pauseOnRevision ? (
-          // pause-on-revision is ON: nothing runs until the review is done
-          <Tooltip title={t('Runs are paused until the new version is reviewed.')}>
-            <Button size="small" disabled icon={<Play size={13} />}>
-              {t('Run now')}
-            </Button>
-          </Tooltip>
-        ) : (
-        <div className="flex items-center gap-2">
-          {/* paused: resuming is the main intent, so Resume takes the primary slot */}
-          <Button
-            type={paused ? 'default' : 'primary'}
-            size="small"
-            icon={<Play size={13} />}
-            onClick={runNow}
+        // Run now left the header for the footer's secondary slot (Mehdi 07-20:
+        // Save is the primary action). Pause/Resume stays here — an immediate
+        // state control, quiet (no primary in the header, one accent per view).
+        // Merge/revision reviews suspend runs; the eyebrow already says so.
+        creating || merge || revision || view.status === 'approved' ? undefined : (
+          <Tooltip
+            title={
+              resumeBlocked
+                ? t('Set an environment below to resume this test.')
+                : undefined
+            }
           >
-            {t('Run now')}
-          </Button>
-          {/* approved tests have no schedule to pause — they just run on demand */}
-          {test.status !== 'approved' && (
-            <Tooltip
-              title={
-                resumeBlocked
-                  ? t('Set an environment below to resume this test.')
-                  : undefined
-              }
+            <Button
+              size="small"
+              disabled={resumeBlocked}
+              icon={paused ? <Play size={13} /> : <Pause size={13} />}
+              onClick={togglePause}
             >
-              <Button
-                type={paused ? 'primary' : 'default'}
-                size="small"
-                disabled={resumeBlocked}
-                icon={paused ? <Play size={13} /> : <Pause size={13} />}
-                onClick={togglePause}
-              >
-                {paused ? t('Resume') : t('Pause')}
-              </Button>
-            </Tooltip>
-          )}
-        </div>
+              {paused ? t('Resume') : t('Pause')}
+            </Button>
+          </Tooltip>
         )
       }
       footer={
@@ -427,17 +459,33 @@ function TestDrawer({
             </Button>
           </div>
         ) : (
-          <Popconfirm
-            title={t('Delete this test?')}
-            okText={t('Delete')}
-            okButtonProps={{ danger: true }}
-            cancelText={t('Cancel')}
-            onConfirm={remove}
-          >
-            <Button type="text" danger icon={<Trash2 size={15} />}>
-              {t('Delete test')}
-            </Button>
-          </Popconfirm>
+          // Save is the primary action (Mehdi 07-20; there was no Save before) —
+          // Run now rides second and commits pending edits before running
+          <div className="flex items-center justify-between">
+            <Popconfirm
+              title={t('Delete this test?')}
+              okText={t('Delete')}
+              okButtonProps={{ danger: true }}
+              cancelText={t('Cancel')}
+              onConfirm={remove}
+            >
+              <Button type="text" danger icon={<Trash2 size={15} />}>
+                {t('Delete test')}
+              </Button>
+            </Popconfirm>
+            <div className="flex items-center gap-2">
+              <Tooltip
+                title={dirty ? t('Saves your changes, then runs') : undefined}
+              >
+                <Button icon={<Play size={15} />} onClick={runNow}>
+                  {t('Run now')}
+                </Button>
+              </Tooltip>
+              <Button type="primary" icon={<Check size={15} />} onClick={save}>
+                {t('Save')}
+              </Button>
+            </div>
+          </div>
         )
       }
     >
@@ -515,17 +563,17 @@ function TestDrawer({
       ) : (
         /* bounded: run settings / tags / runs stay reachable even with 50 steps */
         <EditableSteps
-          steps={test.steps}
+          steps={view.steps}
           bounded
           headerAction={versionSwitcher}
           historyFor={history.length > 0 ? (idx) => stepHistory(test, idx) : undefined}
-          onStepsChange={(steps) => onChange({ ...test, steps })}
+          onStepsChange={(steps) => edit({ steps })}
         />
       )}
 
       <div ref={settingsRef}>
         <Section title={t('Run settings')}>
-          {test.status === 'approved' && (
+          {view.status === 'approved' && (
             <div className="-mt-1 mb-3 text-sm text-disabled-text">
               {t(
                 'Not scheduled — this test runs manually until you set a schedule below.',
@@ -547,8 +595,8 @@ function TestDrawer({
         }
       >
         <TagEditor
-          value={test.tags}
-          onChange={(tags) => onChange({ ...test, tags })}
+          value={view.tags}
+          onChange={(tags) => edit({ tags })}
         />
       </Section>
 
