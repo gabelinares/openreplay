@@ -1,4 +1,4 @@
-import { Environment, RunData, TestCase } from './types';
+import { ConsoleLog, Environment, NetworkRequest, RunData, TestCase } from './types';
 
 const HOUR = 3600000;
 const NOW = Date.now();
@@ -640,6 +640,100 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
 ];
 
+
+// Every finished run carries its network + console capture, PASSED or failed
+// (Mehdi 07-20: the data exists either way — production exposing it only on
+// failures is the backend gap tracked as OR-3634). This factory builds a
+// plausible page-load + API trace so passed runs aren't hand-written HAR
+// novels; the failed runs above keep their bespoke captures.
+const mkReq = (
+  time: number,
+  method: string,
+  url: string,
+  type: string,
+  status: number,
+  size: number,
+  duration: number,
+): NetworkRequest => {
+  const host = url.replace(/^https?:\/\//, '').split('/')[0];
+  return {
+    method,
+    url,
+    name: url.split('?')[0].split('/').filter(Boolean).pop() ?? host,
+    type,
+    status,
+    size,
+    duration,
+    time,
+    ip: '203.0.113.10',
+    protocol: 'HTTP/2.0',
+    timing: {
+      dns: 2,
+      connect: 6,
+      ssl: 11,
+      ttfb: Math.max(8, Math.round(duration * 0.6)),
+      download: Math.max(2, Math.round(duration * 0.25)),
+    },
+    requestHeaders: [
+      { name: ':authority', value: host },
+      { name: ':method', value: method },
+      {
+        name: 'accept',
+        value:
+          type === 'document' ? 'text/html,application/xhtml+xml' : 'application/json',
+      },
+      { name: 'user-agent', value: 'OpenReplay-TestAgent/1.0' },
+    ],
+    responseHeaders: [
+      {
+        name: 'content-type',
+        value:
+          type === 'document'
+            ? 'text/html; charset=utf-8'
+            : type === 'script'
+              ? 'application/javascript'
+              : type === 'stylesheet'
+                ? 'text/css'
+                : type === 'img'
+                  ? 'image/svg+xml'
+                  : 'application/json',
+      },
+      { name: 'cache-control', value: 'no-cache' },
+    ],
+  };
+};
+const runCapture = (
+  page: string,
+  xhrs: [method: string, path: string][],
+): { console: ConsoleLog[]; network: NetworkRequest[] } => ({
+  console: [
+    { level: 'info', time: 130, text: `GET ${page} 200` },
+    { level: 'info', time: 940, text: '[vitals] LCP 1.24s \u00b7 CLS 0.02' },
+    {
+      level: 'warn',
+      time: 2100,
+      text: '[Deprecation] Listener added for a synchronous XHR.',
+    },
+  ],
+  network: [
+    mkReq(60, 'GET', `https://app.example.com${page}`, 'document', 200, 18420, 142),
+    mkReq(210, 'GET', 'https://app.example.com/static/app.css', 'stylesheet', 200, 48210, 88),
+    mkReq(216, 'GET', 'https://app.example.com/static/app.js', 'script', 200, 412600, 240),
+    ...xhrs.map(([method, path], i) =>
+      mkReq(
+        600 + i * 420,
+        method,
+        `https://app.example.com${path}`,
+        'xhr',
+        method === 'POST' ? 201 : 200,
+        2400 + i * 800,
+        120 + i * 35,
+      ),
+    ),
+    mkReq(2600, 'GET', 'https://app.example.com/static/logo.svg', 'img', 304, 0, 24),
+  ],
+});
+
 // A run is one execution of a test. The same test shows up every time it runs, with
 // its own timestamp — that's what makes this a log, not a second list of tests.
 export const MOCK_RUNS: RunData[] = [
@@ -662,6 +756,27 @@ export const MOCK_RUNS: RunData[] = [
       status: i < 33 ? 'passed' : i === 33 ? 'failed' : 'skipped',
       ...(i % 8 === 0 ? { shots: 2 } : {}),
     })) as RunData['steps'],
+    // failed runs capture the same trace — plus the failure itself
+    ...(() => {
+      const cap = runCapture('/billing', [
+        ['GET', '/api/billing'],
+        ['POST', '/api/billing/entries'],
+      ]);
+      return {
+        console: [
+          ...cap.console,
+          {
+            level: 'error' as const,
+            time: 174000,
+            text: 'Timed out after 10s waiting for selector "[data-row=billing-entry]"',
+          },
+        ],
+        network: [
+          ...cap.network,
+          mkReq(164000, 'GET', 'https://app.example.com/api/billing/entries', 'xhr', 504, 0, 10000),
+        ],
+      };
+    })(),
   },
   // ---- in progress (today) --------------------------------------------
   {
@@ -875,6 +990,11 @@ export const MOCK_RUNS: RunData[] = [
       { step: 'Select a suggestion', status: 'passed' },
       { step: 'Apply a price filter', status: 'passed' },
     ],
+    ...runCapture('/search', [
+      ['GET', '/api/suggest?q=lamp'],
+      ['GET', '/api/search?q=lamp'],
+      ['GET', '/api/search?q=lamp&price=25-50'],
+    ]),
   },
   // ---- yesterday -------------------------------------------------------
   {
@@ -966,6 +1086,12 @@ export const MOCK_RUNS: RunData[] = [
       { step: 'Submit the order', status: 'passed' },
       { step: 'Verify the order confirmation page', status: 'passed' },
     ],
+    ...runCapture('/checkout', [
+      ['POST', '/api/cart/items'],
+      ['GET', '/api/cart'],
+      ['POST', '/api/orders'],
+      ['GET', '/api/orders/1042'],
+    ]),
   },
   {
     key: 'r7',
@@ -982,6 +1108,10 @@ export const MOCK_RUNS: RunData[] = [
       { step: 'Click the submit button', status: 'passed' },
       { step: 'Verify redirect to dashboard', status: 'passed' },
     ],
+    ...runCapture('/login', [
+      ['POST', '/api/auth/login'],
+      ['GET', '/api/me'],
+    ]),
   },
   // ---- earlier ---------------------------------------------------------
   {
@@ -998,6 +1128,10 @@ export const MOCK_RUNS: RunData[] = [
       { step: 'Pick a template', status: 'passed' },
       { step: 'Create the project', status: 'passed' },
     ],
+    ...runCapture('/projects/new', [
+      ['GET', '/api/templates'],
+      ['POST', '/api/projects'],
+    ]),
   },
   {
     key: 'r9',
@@ -1014,6 +1148,12 @@ export const MOCK_RUNS: RunData[] = [
       { step: 'Submit the order', status: 'passed' },
       { step: 'Verify the order confirmation page', status: 'passed' },
     ],
+    ...runCapture('/checkout', [
+      ['POST', '/api/cart/items'],
+      ['GET', '/api/cart'],
+      ['POST', '/api/orders'],
+      ['GET', '/api/orders/987'],
+    ]),
   },
 
   // ---- more runs (volume, to exercise pagination + filters, and so a test's
