@@ -1,4 +1,4 @@
-import { App, Button, List, Tag, Typography } from 'antd';
+import { App, Button, List, Tag, Tooltip, Typography } from 'antd';
 import { Globe, PencilIcon, Plus, Trash2 } from 'lucide-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -142,7 +142,25 @@ function Environments({ environments, setEnvironments }: Props) {
             >
               <div className="flex flex-col gap-0.5 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium">{env.name}</span>
+                  <span
+                    className="font-medium"
+                    style={
+                      env.active === false
+                        ? { color: 'var(--color-gray-medium)' }
+                        : undefined
+                    }
+                  >
+                    {env.name}
+                  </span>
+                  {/* deactivated environments say so in the list (Mehdi 07-20:
+                      the state was invisible without opening the drawer) */}
+                  {env.active === false && (
+                    <Tooltip
+                      title={t('Tests won’t run against this environment.')}
+                    >
+                      <Tag className="cursor-help">{t('Inactive')}</Tag>
+                    </Tooltip>
+                  )}
                   {env.username ? (
                     <Tag color="blue">{t('With credentials')}</Tag>
                   ) : (
