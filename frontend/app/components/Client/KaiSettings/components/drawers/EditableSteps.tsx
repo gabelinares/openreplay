@@ -22,9 +22,12 @@ import { TestAlternative } from '../shared/types';
 import { Section } from './EntityDrawer';
 
 const STEP_DND = 'KAI_STEP';
-// muted, semi-transparent blue — shared by the insert line and the drag drop line so
-// "add here" and "move here" read identically.
-const LINE = 'rgba(54, 108, 217, 0.55)';
+// the insert line and the drag drop line share one look, so "add here" and
+// "move here" read identically. Both derive from the BRAND primary (Gabriel
+// 07-21: the old hardcoded #366CD9 was a second, off-brand blue) and fade at
+// the ends — a 2px line chopping off mid-air reads as a rendering bug.
+const LINE = 'color-mix(in srgb, var(--color-main) 45%, transparent)';
+const LINE_FADED = `linear-gradient(to right, transparent, ${LINE} 12%, ${LINE} 88%, transparent)`;
 // git-diff row tints (Mehdi 07-06: "as close to a git diff as possible") — light
 // green for additions, light red for deletions, on the brand green/red
 const ADDED_BG = 'rgba(66, 174, 94, 0.1)';
@@ -202,8 +205,8 @@ function Gap({
     return (
       <div className="h-5 flex items-center" aria-hidden>
         <div
-          className="w-full h-0.5 rounded-full"
-          style={{ background: isDropTarget ? LINE : 'transparent' }}
+          className="w-full h-0.5"
+          style={{ background: isDropTarget ? LINE_FADED : 'transparent' }}
         />
       </div>
     );
@@ -222,13 +225,15 @@ function Gap({
       }`}
     >
       <div
-        className={`absolute inset-x-0 h-0.5 rounded-full ${reveal}`}
-        style={{ background: LINE }}
+        className={`absolute inset-x-0 h-0.5 ${reveal}`}
+        style={{ background: LINE_FADED }}
       />
+      {/* the plus chip wears the same brand primary as every button around it */}
       <div
-        className={`relative z-10 flex items-center gap-1 rounded-full bg-blue text-white shadow-sm ${reveal} ${
+        className={`relative z-10 flex items-center gap-1 rounded-full text-white shadow-sm ${reveal} ${
           label ? 'pl-1 pr-2 py-0.5' : 'p-1'
         }`}
+        style={{ background: 'var(--color-main)' }}
       >
         <Plus size={13} />
         {label && <span className="text-xs font-medium">{label}</span>}
