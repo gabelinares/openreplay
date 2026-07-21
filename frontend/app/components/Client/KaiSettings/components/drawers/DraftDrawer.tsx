@@ -1,4 +1,4 @@
-import { Button, message } from 'antd';
+import { Button, Tooltip, message } from 'antd';
 import {
   ArrowLeft,
   ArrowRight,
@@ -99,11 +99,13 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
     onChange(draft);
     onClose();
   };
-  // dismissing rejects the agent's proposal and removes it from the list — the
-  // removal announces itself (report 2.4: a silently vanishing row reads as lost)
+  // Dismiss NEVER deletes (Mehdi 07-20): it sets the proposal aside — the draft
+  // stays in the list with its "new" dot cleared, un-touched by any edits made
+  // here. Deleting is a separate act (row menu). Applies to duplicates AND
+  // agent proposals alike; one word, one behavior.
   const dismiss = () => {
-    onRemove(draft.key);
-    message.success(t('Draft dismissed'));
+    if (test) onChange({ ...test, isNew: false });
+    message.info(t('Draft kept in your list — approve or delete it anytime.'));
     onClose();
   };
   // X / mask: if the steps were approved, persist as approved (or active if scheduled)
@@ -123,14 +125,15 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
   const footer =
     step === 0 ? (
       <div className="flex items-center justify-between">
-        {/* Dismiss removes the proposal, so it's red — but its icon is the X,
-            not the bin (Gabriel 07-20): X is this product's "reject a suggestion"
-            grammar (the per-line review reject), while the bin means deleting
-            something the user built (TestDrawer's "Delete test"). The word stays
-            "Dismiss" here and in the row menu for the same reason. */}
-        <Button type="text" danger icon={<X size={15} />} onClick={dismiss}>
-          {t('Dismiss')}
-        </Button>
+        {/* Dismiss keeps the draft (Mehdi 07-20), so it's quiet gray — red is
+            reserved for Delete. The X icon stays: it's this product's
+            "set a suggestion aside" grammar (the per-line review reject),
+            while the bin means deleting something the user built. */}
+        <Tooltip title={t('Keeps the draft in your list')}>
+          <Button type="text" icon={<X size={15} />} onClick={dismiss}>
+            {t('Dismiss')}
+          </Button>
+        </Tooltip>
         <div className="flex items-center gap-2">
           <Button onClick={saveDraft}>{t('Save draft')}</Button>
           <Button
@@ -153,9 +156,17 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
           {t('Back')}
         </Button>
         <div className="flex items-center gap-2">
-          <Button type="text" onClick={finalize}>
-            {scheduled ? t('Skip tags & finish') : t('Finish without schedule')}
-          </Button>
+          {/* the no-schedule exit is a real Save with a tooltip saying exactly
+              what happens (report 1.4) — not a vague "finish" text link */}
+          {scheduled ? (
+            <Button type="text" onClick={finalize}>
+              {t('Skip tags & finish')}
+            </Button>
+          ) : (
+            <Tooltip title={t('Test will be saved without schedule')}>
+              <Button onClick={finalize}>{t('Save')}</Button>
+            </Tooltip>
+          )}
           <Button
             type="primary"
             onClick={() => setStep(2)}
@@ -277,11 +288,21 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
         </Section>
       )}
 
-      {/* Step 3 — optional tags */}
+      {/* Step 3 — optional tags. "(optional)" lives in the label itself, not
+          buried in the helper text (report 1.3) */}
       {step === 2 && (
-        <Section title={t('Tags')}>
+        <Section
+          title={
+            <span>
+              {t('Tags')}{' '}
+              <span className="font-normal text-disabled-text">
+                ({t('optional')})
+              </span>
+            </span>
+          }
+        >
           <div className="text-sm text-disabled-text mb-3">
-            {t('Add up to 3 tags to organise this test (optional).')}
+            {t('Add up to 3 tags to organise this test.')}
           </div>
           <TagEditor value={draft.tags} onChange={(tags) => patch({ tags })} />
         </Section>
