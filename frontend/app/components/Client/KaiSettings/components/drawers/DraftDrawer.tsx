@@ -1,4 +1,4 @@
-import { Button, Tooltip, message } from 'antd';
+import { Button, Popconfirm, Tooltip, message } from 'antd';
 import {
   ArrowLeft,
   ArrowRight,
@@ -105,7 +105,6 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
   // agent proposals alike; one word, one behavior.
   const dismiss = () => {
     if (test) onChange({ ...test, isNew: false });
-    message.info(t('Draft kept in your list — approve or delete it anytime.'));
     onClose();
   };
   // X / mask: if the steps were approved, persist as approved (or active if scheduled)
@@ -129,11 +128,18 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
             reserved for Delete. The X icon stays: it's this product's
             "set a suggestion aside" grammar (the per-line review reject),
             while the bin means deleting something the user built. */}
-        <Tooltip title={t('Keeps the draft in your list')}>
-          <Button type="text" icon={<X size={15} />} onClick={dismiss}>
+        {/* confirmed like every other consequential action (Gabriel 07-21) */}
+        <Popconfirm
+          title={t('Dismiss this draft?')}
+          description={t('It stays in your list — approve or delete it anytime.')}
+          okText={t('Dismiss')}
+          cancelText={t('Cancel')}
+          onConfirm={dismiss}
+        >
+          <Button type="text" icon={<X size={15} />}>
             {t('Dismiss')}
           </Button>
-        </Tooltip>
+        </Popconfirm>
         <div className="flex items-center gap-2">
           <Button onClick={saveDraft}>{t('Save draft')}</Button>
           <Button
