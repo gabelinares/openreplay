@@ -1,4 +1,4 @@
-import { Button, Dropdown, Modal, Tooltip, message } from 'antd';
+import { Button, Dropdown, Tooltip, message } from 'antd';
 import {
   Check,
   CheckCheck,
@@ -14,7 +14,7 @@ import {
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { confirmDelete } from '../shared/confirms';
+import { useConfirms } from '../shared/confirms';
 import { MOCK_RUNS } from '../shared/mockData';
 import {
   StepItem,
@@ -81,6 +81,7 @@ function TestDrawer({
   onCancelMerge,
 }: Props) {
   const { t } = useTranslation();
+  const { confirmDelete, confirmDiscard } = useConfirms();
   const settingsRef = useRef<HTMLDivElement>(null);
   // Settings → "Pause tests on new revisions": decides whether a pending revision
   // pauses the test (Needs review status, run controls off) or it keeps running
@@ -350,15 +351,9 @@ function TestDrawer({
   // closing with unsaved edits asks — silent discard reads as data loss
   const handleDrawerClose = () => {
     if (dirty) {
-      Modal.confirm({
-        title: t('Discard unsaved changes?'),
-        okText: t('Discard'),
-        okButtonProps: { danger: true },
-        cancelText: t('Keep editing'),
-        onOk: () => {
-          setPending(null);
-          onClose();
-        },
+      confirmDiscard(() => {
+        setPending(null);
+        onClose();
       });
       return;
     }
