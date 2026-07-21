@@ -26,6 +26,8 @@ function EnvironmentForm({ env, onSubmit, onDelete }: Props) {
   const [password, setPassword] = useState(env?.password ?? '');
   const [headers, setHeaders] = useState<HttpHeader[]>(env?.headers ?? []);
   const [ignoreHttps, setIgnoreHttps] = useState(!!env?.ignoreHttpsErrors);
+  // undefined = active (existing environments predate the flag)
+  const [active, setActive] = useState(env?.active !== false);
   const [showAdvanced, setShowAdvanced] = useState(
     !!(
       env?.username ||
@@ -46,6 +48,7 @@ function EnvironmentForm({ env, onSubmit, onDelete }: Props) {
       password: password.trim() || undefined,
       headers: headers.filter((h) => h.name.trim()),
       ignoreHttpsErrors: ignoreHttps,
+      active,
     });
     closeModal();
   };
@@ -75,6 +78,21 @@ function EnvironmentForm({ env, onSubmit, onDelete }: Props) {
           onChange={(e) => setUrl(e.target.value)}
         />
       </Field>
+
+      {/* Active/Inactive (Mehdi 07-20): deactivating keeps the whole setup but
+          stops tests from running against it — a softer step than Delete. It's
+          a primary state control, so it lives with Name/URL, not in Advanced.
+          Deliberately NO "Set as default" here: defaults are owned by Settings →
+          Default run configuration (one home, not two). */}
+      <div className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2">
+        <span className="flex flex-col text-sm min-w-0">
+          <span>{t('Active')}</span>
+          <span className="text-xs text-disabled-text">
+            {t('When off, the setup is kept but tests won’t run against it.')}
+          </span>
+        </span>
+        <Switch size="small" checked={active} onChange={setActive} />
+      </div>
 
       <button
         type="button"

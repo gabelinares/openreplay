@@ -26,6 +26,9 @@ export interface Environment {
   password?: string;
   headers?: HttpHeader[];
   ignoreHttpsErrors?: boolean;
+  /** switched off = keeps its setup, but tests don't run against it (Mehdi
+   *  07-20; the backend supports this). undefined reads as active. */
+  active?: boolean;
 }
 
 // Run viewport, simplified to three device classes.
