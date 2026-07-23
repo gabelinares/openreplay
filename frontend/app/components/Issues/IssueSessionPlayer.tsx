@@ -11,7 +11,6 @@ import {
   User,
   Search,
   Play,
-  Split,
 } from 'lucide-react';
 import {
   MoreOutlined,
@@ -63,6 +62,7 @@ import {
   type Issue,
   type IssueSessionCard,
 } from 'App/mstore/issuesStore';
+import { RowTagChip } from './IssuesList';
 
 import {
   debounceUpdate,
@@ -723,6 +723,9 @@ function IssueSessionPlayer() {
         .exampleSessions(issue, { ignoreScope: true })
         .find((c) => c.sessionId === sessionId)
     : undefined;
+  // which segments THIS session matches (Mehdi 07-20) — computed from segment
+  // conditions over the shared pool
+  const sessionSegs = issuesStore.sessionSegments(sessionId ?? '');
 
   // user metadata — customer-defined, can be many; shown as wrapping pills in
   // the header "More" popover (hidden by default), compact enough for dozens.
@@ -1251,20 +1254,29 @@ function IssueSessionPlayer() {
                   >
                     {card.variation}
                   </span>
-                  {/* which segments THIS session matches (Mehdi 07-20) —
-                      computed from segment conditions over the shared pool */}
-                  {issuesStore.sessionSegments(sessionId).length > 0 && (
-                    <div
-                      className="flex items-center gap-x-2 gap-y-1 flex-wrap text-sm"
-                      style={{ color: 'var(--color-gray-medium)' }}
-                    >
-                      {issuesStore.sessionSegments(sessionId).map((seg, i) => (
-                        <span key={seg.id} className="inline-flex items-center gap-1.5">
-                          {i > 0 && <span style={{ color: 'var(--color-gray-light)' }}>·</span>}
-                          <Split size={12} />
-                          {seg.name}
-                        </span>
+                  {/* segment chips share the list's grammar: RowTagChip +
+                      "+N" overflow (tooltip lists the rest) */}
+                  {sessionSegs.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap text-sm">
+                      <span style={{ color: 'var(--color-gray-medium)' }}>
+                        Segments:
+                      </span>
+                      {sessionSegs.slice(0, 3).map((seg) => (
+                        <RowTagChip key={seg.id} label={seg.name} />
                       ))}
+                      {sessionSegs.length > 3 && (
+                        <Tooltip
+                          title={sessionSegs.slice(3).map((s) => s.name).join(', ')}
+                          placement="top"
+                        >
+                          <span
+                            className="text-xs shrink-0 cursor-default"
+                            style={{ color: 'var(--color-gray-medium)' }}
+                          >
+                            +{sessionSegs.length - 3}
+                          </span>
+                        </Tooltip>
+                      )}
                     </div>
                   )}
                 </div>

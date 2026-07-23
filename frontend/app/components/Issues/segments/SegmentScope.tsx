@@ -1,4 +1,4 @@
-import { Button, Popover, Tooltip } from 'antd';
+import { Button, Popover } from 'antd';
 import { ChevronDown, Globe, Split } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
@@ -34,12 +34,25 @@ export const FoundInChips = observer(function FoundInChips({
   issue: Issue;
 }) {
   const { issuesStore } = useStore();
+  const [showAll, setShowAll] = React.useState(false);
   const rows = issuesStore.issueSegments(issue);
   const scoped = issuesStore.detailScope;
   const toggle = (id: number) => {
     issuesStore.toggleDetailScope(id);
     syncScopeToUrl(issuesStore.detailScope);
   };
+
+  // many segments collapse behind a "+N" (same grammar as the list's tag
+  // overflow) — scoped ones are always kept visible so an active filter can't
+  // hide its own control
+  const CAP = 3;
+  const visible =
+    showAll || rows.length <= CAP
+      ? rows
+      : rows.filter(
+          ({ segment }, i) => i < CAP || scoped.includes(segment.id),
+        );
+  const hiddenCount = rows.length - visible.length;
 
   return (
     <div className="flex items-center gap-2 flex-wrap text-sm">
@@ -52,40 +65,42 @@ export const FoundInChips = observer(function FoundInChips({
           <Globe size={12} /> full traffic
         </span>
       )}
-      {rows.map(({ segment, matched, total }) => {
+      {visible.map(({ segment }) => {
         const on = scoped.includes(segment.id);
         return (
-          <Tooltip
+          <button
             key={segment.id}
-            title={
+            type="button"
+            onClick={() => toggle(segment.id)}
+            className="inline-flex items-center gap-1.5 border rounded-full px-2.5 py-0.5 cursor-pointer transition-colors"
+            style={
               on
-                ? 'Showing this segment’s sessions — click to clear'
-                : `${matched} of ${total} sampled sessions · click to show only these`
+                ? {
+                    color: 'var(--color-main)',
+                    borderColor: 'var(--color-main)',
+                    background: 'var(--color-active-blue)',
+                  }
+                : { color: 'var(--color-gray-darkest)' }
             }
           >
-            <button
-              type="button"
-              onClick={() => toggle(segment.id)}
-              className="inline-flex items-center gap-1.5 border rounded-full px-2.5 py-0.5 cursor-pointer transition-colors"
-              style={
-                on
-                  ? {
-                      color: 'var(--color-main)',
-                      borderColor: 'var(--color-main)',
-                      background: 'var(--color-active-blue)',
-                    }
-                  : { color: 'var(--color-gray-darkest)' }
-              }
-            >
-              <Split
-                size={12}
-                style={{ color: on ? 'var(--color-main)' : 'var(--color-gray-medium)' }}
-              />
-              {segment.name}
-            </button>
-          </Tooltip>
+            <Split
+              size={12}
+              style={{ color: on ? 'var(--color-main)' : 'var(--color-gray-medium)' }}
+            />
+            {segment.name}
+          </button>
         );
       })}
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="text-xs cursor-pointer"
+          style={{ color: 'var(--color-gray-medium)' }}
+        >
+          +{hiddenCount}
+        </button>
+      )}
     </div>
   );
 });
@@ -123,18 +138,13 @@ export const SegmentScopeFilter = observer(function SegmentScopeFilter({
       placement="bottomLeft"
       content={
         <div className="flex flex-col gap-0.5 w-64">
-          {rows.map(({ segment, matched, total }) => (
+          {rows.map(({ segment }) => (
             <CheckRow
               key={segment.id}
               on={scoped.includes(segment.id)}
               onClick={() => toggle(segment.id)}
-              icon={<Split size={13} style={{ color: 'var(--color-gray-medium)' }} />}
             >
               {segment.name}
-              <span style={{ color: 'var(--color-gray-medium)' }}>
-                {' '}
-                · {matched}/{total}
-              </span>
             </CheckRow>
           ))}
           {rows.length === 0 && (
