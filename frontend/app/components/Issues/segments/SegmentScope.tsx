@@ -20,6 +20,50 @@ import { CheckRow } from '../TagFilter';
    issuesStore.detailScope and is mirrored to the URL (?seg=1,2) so a scoped
    view is shareable and survives issue → session → back. */
 
+/** THE segment chip — one look everywhere a segment is named (issue page
+ *  "Found in", replay session panel). Interactive when onClick is given. */
+export function SegmentChip({
+  name,
+  on = false,
+  onClick,
+}: {
+  name: string;
+  on?: boolean;
+  onClick?: () => void;
+}) {
+  const className =
+    'inline-flex items-center gap-1.5 border rounded-full px-2.5 py-0.5 transition-colors';
+  const style = on
+    ? {
+        color: 'var(--color-main)',
+        borderColor: 'var(--color-main)',
+        background: 'var(--color-active-blue)',
+      }
+    : { color: 'var(--color-gray-darkest)' };
+  const icon = (
+    <Split
+      size={12}
+      style={{ color: on ? 'var(--color-main)' : 'var(--color-gray-medium)' }}
+    />
+  );
+  return onClick ? (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${className} cursor-pointer`}
+      style={style}
+    >
+      {icon}
+      {name}
+    </button>
+  ) : (
+    <span className={`${className} cursor-default`} style={style}>
+      {icon}
+      {name}
+    </span>
+  );
+}
+
 /** write the current scope into the URL without a navigation */
 export const syncScopeToUrl = (ids: number[]) => {
   const url = new URL(window.location.href);
@@ -65,32 +109,14 @@ export const FoundInChips = observer(function FoundInChips({
           <Globe size={12} /> full traffic
         </span>
       )}
-      {visible.map(({ segment }) => {
-        const on = scoped.includes(segment.id);
-        return (
-          <button
-            key={segment.id}
-            type="button"
-            onClick={() => toggle(segment.id)}
-            className="inline-flex items-center gap-1.5 border rounded-full px-2.5 py-0.5 cursor-pointer transition-colors"
-            style={
-              on
-                ? {
-                    color: 'var(--color-main)',
-                    borderColor: 'var(--color-main)',
-                    background: 'var(--color-active-blue)',
-                  }
-                : { color: 'var(--color-gray-darkest)' }
-            }
-          >
-            <Split
-              size={12}
-              style={{ color: on ? 'var(--color-main)' : 'var(--color-gray-medium)' }}
-            />
-            {segment.name}
-          </button>
-        );
-      })}
+      {visible.map(({ segment }) => (
+        <SegmentChip
+          key={segment.id}
+          name={segment.name}
+          on={scoped.includes(segment.id)}
+          onClick={() => toggle(segment.id)}
+        />
+      ))}
       {hiddenCount > 0 && (
         <button
           type="button"
