@@ -62,7 +62,7 @@ import {
   type Issue,
   type IssueSessionCard,
 } from 'App/mstore/issuesStore';
-import { RowTagChip } from './IssuesList';
+import { SegmentChip } from './segments/SegmentScope';
 
 import {
   debounceUpdate,
@@ -1254,15 +1254,15 @@ function IssueSessionPlayer() {
                   >
                     {card.variation}
                   </span>
-                  {/* segment chips share the list's grammar: RowTagChip +
-                      "+N" overflow (tooltip lists the rest) */}
+                  {/* same SegmentChip as the issue page's "Found in" row,
+                      read-only here; "+N" overflow lists the rest */}
                   {sessionSegs.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap text-sm">
                       <span style={{ color: 'var(--color-gray-medium)' }}>
                         Segments:
                       </span>
                       {sessionSegs.slice(0, 3).map((seg) => (
-                        <RowTagChip key={seg.id} label={seg.name} />
+                        <SegmentChip key={seg.id} name={seg.name} />
                       ))}
                       {sessionSegs.length > 3 && (
                         <Tooltip
