@@ -4,7 +4,6 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModal } from 'Components/ModalContext';
-import AnimatedSVG, { ICONS } from 'Shared/AnimatedSVG/AnimatedSVG';
 import { NoContent } from 'UI';
 
 import EnvironmentForm from './EnvironmentForm';
@@ -117,15 +116,19 @@ function Environments({ environments, setEnvironments }: Props) {
             {t('The URLs and credentials your tests run against.')}
           </Typography.Text>
         </div>
-        <Button type="primary" icon={<Plus size={16} />} onClick={openAdd}>
+        {/* secondary on purpose — a primary inside a section header is loud
+            (production review 07-15; Gabriel 07-27) */}
+        <Button icon={<Plus size={16} />} onClick={openAdd}>
           {t('Add environment')}
         </Button>
       </div>
 
+      {/* quiet empty state — the ghost NO_WEBHOOKS illustration read off-brand
+          (production review 07-15): a muted Globe carries the meaning instead */}
       <NoContent
         title={
           <div className="flex flex-col items-center justify-center">
-            <AnimatedSVG name={ICONS.NO_WEBHOOKS} size={60} />
+            <Globe size={36} style={{ color: 'var(--color-gray-medium)' }} />
             <div className="text-center my-4">
               {t('No environments yet. Add one to get started.')}
             </div>
