@@ -1,6 +1,6 @@
 import React from 'react';
-import { Alert, Button, Drawer, Input, Segmented, Switch, Tooltip, message } from 'antd';
-import { Check, Info, Lock, Plus, Users } from 'lucide-react';
+import { Alert, App, Button, Drawer, Input, Segmented, Switch, Tooltip, message } from 'antd';
+import { Check, Info, Lock, Plus, Trash2, Users } from 'lucide-react';
 import { DateTime } from 'luxon';
 import { observer } from 'mobx-react-lite';
 import { useStore } from 'App/mstore';
@@ -40,6 +40,7 @@ interface Props {
 
 function SegmentDrawer({ open, segment, source, onClose }: Props) {
   const { issuesStore } = useStore();
+  const { modal } = App.useApp();
   const fromIssues = source === 'issues';
   // edit-own / read-only-others (Mehdi 07-07) — teammates' segments open as
   // a view; anyone still toggles capture from the list, just not the query
@@ -109,6 +110,34 @@ function SegmentDrawer({ open, segment, source, onClose }: Props) {
     onClose();
   };
 
+  // deletion lives in the drawer footer, both sources (Gabriel 07-27 — closes
+  // the "no UI path" gap). Own segments only; confirm follows the app dialog
+  // grammar (Issues Hide modal): no icon, subject quoted in a gray body line.
+  const confirmDelete = () => {
+    if (!segment) return;
+    modal.confirm({
+      title: 'Delete this segment?',
+      icon: null,
+      content: (
+        <p style={{ color: 'var(--color-gray-dark)' }}>
+          “{segment.name}” will be removed for everyone.
+          {segment.active &&
+            ' It is capturing traffic right now; if it is the last active segment, capture falls back to full traffic.'}
+        </p>
+      ),
+      okText: 'Delete segment',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        const fellBack = issuesStore.deleteSegment(segment.id);
+        if (fellBack)
+          message.info(
+            'No active segments left — capture switched to full traffic.',
+          );
+        onClose();
+      },
+    });
+  };
+
   return (
     <Drawer
       open={open}
@@ -123,12 +152,26 @@ function SegmentDrawer({ open, segment, source, onClose }: Props) {
           </div>
         ) : (
           <div className="flex items-center justify-between">
-            <Button type="text" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="primary" icon={<Check size={15} />} onClick={save}>
-              {segment ? 'Save segment' : 'Create segment'}
-            </Button>
+            {segment ? (
+              <Button
+                type="text"
+                danger
+                icon={<Trash2 size={14} />}
+                onClick={confirmDelete}
+              >
+                Delete
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex items-center gap-2">
+              <Button type="text" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="primary" icon={<Check size={15} />} onClick={save}>
+                {segment ? 'Save segment' : 'Create segment'}
+              </Button>
+            </div>
           </div>
         )
       }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { makeAutoObservable } from 'mobx';
 import { CircleX, MousePointerClick, Gauge } from 'lucide-react';
-import { getMockSessionById, MOCK_SESSION_POOL } from 'App/dev/mockSessions';
+import { getMockSessionById, MOCK_SESSION_POOL, sessionMatchesSeeds } from 'App/dev/mockSessions';
 
 /* =========================================================================
    Issues — the new AI issue-detection surface. Mock, in-memory data only
@@ -658,6 +658,11 @@ export default class IssuesStore {
       origin is an ATTRIBUTE of an issue (Display only shapes visibility).
       Multi-select; empty = everywhere. */
   origins: IssueOrigin[] = [];
+  /** ISSUE-PAGE segment scope (Mehdi 07-20): sessions shown on the detail page
+      are filtered to these segments. Seeded from the list's origins filter on
+      arrival (propagation), then user-controlled via the Segments dropdown;
+      headline stats stay GLOBAL (Gabriel 07-21: sessions-only scoping). */
+  detailScope: number[] = [];
 
   constructor() {
     makeAutoObservable(this);
@@ -746,7 +751,7 @@ export default class IssuesStore {
   /** Example-session cards for the issue detail page, resolved from the shared
       session pool (same entities as the Sessions page). Falls back to the
       issue-authored summaries if no pool ids are mapped. */
-  exampleSessions(issue: Issue): IssueSessionCard[] {
+  exampleSessions(issue: Issue, opts?: { ignoreScope?: boolean }): IssueSessionCard[] {
     // The curated ids come first; we then top up from the shared pool so the detail
     // page can "load more" / "refresh" through a bigger sample (the only count shown
     // is the quiet matched-sessions total, see journeyMatchTotal).
@@ -754,7 +759,15 @@ export default class IssuesStore {
     const extra = MOCK_SESSION_POOL.map((s) => s.sessionId).filter(
       (id) => !curated.includes(id),
     );
-    const orderedIds = [...curated, ...extra].slice(0, 12);
+    // segment scope (detail page): only sessions matching ANY scoped segment.
+    // Applied BEFORE the sample slice so "load more" keeps honoring the scope.
+    const scopeSeeds = (opts?.ignoreScope ? [] : this.detailScope)
+      .map((id) => this.segmentById(id)?.seeds)
+      .filter((x): x is SavedSegment['seeds'] => Boolean(x));
+    const inScope = (id: string) =>
+      scopeSeeds.length === 0 ||
+      scopeSeeds.some((seeds) => sessionMatchesSeeds(id, seeds));
+    const orderedIds = [...curated, ...extra].filter(inScope).slice(0, 12);
     const fromPool = orderedIds
       .map((id, i) => {
         const s = getMockSessionById(id);
@@ -857,6 +870,51 @@ export default class IssuesStore {
       project flag, so nobody else is affected. */
   removeMine = (id: number) => {
     this.mine = this.mine.filter((x) => x !== id);
+  };
+
+  // ---- issue-page segment scope ----
+  setDetailScope = (ids: number[]) => {
+    this.detailScope = ids.filter((id) => this.segmentById(id));
+  };
+  toggleDetailScope = (id: number) => {
+    this.detailScope = this.detailScope.includes(id)
+      ? this.detailScope.filter((x) => x !== id)
+      : [...this.detailScope, id];
+  };
+  clearDetailScope = () => {
+    this.detailScope = [];
+  };
+  /** every saved segment whose conditions match this pool session */
+  sessionSegments = (sessionId: string): SavedSegment[] =>
+    this.segments.filter(
+      (seg) => seg.seeds.length > 0 && sessionMatchesSeeds(sessionId, seg.seeds),
+    );
+  /** segments this issue is "found in": the surfacing origin first, then every
+      segment matching ≥1 of its sampled sessions, with the matched share */
+  issueSegments = (
+    issue: Issue,
+  ): { segment: SavedSegment; matched: number; total: number }[] => {
+    const ids = (issue.sessionIds ?? []).length
+      ? issue.sessionIds!
+      : MOCK_SESSION_POOL.slice(0, 12).map((s) => s.sessionId);
+    const rows = this.segments
+      .map((segment) => ({
+        segment,
+        matched:
+          segment.seeds.length > 0
+            ? ids.filter((id) => sessionMatchesSeeds(id, segment.seeds)).length
+            : 0,
+        total: ids.length,
+      }))
+      .filter((r) => r.matched > 0 || r.segment.id === issue.segmentId);
+    // origin first, then by share
+    return rows.sort((a, b) =>
+      a.segment.id === issue.segmentId
+        ? -1
+        : b.segment.id === issue.segmentId
+          ? 1
+          : b.matched - a.matched,
+    );
   };
 
   // ---- saved segments (capture = the `active` flag) ----
