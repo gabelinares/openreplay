@@ -1,10 +1,9 @@
-import { App, Button, List, Tag, Typography } from 'antd';
+import { App, Button, List, Tag, Tooltip, Typography } from 'antd';
 import { Globe, PencilIcon, Plus, Trash2 } from 'lucide-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModal } from 'Components/ModalContext';
-import AnimatedSVG, { ICONS } from 'Shared/AnimatedSVG/AnimatedSVG';
 import { NoContent } from 'UI';
 
 import EnvironmentForm from './EnvironmentForm';
@@ -69,8 +68,10 @@ function Environments({ environments, setEnvironments }: Props) {
       okText: toPause.length ? t('Pause tests & delete') : t('Delete'),
       okButtonProps: { danger: true },
       cancelText: t('Cancel'),
-      width: 480,
-      centered: true,
+      // the app's dialog look (Gabriel 07-21) — no exclamation icon, default
+      // width/position, same as the Issues Hide modal and shared/confirms
+      icon: null,
+      width: 520,
       content: (
         <div className="flex flex-col gap-4 py-2">
           {toPause.length > 0 ? (
@@ -115,15 +116,19 @@ function Environments({ environments, setEnvironments }: Props) {
             {t('The URLs and credentials your tests run against.')}
           </Typography.Text>
         </div>
-        <Button type="primary" icon={<Plus size={16} />} onClick={openAdd}>
+        {/* secondary on purpose — a primary inside a section header is loud
+            (production review 07-15; Gabriel 07-27) */}
+        <Button icon={<Plus size={16} />} onClick={openAdd}>
           {t('Add environment')}
         </Button>
       </div>
 
+      {/* quiet empty state — the ghost NO_WEBHOOKS illustration read off-brand
+          (production review 07-15): a muted Globe carries the meaning instead */}
       <NoContent
         title={
           <div className="flex flex-col items-center justify-center">
-            <AnimatedSVG name={ICONS.NO_WEBHOOKS} size={60} />
+            <Globe size={36} style={{ color: 'var(--color-gray-medium)' }} />
             <div className="text-center my-4">
               {t('No environments yet. Add one to get started.')}
             </div>
@@ -142,7 +147,25 @@ function Environments({ environments, setEnvironments }: Props) {
             >
               <div className="flex flex-col gap-0.5 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium">{env.name}</span>
+                  <span
+                    className="font-medium"
+                    style={
+                      env.active === false
+                        ? { color: 'var(--color-gray-medium)' }
+                        : undefined
+                    }
+                  >
+                    {env.name}
+                  </span>
+                  {/* deactivated environments say so in the list (Mehdi 07-20:
+                      the state was invisible without opening the drawer) */}
+                  {env.active === false && (
+                    <Tooltip
+                      title={t('Tests won’t run against this environment.')}
+                    >
+                      <Tag className="cursor-help">{t('Inactive')}</Tag>
+                    </Tooltip>
+                  )}
                   {env.username ? (
                     <Tag color="blue">{t('With credentials')}</Tag>
                   ) : (

@@ -1,9 +1,8 @@
 import {
+  App,
   Badge,
   Button,
   Dropdown,
-  Input,
-  Modal,
   Segmented,
   Select,
   Table,
@@ -20,6 +19,7 @@ import { Pagination } from 'UI';
 
 import DraftDrawer from './drawers/DraftDrawer';
 import TestDrawer from './drawers/TestDrawer';
+import { useConfirms } from './shared/confirms';
 import './kai-table.css';
 import { needsReview } from './shared/revisions';
 import { hasNoEnvironment, kaiStore, useKaiStore } from './shared/store';
@@ -52,10 +52,11 @@ function TestsTab() {
   // tests live in the shared store — Settings (environment deletion) mutates them too.
   // pauseOnRevision decides whether a pending revision reads "Needs review" and
   // suspends the run controls, or the test keeps running while the review waits.
-  const { tests, pauseOnRevision } = useKaiStore();
+  const { tests, pauseOnRevision, testsQuery: query } = useKaiStore();
   const { setTests } = kaiStore;
+  const { confirmDelete, confirmDismissSuggestion } = useConfirms();
+  const { modal } = App.useApp();
   const statusOf = (tc: TestCase) => displayStatus(tc, pauseOnRevision);
-  const [query, setQuery] = useState('');
   const [statusTab, setStatusTab] = useState<StatusTab>('all');
   const [envFilter, setEnvFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('all');
@@ -125,6 +126,7 @@ function TestsTab() {
       key: `test-manual-${(manualCounter += 1)}-${Date.now()}`,
       title: t('Untitled test'),
       createdAt: Date.now(),
+      origin: 'user',
       steps: [],
       status: 'approved',
       schedule: null,
@@ -152,17 +154,24 @@ function TestsTab() {
 
   // Duplicate (row ellipsis): copies the steps only — no environment, schedule or
   // tags travel with it — and lands as a draft at v1, floating to the top.
+  // The brief pending toast models the async contract for production (report
+  // 2.5): the action acknowledges immediately, the row lands with a confirm.
   const duplicateTest = (tc: TestCase) => {
-    const copy: TestCase = {
-      key: `test-copy-${(manualCounter += 1)}-${Date.now()}`,
-      title: `${tc.title} (copy)`,
-      steps: [...tc.steps],
-      status: 'draft',
-      createdAt: Date.now(),
-      isNew: true,
-    };
-    setTests((prev) => [copy, ...prev]);
-    message.success(t('Duplicated as a draft'));
+    const hide = message.loading(t('Duplicating…'), 0);
+    window.setTimeout(() => {
+      const copy: TestCase = {
+        key: `test-copy-${(manualCounter += 1)}-${Date.now()}`,
+        title: `${tc.title} (copy)`,
+        steps: [...tc.steps],
+        status: 'draft',
+        createdAt: Date.now(),
+        origin: 'user',
+        isNew: true,
+      };
+      setTests((prev) => [copy, ...prev]);
+      hide();
+      message.success(t('Duplicated as a draft'));
+    }, 450);
   };
 
   const openTest = tests.find((tc) => tc.key === openKey) ?? null;
@@ -274,7 +283,17 @@ function TestsTab() {
         tc.status === 'paused' && !hasNoEnvironment(tc) && !tc.pendingMerge,
       { status: 'active' },
     );
-  const deleteSelected = () => removeMany(selectedKeys);
+  const deleteSelected = () =>
+    confirmDelete({
+      what:
+        selectedKeys.length === 1
+          ? t('test')
+          : `${selectedKeys.length} ${t('tests')}`,
+      consequence: selected.some((tc) => tc.pendingMerge)
+        ? t('Tests absorbed by a pending merge will be restored to your list.')
+        : undefined,
+      onOk: () => removeMany(selectedKeys),
+    });
 
   // ---- merge (Mehdi 07-13): combine tests, steps arrive as groups -------
   // Base = FIRST selected: the merged test keeps its name, settings, tags,
@@ -312,7 +331,9 @@ function TestsTab() {
       .filter(Boolean) as TestCase[];
     if (sel.length < 2) return;
     const [base, ...rest] = sel;
-    Modal.confirm({
+    modal.confirm({
+      icon: null,
+      width: 520,
       title: t('Merge {{n}} tests into “{{name}}”?', {
         n: sel.length,
         name: base.title,
@@ -421,11 +442,16 @@ function TestsTab() {
         { key: 'delete', label: t('Delete'), danger: true },
       ];
     } else if (tc.status === 'draft') {
+      // the reject grammar (Gabriel 07-21): a SUGGESTION gets Dismiss (red,
+      // confirmed, optional reason for the agent); YOUR draft gets Delete.
+      // Never both — that ambiguity is what got Mehdi's duplicate deleted.
       items = [
         { key: 'open', label: t('Review draft') },
         { key: 'merge', label: t('Merge with…') },
         { type: 'divider' as const },
-        { key: 'dismiss', label: t('Dismiss'), danger: true },
+        tc.origin === 'user'
+          ? { key: 'delete', label: t('Delete'), danger: true }
+          : { key: 'dismiss', label: t('Dismiss'), danger: true },
       ];
     } else if (needsReview(tc) && pauseOnRevision) {
       // pause-on-revision: the run controls are suspended — reviewing is the only
@@ -499,12 +525,17 @@ function TestsTab() {
         }
         else if (key === 'pause') updateTest({ ...tc, status: 'paused' });
         else if (key === 'resume') updateTest({ ...tc, status: 'active' });
-        else if (key === 'dismiss') {
-          // same announcement as the drawer's Dismiss — a row that vanishes
-          // silently reads as lost (report 2.4)
-          removeTest(tc.key);
-          message.success(t('Draft dismissed'));
-        } else if (key === 'delete') removeTest(tc.key);
+        else if (key === 'dismiss')
+          confirmDismissSuggestion(tc.title, () => removeTest(tc.key));
+        else if (key === 'delete')
+          confirmDelete({
+            what: tc.status === 'draft' ? t('draft') : t('test'),
+            name: tc.title,
+            consequence: tc.pendingMerge
+              ? t('The absorbed tests will be restored to your list.')
+              : undefined,
+            onOk: () => removeTest(tc.key),
+          });
       },
     };
   };
@@ -702,14 +733,18 @@ function TestsTab() {
 
   return (
     <div className="flex flex-col">
-      {/* controls bar — status tabs (left) + search & filters (right) */}
+      {/* controls bar — status tabs (left), filters (right). Search lives in
+          the page's MAIN tab bar (index.tsx), not here: keeps this row to one
+          line (Gabriel 07-27). Bulk mode swaps the whole right cluster. */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap">
-        <Segmented
-          size="small"
-          value={statusTab}
-          onChange={(v) => setStatusTab(v as StatusTab)}
-          options={statusOptions}
-        />
+        <div className="flex items-center gap-2">
+          <Segmented
+            size="small"
+            value={statusTab}
+            onChange={(v) => setStatusTab(v as StatusTab)}
+            options={statusOptions}
+          />
+        </div>
         {/* selecting rows swaps the filters out for bulk actions — same row, no
             extra banner; each button carries the count it will affect */}
         {selectedKeys.length > 0 ? (
@@ -758,14 +793,6 @@ function TestsTab() {
           </div>
         ) : (
           <div className="flex items-center gap-2 flex-wrap">
-            <Input.Search
-              size="small"
-              allowClear
-              placeholder={t('Search tests')}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              style={{ width: 170 }}
-            />
             <Select
               size="small"
               value={envFilter}

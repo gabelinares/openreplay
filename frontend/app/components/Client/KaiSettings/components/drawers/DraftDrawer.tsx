@@ -1,14 +1,16 @@
-import { Button, message } from 'antd';
+import { Button, Tooltip } from 'antd';
 import {
   ArrowLeft,
   ArrowRight,
   CalendarClock,
   Check,
+  Trash2,
   X,
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useConfirms } from '../shared/confirms';
 import { kaiStore } from '../shared/store';
 import { TestCase } from '../shared/types';
 import { isScheduled } from '../shared/utils';
@@ -34,6 +36,7 @@ type WizStep = 0 | 1 | 2;
  *  after approving — in which case it lands as "approved"). */
 function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
   const { t } = useTranslation();
+  const { confirmDelete, confirmDismissSuggestion } = useConfirms();
   const [draft, setDraft] = useState<TestCase | null>(test);
   const [step, setStep] = useState<WizStep>(0);
   // true once the user has clicked "Approve steps" — closing now keeps it approved
@@ -99,13 +102,26 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
     onChange(draft);
     onClose();
   };
-  // dismissing rejects the agent's proposal and removes it from the list — the
-  // removal announces itself (report 2.4: a silently vanishing row reads as lost)
-  const dismiss = () => {
-    onRemove(draft.key);
-    message.success(t('Draft dismissed'));
-    onClose();
-  };
+  // The reject grammar (Gabriel 07-21, refining Mehdi 07-20): a SUGGESTION
+  // (agent draft) gets Dismiss — red, confirmed — and dismissing removes it.
+  // YOUR draft (duplicate, manual) never shows Dismiss at all; it gets
+  // Delete. The 07-20 accident (a duplicate silently deleted by "Dismiss")
+  // is impossible because the word doesn't exist in that context anymore.
+  const mine = draft.origin === 'user';
+  const dismiss = () =>
+    confirmDismissSuggestion(draft.title, () => {
+      onRemove(draft.key);
+      onClose();
+    });
+  const deleteDraft = () =>
+    confirmDelete({
+      what: t('draft'),
+      name: draft.title,
+      onOk: () => {
+        onRemove(draft.key);
+        onClose();
+      },
+    });
   // X / mask: if the steps were approved, persist as approved (or active if scheduled)
   const handleClose = () => {
     if (approved) finalize();
@@ -123,14 +139,23 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
   const footer =
     step === 0 ? (
       <div className="flex items-center justify-between">
-        {/* Dismiss removes the proposal, so it's red — but its icon is the X,
-            not the bin (Gabriel 07-20): X is this product's "reject a suggestion"
-            grammar (the per-line review reject), while the bin means deleting
-            something the user built (TestDrawer's "Delete test"). The word stays
-            "Dismiss" here and in the row menu for the same reason. */}
-        <Button type="text" danger icon={<X size={15} />} onClick={dismiss}>
-          {t('Dismiss')}
-        </Button>
+        {/* X = reject a suggestion, bin = delete your work — never both.
+            Both are red (something goes away) and both confirm; Dismiss's
+            confirm carries the optional agent-learning reason. */}
+        {mine ? (
+          <Button
+            type="text"
+            danger
+            icon={<Trash2 size={15} />}
+            onClick={deleteDraft}
+          >
+            {t('Delete draft')}
+          </Button>
+        ) : (
+          <Button type="text" danger icon={<X size={15} />} onClick={dismiss}>
+            {t('Dismiss')}
+          </Button>
+        )}
         <div className="flex items-center gap-2">
           <Button onClick={saveDraft}>{t('Save draft')}</Button>
           <Button
@@ -153,9 +178,17 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
           {t('Back')}
         </Button>
         <div className="flex items-center gap-2">
-          <Button type="text" onClick={finalize}>
-            {scheduled ? t('Skip tags & finish') : t('Finish without schedule')}
-          </Button>
+          {/* the no-schedule exit is a real Save with a tooltip saying exactly
+              what happens (report 1.4) — not a vague "finish" text link */}
+          {scheduled ? (
+            <Button type="text" onClick={finalize}>
+              {t('Skip tags & finish')}
+            </Button>
+          ) : (
+            <Tooltip title={t('Test will be saved without schedule')}>
+              <Button onClick={finalize}>{t('Save')}</Button>
+            </Tooltip>
+          )}
           <Button
             type="primary"
             onClick={() => setStep(2)}
@@ -277,11 +310,21 @@ function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
         </Section>
       )}
 
-      {/* Step 3 — optional tags */}
+      {/* Step 3 — optional tags. "(optional)" lives in the label itself, not
+          buried in the helper text (report 1.3) */}
       {step === 2 && (
-        <Section title={t('Tags')}>
+        <Section
+          title={
+            <span>
+              {t('Tags')}{' '}
+              <span className="font-normal text-disabled-text">
+                ({t('optional')})
+              </span>
+            </span>
+          }
+        >
           <div className="text-sm text-disabled-text mb-3">
-            {t('Add up to 3 tags to organise this test (optional).')}
+            {t('Add up to 3 tags to organise this test.')}
           </div>
           <TagEditor value={draft.tags} onChange={(tags) => patch({ tags })} />
         </Section>
