@@ -748,16 +748,14 @@ function IssueDetail() {
                 button read off-system). Examples are a SAMPLE though, not pages,
                 so the right side is a quiet show-more, never a pager. */}
             <div className="flex items-center justify-between px-4 py-3 shadow-xs w-full bg-white rounded-lg">
-              <div
-                className="text-sm"
-                style={{ color: 'var(--color-gray-medium)' }}
-              >
+              {/* default size + ink, font-medium numbers — exactly the Spots text */}
+              <div>
                 Showing <span className="font-medium">{sessions.length}</span>{' '}
-                {sessions.length === 1 ? 'example' : 'examples'} of{' '}
+                significant {sessions.length === 1 ? 'example' : 'examples'} of{' '}
                 <span className="font-medium">
                   {issuesStore.journeyMatchTotal(issue).toLocaleString()}
                 </span>{' '}
-                matching sessions
+                sessions
                 {issuesStore.detailScope.length > 0 && (
                   <>
                     {' '}
