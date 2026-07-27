@@ -6,7 +6,6 @@ import {
   Modal,
   Input,
   Tooltip,
-  Typography,
 } from 'antd';
 import {
   ArrowLeft,
@@ -18,6 +17,7 @@ import {
   SkipForward,
   Maximize2,
   ArrowUpRight,
+  ChevronDown,
   Info,
   Loader,
 } from 'lucide-react';
@@ -743,12 +743,21 @@ function IssueDetail() {
         ) : (
           <>
             {gridView}
-            {/* one footer row: quiet sample-total bottom-left (counts live bottom-left
-                across the app), Load more truly centered via the 3-col grid */}
-            <div className="grid grid-cols-3 items-center min-h-8">
-              <Typography.Text type="secondary" className="text-sm">
-                Sample of {issuesStore.journeyMatchTotal(issue)} matching
-                sessions
+            {/* footer bar in the Spots grammar (SpotsList/index.tsx): same shell,
+                count left, control right (Mehdi 07-27: the floating Load-more
+                button read off-system). Examples are a SAMPLE though, not pages,
+                so the right side is a quiet show-more, never a pager. */}
+            <div className="flex items-center justify-between px-4 py-3 shadow-xs w-full bg-white rounded-lg">
+              <div
+                className="text-sm"
+                style={{ color: 'var(--color-gray-medium)' }}
+              >
+                Showing <span className="font-medium">{sessions.length}</span>{' '}
+                {sessions.length === 1 ? 'example' : 'examples'} of{' '}
+                <span className="font-medium">
+                  {issuesStore.journeyMatchTotal(issue).toLocaleString()}
+                </span>{' '}
+                matching sessions
                 {issuesStore.detailScope.length > 0 && (
                   <>
                     {' '}
@@ -759,13 +768,17 @@ function IssueDetail() {
                       .join(', ')}
                   </>
                 )}
-              </Typography.Text>
-              <div className="flex justify-center">
-                {canLoadMore && (
-                  <Button onClick={loadMore}>Load more examples</Button>
-                )}
               </div>
-              <span />
+              {canLoadMore && (
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<ChevronDown size={14} />}
+                  onClick={loadMore}
+                >
+                  Show more examples
+                </Button>
+              )}
             </div>
           </>
         )}
