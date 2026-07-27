@@ -1258,7 +1258,7 @@ function IssueSessionPlayer() {
                       next to long LLM descriptions): first segment as the shared
                       chip, everything else behind the list's "+N" tooltip */}
                   {sessionSegs.length > 0 && (
-                    <div className="flex items-center gap-1.5 text-sm overflow-hidden">
+                    <div className="flex items-center gap-1.5 text-xs overflow-hidden">
                       <span
                         className="shrink-0"
                         style={{ color: 'var(--color-gray-medium)' }}
