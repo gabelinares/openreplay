@@ -12,11 +12,12 @@ import {
   message,
 } from 'antd';
 import type { TableColumnsType } from 'antd';
-import { ChevronRight, EllipsisVertical, Info, Plus } from 'lucide-react';
+import { ArrowLeft, ChevronRight, EllipsisVertical, Info, Plus } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useHistory } from 'App/routing';
 import { useStore } from 'App/mstore';
 import { PREDEFINED_JOURNEY_TAGS } from 'App/mstore/issuesStore';
 import TagDialog from 'Components/Issues/TagDialog';
@@ -40,6 +41,7 @@ function AgentsPreferences() {
   const { issuesStore } = useStore();
   const { pauseOnRevision } = useKaiStore();
   const { modal } = App.useApp();
+  const history = useHistory();
 
   const [showPredefined, setShowPredefined] = React.useState(false);
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -127,7 +129,19 @@ function AgentsPreferences() {
   ];
 
   return (
-    <div className="flex flex-col rounded-lg border bg-white">
+    <div className="flex flex-col gap-2">
+      {/* the Settings shortcut on the agent pages lands here mid-flow — the
+          same back button as the issue detail page returns the user */}
+      <Button
+        type="text"
+        size="small"
+        icon={<ArrowLeft size={15} />}
+        onClick={() => history.goBack()}
+        className="self-start -ml-2"
+      >
+        {t('Back')}
+      </Button>
+      <div className="flex flex-col rounded-lg border bg-white">
       {/* header — mirrors the agent pages' header grammar */}
       <div className="flex items-center gap-2 border-b px-4 py-2">
         <span className="font-semibold text-lg">{t('Agents')}</span>
@@ -307,6 +321,8 @@ function AgentsPreferences() {
             />
           </div>
         </section>
+      </div>
+
       </div>
 
       <TagDialog
