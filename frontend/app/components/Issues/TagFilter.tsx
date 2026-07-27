@@ -11,21 +11,18 @@ import {
 } from 'lucide-react';
 import type { IssueOrigin } from 'App/mstore/issuesStore';
 
-/* Tags multi-select modeled on OpenReplay's FilterSelection + ValueAutoComplete:
-   a STABLE trigger button (it never resizes as you select) that opens a Popover
-   with a match toggle, a search field, and a scrollable checkbox list. Selection
-   happens in the panel, so nothing in the toolbar reflows.
+/* The list's attribute filters, modeled on OpenReplay's FilterSelection +
+   ValueAutoComplete: STABLE trigger buttons (they never resize as you select)
+   opening Popovers where the selection happens, so nothing in the toolbar
+   reflows.
 
-   It also hosts the FOUND IN section — where an issue was surfaced (full traffic
-   or a traffic segment) is an attribute of the issue, same species as its tags,
-   and the rows even wear it as a chip in the Tags column. Display stays
-   visibility-only.
-
-   Built for scale (Mehdi 07-27): 8+ predefined tags plus any number of custom
-   ones, and up to ~10 segments. ONE search at the top covers both groups;
-   segments follow the app's picker grammar (first 5 at rest, "search to find
-   them" for the tail); tags scroll. "New tag" opens the creation dialog:
-   name + a natural-language description the agent matches automatically. */
+   Tags and segments are SEPARATE dropdowns (Gabriel 07-27): they answer
+   different questions (what happened vs where it was captured) and each has
+   to scale on its own — 8+ predefined tags plus any number of custom ones,
+   and ~10 segments. Both stay built for that scale: search when it grows,
+   the app's picker grammar for the segment tail, scroll for tags. "New tag"
+   opens the creation dialog: name + a natural-language description the agent
+   matches automatically. */
 
 export function CheckRow({
   on,
@@ -54,26 +51,28 @@ export function CheckRow({
   );
 }
 
-const sectionLabel = (label: string, right?: React.ReactNode) => (
-  <div className="flex items-center justify-between mt-1">
-    <span
-      className="text-[11px] font-medium uppercase tracking-wider"
-      style={{ color: 'var(--color-gray-medium)' }}
-    >
-      {label}
+const panelFooter = (n: number, onClear: () => void) => (
+  <div className="flex items-center justify-between border-t pt-2">
+    <span className="text-xs" style={{ color: 'var(--color-gray-medium)' }}>
+      {n} selected
     </span>
-    {right}
+    <Button type="text" size="small" disabled={!n} onClick={onClear}>
+      Clear
+    </Button>
   </div>
 );
+
+const popoverClassNames = {
+  root: 'rounded-lg border border-gray-200 shadow-xs overflow-hidden',
+};
+
+/* ──────────────────────────── Tags ──────────────────────────── */
 
 export default function TagFilter({
   allTags,
   labels,
   match,
-  segments,
-  origins,
   onToggle,
-  onToggleOrigin,
   onSetMatch,
   onClear,
   onCreateTag,
@@ -81,14 +80,8 @@ export default function TagFilter({
   allTags: string[];
   labels: string[];
   match: 'all' | 'any';
-  /** segments available as "found in" options; `mine` powers the aggregate
-      "My segments" row */
-  segments: { id: number; name: string; mine?: boolean }[];
-  origins: IssueOrigin[];
   onToggle: (t: string) => void;
-  onToggleOrigin: (o: IssueOrigin) => void;
   onSetMatch: (m: 'all' | 'any') => void;
-  /** clears labels AND origins */
   onClear: () => void;
   /** creates a customer-defined journey tag (name + NL description) */
   onCreateTag?: (name: string, description: string) => void;
@@ -98,31 +91,9 @@ export default function TagFilter({
   const [creating, setCreating] = React.useState(false);
   const [newName, setNewName] = React.useState('');
   const [newDesc, setNewDesc] = React.useState('');
-  const n = labels.length + origins.length;
+  const n = labels.length;
   const ql = q.toLowerCase().trim();
-
-  // ONE search over both groups: it's the only control that scales no matter
-  // how many tags and segments a project accumulates
-  const shownTags = allTags.filter((t) => t.toLowerCase().includes(ql));
-  const shownSegments = ql
-    ? segments.filter((s) => s.name.toLowerCase().includes(ql))
-    : segments;
-  // at rest, segments follow the app's picker grammar (SegmentsIndicator):
-  // first 5 + a "search to find them" tail — never a 10-row wall
-  const SEG_CAP = 5;
-  const restSegments = ql ? shownSegments : shownSegments.slice(0, SEG_CAP);
-  const hiddenSegs = shownSegments.length - restSegments.length;
-  const showFull = !ql || 'full traffic'.includes(ql);
-  // aggregate "mine" shortcut over the segments I own (Mehdi 07-07): on when
-  // every one of my segments is selected; a click toggles them as a set
-  const myIds = segments.filter((s) => s.mine).map((s) => s.id);
-  const mineOn = myIds.length > 0 && myIds.every((id) => origins.includes(id));
-  const showMine = myIds.length > 0 && (!ql || 'my segments'.includes(ql));
-  const toggleMine = () => {
-    (mineOn ? myIds : myIds.filter((id) => !origins.includes(id))).forEach(
-      onToggleOrigin,
-    );
-  };
+  const shown = allTags.filter((t) => t.toLowerCase().includes(ql));
 
   const closeCreate = () => {
     setCreating(false);
@@ -136,61 +107,16 @@ export default function TagFilter({
   };
 
   const panel = (
-    <div style={{ width: 288 }} className="flex flex-col gap-2">
-      <Input
-        size="small"
-        allowClear
-        placeholder="Search tags and segments"
-        prefix={<Search size={15} style={{ color: 'var(--color-gray-medium)', marginRight: 2 }} />}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-
-      {/* FOUND IN — origin is an issue attribute, filtered like any tag */}
-      {sectionLabel('Found in')}
-      <div className="-mx-1 px-1">
-        {showFull && (
-          <CheckRow
-            on={origins.includes('full')}
-            onClick={() => onToggleOrigin('full')}
-            icon={<Globe size={14} style={{ color: 'var(--color-gray-medium)' }} />}
-          >
-            Full traffic
-          </CheckRow>
-        )}
-        {showMine && (
-          <CheckRow
-            on={mineOn}
-            onClick={toggleMine}
-            icon={<CircleUser size={14} style={{ color: 'var(--color-main)' }} />}
-          >
-            My segments
-          </CheckRow>
-        )}
-        {restSegments.map((s) => (
-          <CheckRow
-            key={s.id}
-            on={origins.includes(s.id)}
-            onClick={() => onToggleOrigin(s.id)}
-            icon={<Split size={14} style={{ color: 'var(--color-main)' }} />}
-          >
-            {s.name}
-          </CheckRow>
-        ))}
-        {hiddenSegs > 0 && (
-          <div className="text-xs px-2 py-1" style={{ color: 'var(--color-gray-medium)' }}>
-            {hiddenSegs} more · search to find them
-          </div>
-        )}
-        {ql && !showFull && !showMine && shownSegments.length === 0 && (
-          <div className="text-xs px-2 py-1" style={{ color: 'var(--color-gray-medium)' }}>
-            No segments match “{q}”
-          </div>
-        )}
-      </div>
-
-      {sectionLabel(
-        'Tags',
+    <div style={{ width: 272 }} className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <Input
+          size="small"
+          allowClear
+          placeholder="Search tags"
+          prefix={<Search size={15} style={{ color: 'var(--color-gray-medium)', marginRight: 2 }} />}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
         <Segmented
           size="small"
           value={match}
@@ -199,12 +125,12 @@ export default function TagFilter({
             { label: 'AND', value: 'all' },
             { label: 'OR', value: 'any' },
           ]}
-        />,
-      )}
+        />
+      </div>
 
-      <div className="overflow-y-auto -mx-1 px-1" style={{ maxHeight: 192 }}>
-        {shownTags.length ? (
-          shownTags.map((t) => (
+      <div className="overflow-y-auto -mx-1 px-1" style={{ maxHeight: 224 }}>
+        {shown.length ? (
+          shown.map((t) => (
             <CheckRow key={t} on={labels.includes(t)} onClick={() => onToggle(t)}>
               {t}
             </CheckRow>
@@ -230,14 +156,7 @@ export default function TagFilter({
         </Button>
       )}
 
-      <div className="flex items-center justify-between border-t pt-2">
-        <span className="text-xs" style={{ color: 'var(--color-gray-medium)' }}>
-          {n} selected
-        </span>
-        <Button type="text" size="small" disabled={!n} onClick={onClear}>
-          Clear
-        </Button>
-      </div>
+      {panelFooter(n, onClear)}
     </div>
   );
 
@@ -250,7 +169,7 @@ export default function TagFilter({
         placement="bottomLeft"
         arrow={false}
         content={panel}
-        classNames={{ root: 'rounded-lg border border-gray-200 shadow-xs overflow-hidden' }}
+        classNames={popoverClassNames}
       >
         <Button size="small" icon={<TagIcon size={14} />}>
           Tags{n ? ` · ${n}` : ''}
@@ -296,5 +215,120 @@ export default function TagFilter({
         </div>
       </Modal>
     </>
+  );
+}
+
+/* ─────────────────────────── Segments ─────────────────────────── */
+
+/** "Found in" filter as its own dropdown — origin is an issue attribute, but a
+ *  different species from tags (where it was captured, not what happened).
+ *  Same trigger grammar as the issue page's Segments control. Rows follow the
+ *  SegmentsIndicator picker at rest: first 5 + "search to find them". */
+export function SegmentFilter({
+  segments,
+  origins,
+  onToggleOrigin,
+  onClear,
+}: {
+  /** `mine` powers the aggregate "My segments" row */
+  segments: { id: number; name: string; mine?: boolean }[];
+  origins: IssueOrigin[];
+  onToggleOrigin: (o: IssueOrigin) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [q, setQ] = React.useState('');
+  const n = origins.length;
+  const ql = q.toLowerCase().trim();
+  const SEG_CAP = 5;
+
+  const shown = ql
+    ? segments.filter((s) => s.name.toLowerCase().includes(ql))
+    : segments;
+  const rest = ql ? shown : shown.slice(0, SEG_CAP);
+  const hidden = shown.length - rest.length;
+  const showFull = !ql || 'full traffic'.includes(ql);
+  // aggregate "mine" shortcut over the segments I own (Mehdi 07-07): on when
+  // every one of my segments is selected; a click toggles them as a set
+  const myIds = segments.filter((s) => s.mine).map((s) => s.id);
+  const mineOn = myIds.length > 0 && myIds.every((id) => origins.includes(id));
+  const showMine = myIds.length > 0 && (!ql || 'my segments'.includes(ql));
+  const toggleMine = () => {
+    (mineOn ? myIds : myIds.filter((id) => !origins.includes(id))).forEach(
+      onToggleOrigin,
+    );
+  };
+
+  const panel = (
+    <div style={{ width: 260 }} className="flex flex-col gap-2">
+      {segments.length > SEG_CAP && (
+        <Input
+          size="small"
+          allowClear
+          placeholder="Search segments"
+          prefix={<Search size={15} style={{ color: 'var(--color-gray-medium)', marginRight: 2 }} />}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+      )}
+      <div className="-mx-1 px-1">
+        {showFull && (
+          <CheckRow
+            on={origins.includes('full')}
+            onClick={() => onToggleOrigin('full')}
+            icon={<Globe size={14} style={{ color: 'var(--color-gray-medium)' }} />}
+          >
+            Full traffic
+          </CheckRow>
+        )}
+        {showMine && (
+          <CheckRow
+            on={mineOn}
+            onClick={toggleMine}
+            icon={<CircleUser size={14} style={{ color: 'var(--color-main)' }} />}
+          >
+            My segments
+          </CheckRow>
+        )}
+        {rest.map((s) => (
+          <CheckRow
+            key={s.id}
+            on={origins.includes(s.id)}
+            onClick={() => onToggleOrigin(s.id)}
+            icon={<Split size={14} style={{ color: 'var(--color-main)' }} />}
+          >
+            {s.name}
+          </CheckRow>
+        ))}
+        {hidden > 0 && (
+          <div className="text-xs px-2 py-1" style={{ color: 'var(--color-gray-medium)' }}>
+            {hidden} more · search to find them
+          </div>
+        )}
+        {ql && !showFull && !showMine && shown.length === 0 && (
+          <div className="text-xs px-2 py-1" style={{ color: 'var(--color-gray-medium)' }}>
+            No segments match “{q}”
+          </div>
+        )}
+      </div>
+      {panelFooter(n, onClear)}
+    </div>
+  );
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      trigger="click"
+      placement="bottomLeft"
+      arrow={false}
+      content={panel}
+      classNames={popoverClassNames}
+    >
+      <Button size="small" icon={<Split size={14} />}>
+        Segments{n ? ` · ${n}` : ''}
+        <ChevronDown size={13} style={{ marginLeft: 2, opacity: 0.6 }} />
+      </Button>
+    </Popover>
   );
 }
