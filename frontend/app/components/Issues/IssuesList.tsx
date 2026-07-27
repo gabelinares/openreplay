@@ -342,13 +342,13 @@ function IssuesList() {
         checked={issuesStore.critOnly}
         onChange={(e) => issuesStore.setCritOnly(e.target.checked)}
       >
-        Critical only ({issuesStore.criticalCount})
+        Critical only · {issuesStore.criticalCount}
       </Checkbox>
       <Checkbox
         checked={issuesStore.showHidden}
         onChange={(e) => issuesStore.setShowHidden(e.target.checked)}
       >
-        Hidden ({issuesStore.hidden.length})
+        Hidden · {issuesStore.hidden.length}
       </Checkbox>
       {/* one toggle for "what's mine": critical-for-me ∪ my segments' finds
           (Mehdi 07-07 — "just show me what's relevant to me"; labeled around
@@ -444,7 +444,7 @@ function IssuesList() {
             content={displayContent}
           >
             <Button size="small" icon={<SlidersHorizontal size={14} />}>
-              Display{dispCount ? ` (${dispCount})` : ''}
+              Display{dispCount ? ` · ${dispCount}` : ''}
               <ChevronDown size={13} style={{ marginLeft: 2, opacity: 0.6 }} />
             </Button>
           </Popover>
