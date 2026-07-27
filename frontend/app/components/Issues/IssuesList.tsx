@@ -52,7 +52,9 @@ import './issues.css';
 export function RowTagChip({ label }: { label: string }) {
   return (
     <span
-      className="text-xs px-2 py-0.5 rounded-md border whitespace-nowrap"
+      // text-sm here = ~12.25px under the 14px html root — the intended tag
+      // size; text-xs resolved to 10.5px and read too small (Gabriel 07-27)
+      className="text-sm px-2 py-0.5 rounded-md border whitespace-nowrap"
       style={{
         borderColor: 'var(--color-gray-light)',
         background: 'var(--color-gray-lightest)',
