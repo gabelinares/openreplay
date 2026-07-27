@@ -43,7 +43,7 @@ import {
 import SelectDateRange from 'Shared/SelectDateRange';
 import Period, { LAST_24_HOURS } from 'Types/app/period';
 import { Pagination } from 'UI';
-import TagFilter from './TagFilter';
+import TagFilter, { SegmentFilter } from './TagFilter';
 import SegmentsIndicator from './segments/SegmentsIndicator';
 import { ImpactGauge, ReasonChip } from './ProblemCard';
 import './issues.css';
@@ -418,20 +418,22 @@ function IssuesList() {
         />
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* tags and segments are separate dropdowns (Gabriel 07-27): what
+              happened vs where it was captured, each scaling on its own */}
           <TagFilter
             allTags={issuesStore.allTags}
             labels={issuesStore.labels}
             match={issuesStore.match}
+            onToggle={issuesStore.toggleLabel}
+            onSetMatch={issuesStore.setMatch}
+            onClear={() => issuesStore.setLabels([])}
+            onCreateTag={issuesStore.addCustomTag}
+          />
+          <SegmentFilter
             segments={issuesStore.originSegments.map((s) => ({ id: s.id, name: s.name, mine: s.mine }))}
             origins={issuesStore.origins}
-            onToggle={issuesStore.toggleLabel}
             onToggleOrigin={issuesStore.toggleOrigin}
-            onSetMatch={issuesStore.setMatch}
-            onClear={() => {
-              issuesStore.setLabels([]);
-              issuesStore.clearOrigins();
-            }}
-            onCreateTag={issuesStore.addCustomTag}
+            onClear={() => issuesStore.clearOrigins()}
           />
 
           <Popover
