@@ -31,8 +31,10 @@ export function SegmentChip({
   on?: boolean;
   onClick?: () => void;
 }) {
+  // text-xs matches RowTagChip — segment chips must not render bigger than
+  // tag chips (Gabriel 07-27, the font-size drift Mehdi flagged)
   const className =
-    'inline-flex items-center gap-1.5 border rounded-full px-2.5 py-0.5 transition-colors';
+    'inline-flex items-center gap-1.5 border rounded-full px-2.5 py-0.5 text-xs transition-colors';
   const style = on
     ? {
         color: 'var(--color-main)',
