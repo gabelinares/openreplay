@@ -1254,26 +1254,28 @@ function IssueSessionPlayer() {
                   >
                     {card.variation}
                   </span>
-                  {/* same SegmentChip as the issue page's "Found in" row,
-                      read-only here; "+N" overflow lists the rest */}
+                  {/* ONE line, always (Mehdi 07-27: the block crowded the panel
+                      next to long LLM descriptions): first segment as the shared
+                      chip, everything else behind the list's "+N" tooltip */}
                   {sessionSegs.length > 0 && (
-                    <div className="flex items-center gap-1.5 flex-wrap text-sm">
-                      <span style={{ color: 'var(--color-gray-medium)' }}>
+                    <div className="flex items-center gap-1.5 text-sm overflow-hidden">
+                      <span
+                        className="shrink-0"
+                        style={{ color: 'var(--color-gray-medium)' }}
+                      >
                         Segments:
                       </span>
-                      {sessionSegs.slice(0, 3).map((seg) => (
-                        <SegmentChip key={seg.id} name={seg.name} />
-                      ))}
-                      {sessionSegs.length > 3 && (
+                      <SegmentChip name={sessionSegs[0].name} />
+                      {sessionSegs.length > 1 && (
                         <Tooltip
-                          title={sessionSegs.slice(3).map((s) => s.name).join(', ')}
+                          title={sessionSegs.slice(1).map((s) => s.name).join(', ')}
                           placement="top"
                         >
                           <span
                             className="text-xs shrink-0 cursor-default"
                             style={{ color: 'var(--color-gray-medium)' }}
                           >
-                            +{sessionSegs.length - 3}
+                            +{sessionSegs.length - 1}
                           </span>
                         </Tooltip>
                       )}
