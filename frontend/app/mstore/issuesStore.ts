@@ -663,14 +663,34 @@ export default class IssuesStore {
       arrival (propagation), then user-controlled via the Segments dropdown;
       headline stats stay GLOBAL (Gabriel 07-21: sessions-only scoping). */
   detailScope: number[] = [];
+  /** customer-defined journey tags (Mehdi 07-27): name + a natural-language
+      description the LLM matches against each session's journey. Attribution
+      is automatic; the description is authored once. Kept even with zero
+      matches so the tag stays discoverable in filters and (later) settings. */
+  customTags: { name: string; description: string }[] = [];
 
   constructor() {
     makeAutoObservable(this);
   }
 
+  addCustomTag = (name: string, description: string) => {
+    if (
+      this.customTags.some(
+        (t) => t.name.toLowerCase() === name.toLowerCase(),
+      )
+    )
+      return;
+    this.customTags.push({ name, description });
+  };
+
   // ---- derived ----
   get allTags(): string[] {
-    return [...new Set(this.all.flatMap((i) => i.tags))].sort();
+    return [
+      ...new Set([
+        ...this.all.flatMap((i) => i.tags),
+        ...this.customTags.map((t) => t.name),
+      ]),
+    ].sort();
   }
 
   catCount(c: CategoryName): number {

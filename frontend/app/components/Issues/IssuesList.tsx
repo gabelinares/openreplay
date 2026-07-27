@@ -431,6 +431,7 @@ function IssuesList() {
               issuesStore.setLabels([]);
               issuesStore.clearOrigins();
             }}
+            onCreateTag={issuesStore.addCustomTag}
           />
 
           <Popover
