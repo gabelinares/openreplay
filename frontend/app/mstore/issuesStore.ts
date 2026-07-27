@@ -683,6 +683,19 @@ export default class IssuesStore {
     this.customTags.push({ name, description });
   };
 
+  updateCustomTag = (oldName: string, name: string, description: string) => {
+    this.customTags = this.customTags.map((t) =>
+      t.name === oldName ? { name, description } : t,
+    );
+    // an active filter follows the rename instead of going stale
+    this.labels = this.labels.map((l) => (l === oldName ? name : l));
+  };
+
+  removeCustomTag = (name: string) => {
+    this.customTags = this.customTags.filter((t) => t.name !== name);
+    this.labels = this.labels.filter((l) => l !== name);
+  };
+
   // ---- derived ----
   get allTags(): string[] {
     return [
@@ -1093,3 +1106,23 @@ export default class IssuesStore {
     }
   };
 }
+
+/** The predefined journey labels (Mehdi 07-27): static, high-level on purpose
+ *  ("applicable to 80-90% of websites"), each with the description the LLM
+ *  matches against a session's journey. Customers extend them with their own
+ *  tags in Preferences > Agents. */
+export const PREDEFINED_JOURNEY_TAGS: {
+  name: string;
+  description: string;
+}[] = [
+  { name: 'Navigation', description: 'The user browses across pages or sections without a transactional goal.' },
+  { name: 'Onboarding', description: 'First-run steps: signup, initial setup, tutorials or welcome flows.' },
+  { name: 'Checkout', description: 'The user moves through a cart or order flow toward placing an order.' },
+  { name: 'Payment', description: 'Entering or confirming payment details, or completing a charge.' },
+  { name: 'Form submission', description: 'Filling and submitting any form, including multi-step ones.' },
+  { name: 'Workflow completed', description: 'A multi-step task reaches its intended end state.' },
+  { name: 'Drop off', description: 'The user abandons a flow before reaching its end state.' },
+  { name: 'Back and forth', description: 'Repeated switching between the same pages or steps, suggesting hesitation.' },
+  { name: 'Error encountered', description: 'The session hits a visible error state, message or broken page.' },
+  { name: 'Frustration', description: 'Rage clicks, dead clicks or rapid repeated actions on the same element.' },
+];

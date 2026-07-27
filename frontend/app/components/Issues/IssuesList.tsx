@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   SlidersHorizontal,
   Album,
+  Settings as SettingsIcon,
   ChevronDown,
   Split,
   Globe,
@@ -385,6 +386,15 @@ function IssuesList() {
           <SegmentsIndicator />
         </div>
         <div className="flex items-center gap-2">
+          {/* shortcut to Preferences > Agents (Gabriel 07-27) — same treatment
+              as the Tests page header */}
+          <Button
+            type="text"
+            icon={<SettingsIcon size={14} />}
+            onClick={() => history.push('/client/agents')}
+          >
+            Settings
+          </Button>
           <a
             href="https://docs.openreplay.com/"
             target="_blank"
