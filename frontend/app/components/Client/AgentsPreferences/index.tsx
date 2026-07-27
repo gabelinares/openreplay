@@ -4,7 +4,6 @@ import {
   Button,
   Divider,
   Dropdown,
-  Select,
   Switch,
   Table,
   Tooltip,
@@ -47,8 +46,11 @@ function AgentsPreferences() {
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<TagRow | null>(null);
 
-  // notification preferences — mock-local, the shape is the spec
-  const [issuesDigest, setIssuesDigest] = React.useState<'off' | 'daily' | 'weekly'>('daily');
+  // notification preferences — mock-local, the shape is the spec. Toggles,
+  // not a dropdown (Gabriel 07-27): every channel reads at a glance and the
+  // two rows share one control grammar
+  const [issuesDaily, setIssuesDaily] = React.useState(true);
+  const [issuesWeekly, setIssuesWeekly] = React.useState(false);
   const [issuesSlack, setIssuesSlack] = React.useState(false);
   const [runFailEmail, setRunFailEmail] = React.useState(true);
   const [runFailSlack, setRunFailSlack] = React.useState(false);
@@ -180,17 +182,22 @@ function AgentsPreferences() {
               </Typography.Text>
             </div>
             <div className="flex items-center gap-4 shrink-0">
-              <Select
-                size="small"
-                value={issuesDigest}
-                onChange={setIssuesDigest}
-                style={{ width: 110 }}
-                options={[
-                  { value: 'daily', label: t('Daily email') },
-                  { value: 'weekly', label: t('Weekly email') },
-                  { value: 'off', label: t('No email') },
-                ]}
-              />
+              <span className="flex items-center gap-2 text-sm">
+                {t('Daily email')}
+                <Switch
+                  size="small"
+                  checked={issuesDaily}
+                  onChange={setIssuesDaily}
+                />
+              </span>
+              <span className="flex items-center gap-2 text-sm">
+                {t('Weekly email')}
+                <Switch
+                  size="small"
+                  checked={issuesWeekly}
+                  onChange={setIssuesWeekly}
+                />
+              </span>
               <span className="flex items-center gap-2 text-sm">
                 {t('Slack')}
                 <Switch
