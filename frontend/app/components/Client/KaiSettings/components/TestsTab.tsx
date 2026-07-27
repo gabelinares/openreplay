@@ -3,7 +3,6 @@ import {
   Badge,
   Button,
   Dropdown,
-  Input,
   Segmented,
   Select,
   Table,
@@ -53,12 +52,11 @@ function TestsTab() {
   // tests live in the shared store — Settings (environment deletion) mutates them too.
   // pauseOnRevision decides whether a pending revision reads "Needs review" and
   // suspends the run controls, or the test keeps running while the review waits.
-  const { tests, pauseOnRevision } = useKaiStore();
+  const { tests, pauseOnRevision, testsQuery: query } = useKaiStore();
   const { setTests } = kaiStore;
   const { confirmDelete, confirmDismissSuggestion } = useConfirms();
   const { modal } = App.useApp();
   const statusOf = (tc: TestCase) => displayStatus(tc, pauseOnRevision);
-  const [query, setQuery] = useState('');
   const [statusTab, setStatusTab] = useState<StatusTab>('all');
   const [envFilter, setEnvFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('all');
@@ -735,9 +733,9 @@ function TestsTab() {
 
   return (
     <div className="flex flex-col">
-      {/* controls bar — status tabs + search up front (left), filters trail
-          (right). Search rides with the primary controls, wider (Mehdi 07-20:
-          the filter cluster was getting crowded; same arrangement as Runs). */}
+      {/* controls bar — status tabs (left), filters (right). Search lives in
+          the page's MAIN tab bar (index.tsx), not here: keeps this row to one
+          line (Gabriel 07-27). Bulk mode swaps the whole right cluster. */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap">
         <div className="flex items-center gap-2">
           <Segmented
@@ -745,14 +743,6 @@ function TestsTab() {
             value={statusTab}
             onChange={(v) => setStatusTab(v as StatusTab)}
             options={statusOptions}
-          />
-          <Input.Search
-            size="small"
-            allowClear
-            placeholder={t('Search tests')}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{ width: 220 }}
           />
         </div>
         {/* selecting rows swaps the filters out for bulk actions — same row, no

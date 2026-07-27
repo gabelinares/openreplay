@@ -1,6 +1,5 @@
 import {
   Button,
-  Input,
   Segmented,
   Select,
   Table,
@@ -64,7 +63,8 @@ const TAG_NAMES = Array.from(
 
 function RunsTab() {
   const { t } = useTranslation();
-  const [query, setQuery] = useState('');
+  // search input renders in the page's main tab bar (index.tsx); query is shared
+  const { runsQuery: query, runsTestFilter, runsOpenRunKey } = useKaiStore();
   const [statusTab, setStatusTab] = useState<StatusTab>('all');
   const [envFilter, setEnvFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('all');
@@ -84,10 +84,9 @@ function RunsTab() {
 
   // a test drawer's "View all runs" shortcut lands here: adopt the test as the search
   // query (one-shot — clearing the search shows everything again)
-  const { runsTestFilter, runsOpenRunKey } = useKaiStore();
   useEffect(() => {
     if (runsTestFilter) {
-      setQuery(runsTestFilter);
+      kaiStore.setRunsQuery(runsTestFilter);
       setStatusTab('all');
       kaiStore.clearRunsTestFilter();
     }
@@ -275,9 +274,9 @@ function RunsTab() {
 
   return (
     <div className="flex flex-col">
-      {/* controls bar — status tabs + search up front (left), filters trail
-          (right; same arrangement as Tests). Search moved out of the filter
-          cluster and got wider (Mehdi 07-20: the row was full of stuff). */}
+      {/* controls bar — status tabs (left), filters (right). Search lives in
+          the page's MAIN tab bar (index.tsx), not here: keeps this row to one
+          line (Gabriel 07-27; same arrangement as Tests). */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap">
         <div className="flex items-center gap-2">
           <Segmented
@@ -285,14 +284,6 @@ function RunsTab() {
             value={statusTab}
             onChange={(v) => setStatusTab(v as StatusTab)}
             options={statusOptions}
-          />
-          <Input.Search
-            size="small"
-            allowClear
-            placeholder={t('Search runs')}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{ width: 220 }}
           />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
