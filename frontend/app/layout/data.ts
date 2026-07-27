@@ -281,7 +281,8 @@ export const preferences: (t: TFunction) => Category[] = (t) => [
         // run defaults) stays with each agent's page.
         label: t('Agents'),
         key: PREFERENCES_MENU.AGENTS,
-        icon: 'analytics',
+        // same icon as the main nav's Agents group
+        icon: 'scan-pulse',
       },
       {
         // moved to the main left nav ("Agents" section); route kept for
