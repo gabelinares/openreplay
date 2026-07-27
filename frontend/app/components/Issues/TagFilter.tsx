@@ -76,6 +76,7 @@ export default function TagFilter({
   onToggleOrigin,
   onSetMatch,
   onClear,
+  onCreateTag,
 }: {
   allTags: string[];
   labels: string[];
