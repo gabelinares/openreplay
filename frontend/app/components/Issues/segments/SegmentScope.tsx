@@ -31,12 +31,10 @@ export function SegmentChip({
   on?: boolean;
   onClick?: () => void;
 }) {
-  // size INHERITS from context on purpose (Gabriel 07-27): in the Found-in row
-  // the chip is an interactive filter control and reads at text-sm like the
-  // toolbar dropdowns; the read-only replay panel wraps it in text-xs so it
-  // sits with the meta/tag scale there
+  // text-xs matches RowTagChip — segment chips must not render bigger than
+  // tag chips (Gabriel 07-27, the font-size drift Mehdi flagged)
   const className =
-    'inline-flex items-center gap-1.5 border rounded-full px-2.5 py-0.5 transition-colors';
+    'inline-flex items-center gap-1.5 border rounded-full px-2.5 py-0.5 text-xs transition-colors';
   const style = on
     ? {
         color: 'var(--color-main)',
