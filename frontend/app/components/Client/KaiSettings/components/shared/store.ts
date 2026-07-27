@@ -22,6 +22,10 @@ interface KaiState {
   // failed run), consumed by RunsTab
   runsTestFilter: string | null;
   runsOpenRunKey: string | null;
+  // search queries live here (not in the tabs) because the search input renders in
+  // the page's main tab bar (index.tsx) and targets whichever tab is active
+  testsQuery: string;
+  runsQuery: string;
 }
 
 let state: KaiState = {
@@ -36,6 +40,8 @@ let state: KaiState = {
   activeTab: 'tests',
   runsTestFilter: null,
   runsOpenRunKey: null,
+  testsQuery: '',
+  runsQuery: '',
 };
 
 const listeners = new Set<() => void>();
@@ -61,6 +67,8 @@ export const kaiStore = {
   setPauseOnRevision: (pauseOnRevision: boolean) => set({ pauseOnRevision }),
 
   setActiveTab: (activeTab: KaiTab) => set({ activeTab }),
+  setTestsQuery: (testsQuery: string) => set({ testsQuery }),
+  setRunsQuery: (runsQuery: string) => set({ runsQuery }),
   /** "View all runs" on a test — jump to the Runs tab filtered to that test. */
   showRunsForTest: (testName: string) =>
     set({ activeTab: 'runs', runsTestFilter: testName }),

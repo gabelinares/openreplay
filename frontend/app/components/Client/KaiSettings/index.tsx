@@ -1,5 +1,5 @@
 import withPageTitle from 'HOCs/withPageTitle';
-import { Button, Tabs, Tooltip } from 'antd';
+import { Button, Input, Tabs, Tooltip } from 'antd';
 import { Album, Info } from 'lucide-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +12,25 @@ import { KaiTab, kaiStore, useKaiStore } from './components/shared/store';
 function KaiSettings() {
   const { t } = useTranslation();
   // controlled by the store so drawers can deep-link across tabs ("View runs")
-  const { activeTab } = useKaiStore();
+  const { activeTab, testsQuery, runsQuery } = useKaiStore();
+
+  // search sits on the main tab line (Gabriel 07-27: keeps each tab's controls
+  // bar to a single line) and targets whichever tab is active
+  const search =
+    activeTab === 'settings' ? null : (
+      <Input.Search
+        size="small"
+        allowClear
+        placeholder={activeTab === 'tests' ? t('Search tests') : t('Search runs')}
+        value={activeTab === 'tests' ? testsQuery : runsQuery}
+        onChange={(e) =>
+          activeTab === 'tests'
+            ? kaiStore.setTestsQuery(e.target.value)
+            : kaiStore.setRunsQuery(e.target.value)
+        }
+        style={{ width: 220 }}
+      />
+    );
 
   const tabItems = [
     {
@@ -69,6 +87,7 @@ function KaiSettings() {
         onChange={(k) => kaiStore.setActiveTab(k as KaiTab)}
         items={tabItems}
         tabBarStyle={{ paddingLeft: 16, paddingRight: 16, marginBottom: 0 }}
+        tabBarExtraContent={{ right: search }}
       />
     </div>
   );
