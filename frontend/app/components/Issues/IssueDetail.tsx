@@ -668,27 +668,31 @@ function IssueDetail() {
 
       {/* example sessions — a rotating sample (not the full set) + NL journey search */}
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <span className="text-base font-semibold text-black">
-              Example sessions
-            </span>
-            <Tooltip title="A sample of the sessions where the agent detected this issue, not the full set. Search or load more to see other examples.">
-              <Info size={15} style={{ color: 'var(--color-gray-medium)' }} />
-            </Tooltip>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
+        {/* the toolbar shares the cards' 3-column grid, so the search sits
+            exactly on the third column and grows with the screen (Mehdi 07-27:
+            it rendered fixed-width because the old calc was relative to the
+            toolbar's right cluster, not the page grid) */}
+        <div className="grid items-center gap-x-4 gap-y-2 md:grid-cols-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap md:col-span-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-base font-semibold text-black">
+                Example sessions
+              </span>
+              <Tooltip title="A sample of the sessions where the agent detected this issue, not the full set. Search or load more to see other examples.">
+                <Info size={15} style={{ color: 'var(--color-gray-medium)' }} />
+              </Tooltip>
+            </div>
             {/* sessions-only scope (Gabriel 07-21): headline stats stay global */}
             <SegmentScopeFilter issue={issue} />
-            {/* no refresh button — "Load more" covers picking up other examples */}
-            <AutoComplete
+          </div>
+          {/* no refresh button — "Load more" covers picking up other examples */}
+          <AutoComplete
             value={query}
             onChange={(v) => setQuery(v)}
             options={suggestions}
             onSelect={runSearch}
             listHeight={160} // ~5 rows visible, the rest by scroll
-            // aligns with the third card of the 3-column grid below (gap-4)
-            style={{ width: 'calc((100% - 2rem) / 3)', minWidth: 280 }}
+            style={{ width: '100%' }}
           >
             <Input.Search
               size="small"
@@ -697,8 +701,7 @@ function IssueDetail() {
               placeholder="Describe the journey to find…"
               onSearch={runSearch}
             />
-            </AutoComplete>
-          </div>
+          </AutoComplete>
         </div>
 
         {searching ? (
