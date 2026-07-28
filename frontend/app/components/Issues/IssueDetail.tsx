@@ -314,8 +314,12 @@ function ClampedTitle({
     const el = measureRef.current;
     if (!el) return undefined;
     const report = () => {
-      const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 1;
-      const n = Math.max(1, Math.round(el.scrollHeight / lineHeight));
+      // re-read the ref and skip detached nodes: ResizeObserver fires a final
+      // 0-size event for removed elements, which would reset the count
+      const node = measureRef.current;
+      if (!node || !node.isConnected) return;
+      const lineHeight = parseFloat(getComputedStyle(node).lineHeight) || 1;
+      const n = Math.max(1, Math.round(node.scrollHeight / lineHeight));
       setNatural(n);
       onNaturalLines(n);
     };
@@ -354,7 +358,10 @@ function ClampedTitle({
       </span>
     </span>
   );
-  return natural > lines ? <Tooltip title={text}>{title}</Tooltip> : title;
+  // ALWAYS wrapped: an empty title just never opens. Flipping between wrapped
+  // and bare would remount the measured DOM — the ResizeObserver then reads
+  // the detached clone as 0 lines and the tooltip kills itself.
+  return <Tooltip title={natural > lines ? text : ''}>{title}</Tooltip>;
 }
 
 /* Session card — the Spots card (same thumbnail block: hover play overlay, teal
