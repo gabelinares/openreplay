@@ -229,12 +229,15 @@ export function SegmentFilter({
   origins,
   onToggleOrigin,
   onClear,
+  showFullTraffic = true,
 }: {
   /** `mine` powers the aggregate "My segments" row */
   segments: { id: number; name: string; mine?: boolean }[];
   origins: IssueOrigin[];
   onToggleOrigin: (o: IssueOrigin) => void;
   onClear: () => void;
+  /** the issue page scopes sessions to segments only — no "Full traffic" row */
+  showFullTraffic?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState('');
@@ -247,7 +250,7 @@ export function SegmentFilter({
     : segments;
   const rest = ql ? shown : shown.slice(0, SEG_CAP);
   const hidden = shown.length - rest.length;
-  const showFull = !ql || 'full traffic'.includes(ql);
+  const showFull = showFullTraffic && (!ql || 'full traffic'.includes(ql));
   // aggregate "mine" shortcut over the segments I own (Mehdi 07-07): on when
   // every one of my segments is selected; a click toggles them as a set
   const myIds = segments.filter((s) => s.mine).map((s) => s.id);

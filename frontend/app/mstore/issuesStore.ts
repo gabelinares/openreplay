@@ -408,8 +408,11 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
     real: 'When the payment processor returns a declined status, the checkout UI swallows the error entirely — no message, no toast, no inline validation. The "Place order" button simply resets to its default state, so the user has no idea whether the charge failed, succeeded, or is still pending. Most retry the exact same card two or three times before giving up, and a meaningful share of them never complete the purchase at all.',
     journey: 'User filled in card details, hit "Place order", saw the spinner end with nothing, retried the same card twice, then abandoned the cart.',
     sessions: [
-      { email: 'daniel@black-bird.io', plan: 'paid', browser: 'Chrome', os: 'Mac OS X', loc: 'Frankfurt am Main', dur: '12m1s', variation: 'Order silently failed, retried twice', tags: ['Payment', 'Checkout', 'Error'], journey: 'Filled in card details, hit "Place order", watched the spinner end with nothing, re-entered the same card twice, then left the cart.' },
-      { email: 'lucas@finhub.io', plan: 'paid', browser: 'Chrome', os: 'Windows', loc: 'Toronto', dur: '9m12s', variation: 'Bounced back to the form, abandoned', tags: ['Checkout', 'Frustration', 'Drop-off'], journey: 'Reached checkout, submitted payment, got silently bounced back to the form, grew visibly frustrated and abandoned.' },
+      // demo pair for the shared title slot (07-28): the first variation runs
+      // PAST three lines (truncated + tooltip), the second sits at ~three
+      // lines untruncated — together they exercise both ends of the clamp
+      { email: 'daniel@black-bird.io', plan: 'paid', browser: 'Chrome', os: 'Mac OS X', loc: 'Frankfurt am Main', dur: '12m1s', variation: 'The order failed silently after the processor declined the card: the spinner ran for a few seconds, the button reset with no message anywhere on the page, and nothing acknowledged the failure — he retried the exact same card twice, checked his bank app for a pending charge, and finally left the cart without completing the purchase.', tags: ['Payment', 'Checkout', 'Error'], journey: 'Filled in card details, hit "Place order", watched the spinner end with nothing, re-entered the same card twice, then left the cart.' },
+      { email: 'lucas@finhub.io', plan: 'paid', browser: 'Chrome', os: 'Windows', loc: 'Toronto', dur: '9m12s', variation: 'Submitted payment and was silently bounced back to the checkout form with every field still filled and no error or toast in sight, grew visibly frustrated and abandoned the order after two attempts.', tags: ['Checkout', 'Frustration', 'Drop-off'], journey: 'Reached checkout, submitted payment, got silently bounced back to the form, grew visibly frustrated and abandoned.' },
       { email: 'amara@shopwave.co', plan: 'trial', browser: 'Safari', os: 'iOS', loc: 'Lagos', dur: '6m03s', variation: 'Pay button reset on mobile', tags: ['Payment', 'Drop-off'], journey: 'Tried to pay on her phone, saw the button reset with no message, and gave up after a single attempt.' },
     ],
   },
@@ -423,7 +426,8 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
     real: 'On mobile viewports the primary "Place order" button receives the tap event but never fires its click handler, so the order is never submitted. An overlay element appears to be intercepting the touch, which is why the button looks active but does nothing. Users tap it repeatedly — classic rage-click behaviour — scroll around hunting for an error that never appears, and then abandon the session.',
     journey: 'User reached the checkout step on a phone, tapped "Place order" seven times in a row, scrolled up and back down looking for an error, then left.',
     sessions: [
-      { email: 'main@badmanners.gg', plan: 'trial', browser: 'Safari', os: 'iOS', loc: 'Islamabad', dur: '8m7s', variation: 'Tapped seven times, nothing fired', tags: ['Checkout', 'Rage Clicks', 'Frustration'], journey: 'Tapped "Place order" seven times in a row on a phone, nothing fired, scrolled up and down hunting for an error, then quit.' },
+      // ~two lines: this issue's grid slots titles at 2 (no three-line gap)
+      { email: 'main@badmanners.gg', plan: 'trial', browser: 'Safari', os: 'iOS', loc: 'Islamabad', dur: '8m7s', variation: 'Tapped "Place order" seven times on a phone, nothing fired and no error appeared anywhere, then quit the checkout for good.', tags: ['Checkout', 'Rage Clicks', 'Frustration'], journey: 'Tapped "Place order" seven times in a row on a phone, nothing fired, scrolled up and down hunting for an error, then quit.' },
       { email: 'priya@meshcart.in', plan: 'free', browser: 'Chrome', os: 'Android', loc: 'Mumbai', dur: '5m44s', variation: 'Looped between cart and checkout', tags: ['Checkout', 'Back-and-Forth'], journey: 'Tapped the order button, looped back to the cart and forward again twice, and never got a response.' },
     ],
   },
@@ -663,6 +667,12 @@ export default class IssuesStore {
       arrival (propagation), then user-controlled via the Segments dropdown;
       headline stats stay GLOBAL (Gabriel 07-21: sessions-only scoping). */
   detailScope: number[] = [];
+  /** ISSUE-PAGE tag filter (Mehdi 07-28): example sessions filtered by their
+      journey tags, the exact grammar of the list's Tags dropdown (AND/OR,
+      search, New tag). Seeded from the list's labels on arrival, like the
+      segment scope. Sessions-only, headline stats stay global. */
+  detailLabels: string[] = [];
+  detailMatch: MatchMode = 'all';
   /** customer-defined journey tags (Mehdi 07-27): name + a natural-language
       description the LLM matches against each session's journey. Attribution
       is automatic; the description is authored once. Kept even with zero
@@ -771,7 +781,7 @@ export default class IssuesStore {
   /** Example-session cards for the issue detail page, resolved from the shared
       session pool (same entities as the Sessions page). Falls back to the
       issue-authored summaries if no pool ids are mapped. */
-  exampleSessions(issue: Issue, opts?: { ignoreScope?: boolean }): IssueSessionCard[] {
+  exampleSessions(issue: Issue, opts?: { ignoreFilters?: boolean }): IssueSessionCard[] {
     // The curated ids come first; we then top up from the shared pool so the detail
     // page can "load more" / "refresh" through a bigger sample (the only count shown
     // is the quiet matched-sessions total, see journeyMatchTotal).
@@ -781,13 +791,21 @@ export default class IssuesStore {
     );
     // segment scope (detail page): only sessions matching ANY scoped segment.
     // Applied BEFORE the sample slice so "load more" keeps honoring the scope.
-    const scopeSeeds = (opts?.ignoreScope ? [] : this.detailScope)
+    const scopeSeeds = (opts?.ignoreFilters ? [] : this.detailScope)
       .map((id) => this.segmentById(id)?.seeds)
       .filter((x): x is SavedSegment['seeds'] => Boolean(x));
     const inScope = (id: string) =>
       scopeSeeds.length === 0 ||
       scopeSeeds.some((seeds) => sessionMatchesSeeds(id, seeds));
-    const orderedIds = [...curated, ...extra].filter(inScope).slice(0, 12);
+    // tag filter (detail page): tags ride the mapped card, so this one applies
+    // AFTER mapping — and the sample slice moves after it, same reason as scope
+    const detailLabels = opts?.ignoreFilters ? [] : this.detailLabels;
+    const matchesTags = (tags: string[]) =>
+      detailLabels.length === 0 ||
+      (this.detailMatch === 'any'
+        ? detailLabels.some((t) => tags.includes(t))
+        : detailLabels.every((t) => tags.includes(t)));
+    const orderedIds = [...curated, ...extra].filter(inScope);
     const fromPool = orderedIds
       .map((id, i) => {
         const s = getMockSessionById(id);
@@ -820,25 +838,30 @@ export default class IssuesStore {
         };
       })
       .filter((s): s is IssueSessionCard => Boolean(s));
-    if (fromPool.length) return fromPool;
-    return issue.sessions.map((s, i) => ({
-      sessionId: `${issue.id}-${i}`,
-      email: s.email,
-      browser: s.browser,
-      os: s.os,
-      city: s.loc,
-      country: '',
-      loc: s.loc,
-      durMs: 0,
-      dur: s.dur,
-      date: '',
-      device: 'desktop',
-      events: 0,
-      plan: s.plan,
-      tags: s.tags,
-      journey: s.journey,
-      variation: s.variation,
-    }));
+    // the authored fallback is for issues with no pool mapping at all — a tag
+    // filter that excludes every pool card returns empty (the page's empty state)
+    if (fromPool.length)
+      return fromPool.filter((s) => matchesTags(s.tags)).slice(0, 12);
+    return issue.sessions
+      .map((s, i) => ({
+        sessionId: `${issue.id}-${i}`,
+        email: s.email,
+        browser: s.browser,
+        os: s.os,
+        city: s.loc,
+        country: '',
+        loc: s.loc,
+        durMs: 0,
+        dur: s.dur,
+        date: '',
+        device: 'desktop',
+        events: 0,
+        plan: s.plan,
+        tags: s.tags,
+        journey: s.journey,
+        variation: s.variation,
+      }))
+      .filter((s) => matchesTags(s.tags));
   }
 
   // ---- actions ----
@@ -904,6 +927,15 @@ export default class IssuesStore {
   clearDetailScope = () => {
     this.detailScope = [];
   };
+  // ---- issue-page tag filter (same shape as the list's labels/match) ----
+  setDetailLabels = (l: string[]) => { this.detailLabels = l; };
+  toggleDetailLabel = (t: string) => {
+    this.detailLabels = this.detailLabels.includes(t)
+      ? this.detailLabels.filter((x) => x !== t)
+      : [...this.detailLabels, t];
+  };
+  setDetailMatch = (m: MatchMode) => { this.detailMatch = m; };
+  clearDetailLabels = () => { this.detailLabels = []; };
   /** every saved segment whose conditions match this pool session */
   sessionSegments = (sessionId: string): SavedSegment[] =>
     this.segments.filter(
