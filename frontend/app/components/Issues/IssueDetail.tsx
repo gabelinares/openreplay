@@ -42,11 +42,9 @@ import {
   JOURNEY_SEARCH_SUGGESTIONS,
 } from 'App/mstore/issuesStore';
 import ProblemCard, { ReasonChip } from './ProblemCard';
-import {
-  FoundInChips,
-  SegmentScopeFilter,
-  syncScopeToUrl,
-} from './segments/SegmentScope';
+import TagFilter, { SegmentFilter } from './TagFilter';
+import TagsRow from './TagsRow';
+import { FoundInChips, syncScopeToUrl } from './segments/SegmentScope';
 import { MOCK_THUMB } from './mockThumb';
 
 /* Issue detail — the intermediary page, built from real app primitives to keep
@@ -293,20 +291,40 @@ function ReplayStage({
   );
 }
 
-function TagChip({ label }: { label: string }) {
-  return (
-    // one chip size across the Issues surface — the list's (smaller) size
+/* Card title clamped to a FIXED 3-line slot (Mehdi 07-28): variation texts
+   run from one to many lines, which pushed tags and footer to different
+   heights per card — the fixed slot keeps every card the same size. Longer
+   titles truncate with an ellipsis and surface whole in a tooltip. */
+function ClampedTitle({ text }: { text: string }) {
+  const ref = React.useRef<HTMLSpanElement>(null);
+  const [clamped, setClamped] = React.useState(false);
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const check = () => setClamped(el.scrollHeight > el.clientHeight + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text]);
+  const title = (
     <span
-      className="text-xs px-2 py-0.5 rounded-md border whitespace-nowrap"
+      ref={ref}
+      className="text-sm font-medium"
       style={{
-        borderColor: 'var(--color-gray-light)',
-        background: 'var(--color-gray-lightest)',
-        color: 'var(--color-gray-dark)',
+        color: 'var(--color-gray-darkest)',
+        lineHeight: 1.35,
+        display: '-webkit-box',
+        WebkitLineClamp: 3,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+        height: `${3 * 1.35}em`,
       }}
     >
-      {label}
+      {text}
     </span>
   );
+  return clamped ? <Tooltip title={text}>{title}</Tooltip> : title;
 }
 
 /* Session card — the Spots card (same thumbnail block: hover play overlay, teal
@@ -357,21 +375,14 @@ function SpotCard({
       </div>
       {/* This card is a VARIATION of the issue, not a user profile — lead with
           how this session experienced it, then the behavioral tags. The session's
-          environment specs live behind "More" so the card stays clean. */}
+          environment specs live behind "More" so the card stays clean. Every
+          footer row has a FIXED height (3-line title slot, one-line tags row),
+          so all cards are the same size and the rows align across the grid. */}
       <div className="border-t px-3 py-3 flex flex-col gap-2">
-        <span
-          className="text-sm font-medium"
-          style={{ color: 'var(--color-gray-darkest)', lineHeight: 1.35 }}
-        >
-          {s.variation || s.journey}
-        </span>
-        {s.tags.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {s.tags.slice(0, 3).map((t) => (
-              <TagChip key={t} label={t} />
-            ))}
-          </div>
-        )}
+        <ClampedTitle text={s.variation || s.journey} />
+        <div className="flex items-center" style={{ height: 24 }}>
+          <TagsRow tags={s.tags} />
+        </div>
         <div
           className="flex items-center justify-between text-xs"
           style={{ color: 'var(--color-gray-medium)' }}
@@ -505,6 +516,12 @@ function IssueDetail() {
       issuesStore.setDetailScope(fromList);
       syncScopeToUrl(issuesStore.detailScope);
     }
+    // the list's tag filter propagates in too (only tags this issue carries —
+    // a leftover label from an OR match would filter against nothing here)
+    issuesStore.setDetailMatch(issuesStore.match);
+    issuesStore.setDetailLabels(
+      issue ? issuesStore.labels.filter((t) => issue.tags.includes(t)) : [],
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [issue?.id]);
 
@@ -540,6 +557,11 @@ function IssueDetail() {
   // quiet matched-sessions total bottom-left of the grid. Search rotates `seed`;
   // "load more" reveals up to 10 (it replaced the refresh button).
   const allExamples = issuesStore.exampleSessions(issue);
+  // tag options mirror the segment dropdown's issue-scoped set: the tags this
+  // issue's sessions carry, plus custom tags (discoverable even at zero matches)
+  const detailTagOptions = [
+    ...new Set([...issue.tags, ...issuesStore.customTags.map((t) => t.name)]),
+  ].sort();
   const rot = allExamples.length ? seed % allExamples.length : 0;
   const rotated = [...allExamples.slice(rot), ...allExamples.slice(0, rot)];
   const MAX_EXAMPLES = Math.min(10, allExamples.length);
@@ -682,8 +704,38 @@ function IssueDetail() {
                 <Info size={15} style={{ color: 'var(--color-gray-medium)' }} />
               </Tooltip>
             </div>
-            {/* sessions-only scope (Gabriel 07-21): headline stats stay global */}
-            <SegmentScopeFilter issue={issue} />
+            {/* sessions-only filters (Gabriel 07-21): headline stats stay
+                global. Tags + Segments are the list page's exact two dropdowns
+                (Mehdi 07-28) — same components, wired to the detail scope. */}
+            <div className="flex items-center gap-2">
+              <TagFilter
+                allTags={detailTagOptions}
+                labels={issuesStore.detailLabels}
+                match={issuesStore.detailMatch}
+                onToggle={issuesStore.toggleDetailLabel}
+                onSetMatch={issuesStore.setDetailMatch}
+                onClear={issuesStore.clearDetailLabels}
+                onCreateTag={issuesStore.addCustomTag}
+              />
+              <SegmentFilter
+                segments={issuesStore.issueSegments(issue).map(({ segment }) => ({
+                  id: segment.id,
+                  name: segment.name,
+                  mine: segment.mine,
+                }))}
+                origins={issuesStore.detailScope}
+                onToggleOrigin={(o) => {
+                  if (typeof o !== 'number') return; // no "Full traffic" here
+                  issuesStore.toggleDetailScope(o);
+                  syncScopeToUrl(issuesStore.detailScope);
+                }}
+                onClear={() => {
+                  issuesStore.clearDetailScope();
+                  syncScopeToUrl([]);
+                }}
+                showFullTraffic={false}
+              />
+            </div>
           </div>
           {/* no refresh button — "Load more" covers picking up other examples */}
           <AutoComplete
@@ -723,20 +775,31 @@ function IssueDetail() {
             className="p-6 text-center rounded-lg border bg-white text-sm flex flex-col items-center gap-2"
             style={{ color: 'var(--color-gray-medium)' }}
           >
-            {issuesStore.detailScope.length > 0 ? (
+            {issuesStore.detailScope.length > 0 ||
+            issuesStore.detailLabels.length > 0 ? (
               <>
                 <span>
                   No sampled sessions match the selected{' '}
-                  {issuesStore.detailScope.length === 1 ? 'segment' : 'segments'}.
+                  {issuesStore.detailScope.length && issuesStore.detailLabels.length
+                    ? 'filters'
+                    : issuesStore.detailScope.length
+                      ? issuesStore.detailScope.length === 1
+                        ? 'segment'
+                        : 'segments'
+                      : issuesStore.detailLabels.length === 1
+                        ? 'tag'
+                        : 'tags'}
+                  .
                 </span>
                 <Button
                   size="small"
                   onClick={() => {
                     issuesStore.clearDetailScope();
+                    issuesStore.clearDetailLabels();
                     syncScopeToUrl([]);
                   }}
                 >
-                  Clear segment filter
+                  Clear filters
                 </Button>
               </>
             ) : (
@@ -767,6 +830,15 @@ function IssueDetail() {
                       .map((id) => issuesStore.segmentById(id)?.name)
                       .filter(Boolean)
                       .join(', ')}
+                  </>
+                )}
+                {issuesStore.detailLabels.length > 0 && (
+                  <>
+                    {' '}
+                    · tagged{' '}
+                    {issuesStore.detailLabels.join(
+                      issuesStore.detailMatch === 'any' ? ' or ' : ' and ',
+                    )}
                   </>
                 )}
               </div>

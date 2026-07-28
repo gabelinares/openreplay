@@ -663,6 +663,12 @@ export default class IssuesStore {
       arrival (propagation), then user-controlled via the Segments dropdown;
       headline stats stay GLOBAL (Gabriel 07-21: sessions-only scoping). */
   detailScope: number[] = [];
+  /** ISSUE-PAGE tag filter (Mehdi 07-28): example sessions filtered by their
+      journey tags, the exact grammar of the list's Tags dropdown (AND/OR,
+      search, New tag). Seeded from the list's labels on arrival, like the
+      segment scope. Sessions-only, headline stats stay global. */
+  detailLabels: string[] = [];
+  detailMatch: MatchMode = 'all';
   /** customer-defined journey tags (Mehdi 07-27): name + a natural-language
       description the LLM matches against each session's journey. Attribution
       is automatic; the description is authored once. Kept even with zero
@@ -681,19 +687,6 @@ export default class IssuesStore {
     )
       return;
     this.customTags.push({ name, description });
-  };
-
-  updateCustomTag = (oldName: string, name: string, description: string) => {
-    this.customTags = this.customTags.map((t) =>
-      t.name === oldName ? { name, description } : t,
-    );
-    // an active filter follows the rename instead of going stale
-    this.labels = this.labels.map((l) => (l === oldName ? name : l));
-  };
-
-  removeCustomTag = (name: string) => {
-    this.customTags = this.customTags.filter((t) => t.name !== name);
-    this.labels = this.labels.filter((l) => l !== name);
   };
 
   // ---- derived ----
@@ -784,7 +777,7 @@ export default class IssuesStore {
   /** Example-session cards for the issue detail page, resolved from the shared
       session pool (same entities as the Sessions page). Falls back to the
       issue-authored summaries if no pool ids are mapped. */
-  exampleSessions(issue: Issue, opts?: { ignoreScope?: boolean }): IssueSessionCard[] {
+  exampleSessions(issue: Issue, opts?: { ignoreFilters?: boolean }): IssueSessionCard[] {
     // The curated ids come first; we then top up from the shared pool so the detail
     // page can "load more" / "refresh" through a bigger sample (the only count shown
     // is the quiet matched-sessions total, see journeyMatchTotal).
@@ -794,13 +787,21 @@ export default class IssuesStore {
     );
     // segment scope (detail page): only sessions matching ANY scoped segment.
     // Applied BEFORE the sample slice so "load more" keeps honoring the scope.
-    const scopeSeeds = (opts?.ignoreScope ? [] : this.detailScope)
+    const scopeSeeds = (opts?.ignoreFilters ? [] : this.detailScope)
       .map((id) => this.segmentById(id)?.seeds)
       .filter((x): x is SavedSegment['seeds'] => Boolean(x));
     const inScope = (id: string) =>
       scopeSeeds.length === 0 ||
       scopeSeeds.some((seeds) => sessionMatchesSeeds(id, seeds));
-    const orderedIds = [...curated, ...extra].filter(inScope).slice(0, 12);
+    // tag filter (detail page): tags ride the mapped card, so this one applies
+    // AFTER mapping — and the sample slice moves after it, same reason as scope
+    const detailLabels = opts?.ignoreFilters ? [] : this.detailLabels;
+    const matchesTags = (tags: string[]) =>
+      detailLabels.length === 0 ||
+      (this.detailMatch === 'any'
+        ? detailLabels.some((t) => tags.includes(t))
+        : detailLabels.every((t) => tags.includes(t)));
+    const orderedIds = [...curated, ...extra].filter(inScope);
     const fromPool = orderedIds
       .map((id, i) => {
         const s = getMockSessionById(id);
@@ -833,25 +834,30 @@ export default class IssuesStore {
         };
       })
       .filter((s): s is IssueSessionCard => Boolean(s));
-    if (fromPool.length) return fromPool;
-    return issue.sessions.map((s, i) => ({
-      sessionId: `${issue.id}-${i}`,
-      email: s.email,
-      browser: s.browser,
-      os: s.os,
-      city: s.loc,
-      country: '',
-      loc: s.loc,
-      durMs: 0,
-      dur: s.dur,
-      date: '',
-      device: 'desktop',
-      events: 0,
-      plan: s.plan,
-      tags: s.tags,
-      journey: s.journey,
-      variation: s.variation,
-    }));
+    // the authored fallback is for issues with no pool mapping at all — a tag
+    // filter that excludes every pool card returns empty (the page's empty state)
+    if (fromPool.length)
+      return fromPool.filter((s) => matchesTags(s.tags)).slice(0, 12);
+    return issue.sessions
+      .map((s, i) => ({
+        sessionId: `${issue.id}-${i}`,
+        email: s.email,
+        browser: s.browser,
+        os: s.os,
+        city: s.loc,
+        country: '',
+        loc: s.loc,
+        durMs: 0,
+        dur: s.dur,
+        date: '',
+        device: 'desktop',
+        events: 0,
+        plan: s.plan,
+        tags: s.tags,
+        journey: s.journey,
+        variation: s.variation,
+      }))
+      .filter((s) => matchesTags(s.tags));
   }
 
   // ---- actions ----
@@ -917,6 +923,15 @@ export default class IssuesStore {
   clearDetailScope = () => {
     this.detailScope = [];
   };
+  // ---- issue-page tag filter (same shape as the list's labels/match) ----
+  setDetailLabels = (l: string[]) => { this.detailLabels = l; };
+  toggleDetailLabel = (t: string) => {
+    this.detailLabels = this.detailLabels.includes(t)
+      ? this.detailLabels.filter((x) => x !== t)
+      : [...this.detailLabels, t];
+  };
+  setDetailMatch = (m: MatchMode) => { this.detailMatch = m; };
+  clearDetailLabels = () => { this.detailLabels = []; };
   /** every saved segment whose conditions match this pool session */
   sessionSegments = (sessionId: string): SavedSegment[] =>
     this.segments.filter(
@@ -1106,23 +1121,3 @@ export default class IssuesStore {
     }
   };
 }
-
-/** The predefined journey labels (Mehdi 07-27): static, high-level on purpose
- *  ("applicable to 80-90% of websites"), each with the description the LLM
- *  matches against a session's journey. Customers extend them with their own
- *  tags in Preferences > Agents. */
-export const PREDEFINED_JOURNEY_TAGS: {
-  name: string;
-  description: string;
-}[] = [
-  { name: 'Navigation', description: 'The user browses across pages or sections without a transactional goal.' },
-  { name: 'Onboarding', description: 'First-run steps: signup, initial setup, tutorials or welcome flows.' },
-  { name: 'Checkout', description: 'The user moves through a cart or order flow toward placing an order.' },
-  { name: 'Payment', description: 'Entering or confirming payment details, or completing a charge.' },
-  { name: 'Form submission', description: 'Filling and submitting any form, including multi-step ones.' },
-  { name: 'Workflow completed', description: 'A multi-step task reaches its intended end state.' },
-  { name: 'Drop off', description: 'The user abandons a flow before reaching its end state.' },
-  { name: 'Back and forth', description: 'Repeated switching between the same pages or steps, suggesting hesitation.' },
-  { name: 'Error encountered', description: 'The session hits a visible error state, message or broken page.' },
-  { name: 'Frustration', description: 'Rage clicks, dead clicks or rapid repeated actions on the same element.' },
-];
