@@ -291,40 +291,70 @@ function ReplayStage({
   );
 }
 
-/* Card title clamped to a FIXED 3-line slot (Mehdi 07-28): variation texts
-   run from one to many lines, which pushed tags and footer to different
-   heights per card — the fixed slot keeps every card the same size. Longer
-   titles truncate with an ellipsis and surface whole in a tooltip. */
-function ClampedTitle({ text }: { text: string }) {
-  const ref = React.useRef<HTMLSpanElement>(null);
-  const [clamped, setClamped] = React.useState(false);
+/* Card title in a shared slot the GRID agrees on (Mehdi/Gabriel 07-28): every
+   card reports its natural line count and all titles get slotted at the max
+   the VISIBLE cards actually need, capped at 3 — cards stay one size, but a
+   grid where every title is one line doesn't carry a two-line dead gap.
+   Titles past the slot truncate with an ellipsis and surface whole in a
+   tooltip. */
+function ClampedTitle({
+  text,
+  lines,
+  onNaturalLines,
+}: {
+  text: string;
+  /** the grid-agreed slot height, in lines */
+  lines: number;
+  /** reports how many lines this title would take unclamped */
+  onNaturalLines: (n: number) => void;
+}) {
+  const measureRef = React.useRef<HTMLSpanElement>(null);
+  const [natural, setNatural] = React.useState(1);
   React.useLayoutEffect(() => {
-    const el = ref.current;
+    const el = measureRef.current;
     if (!el) return undefined;
-    const check = () => setClamped(el.scrollHeight > el.clientHeight + 1);
-    check();
-    const ro = new ResizeObserver(check);
+    const report = () => {
+      const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 1;
+      const n = Math.max(1, Math.round(el.scrollHeight / lineHeight));
+      setNatural(n);
+      onNaturalLines(n);
+    };
+    report();
+    const ro = new ResizeObserver(report);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [text]);
+  }, [text, onNaturalLines]);
+  const styleBase = {
+    color: 'var(--color-gray-darkest)',
+    lineHeight: 1.35,
+  } as const;
   const title = (
-    <span
-      ref={ref}
-      className="text-sm font-medium"
-      style={{
-        color: 'var(--color-gray-darkest)',
-        lineHeight: 1.35,
-        display: '-webkit-box',
-        WebkitLineClamp: 3,
-        WebkitBoxOrient: 'vertical',
-        overflow: 'hidden',
-        height: `${3 * 1.35}em`,
-      }}
-    >
-      {text}
+    <span className="relative block">
+      {/* hidden unclamped clone — the line-count measurement */}
+      <span
+        ref={measureRef}
+        aria-hidden
+        className="text-sm font-medium invisible absolute inset-x-0 top-0"
+        style={styleBase}
+      >
+        {text}
+      </span>
+      <span
+        className="text-sm font-medium"
+        style={{
+          ...styleBase,
+          display: '-webkit-box',
+          WebkitLineClamp: lines,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+          height: `${lines * 1.35}em`,
+        }}
+      >
+        {text}
+      </span>
     </span>
   );
-  return clamped ? <Tooltip title={text}>{title}</Tooltip> : title;
+  return natural > lines ? <Tooltip title={text}>{title}</Tooltip> : title;
 }
 
 /* Session card — the Spots card (same thumbnail block: hover play overlay, teal
@@ -334,11 +364,20 @@ function SpotCard({
   s,
   active,
   onClick,
+  titleLines,
+  onTitleLines,
 }: {
   s: IssueSessionCard;
   active?: boolean;
   onClick: () => void;
+  /** grid-agreed title slot, in lines (max the visible cards need, ≤3) */
+  titleLines: number;
+  onTitleLines: (sessionId: string, n: number) => void;
 }) {
+  const reportLines = React.useCallback(
+    (n: number) => onTitleLines(s.sessionId, n),
+    [onTitleLines, s.sessionId],
+  );
   return (
     <div
       className={`bg-white rounded-lg overflow-hidden shadow-xs border transition hover:border-teal ${
@@ -376,10 +415,15 @@ function SpotCard({
       {/* This card is a VARIATION of the issue, not a user profile — lead with
           how this session experienced it, then the behavioral tags. The session's
           environment specs live behind "More" so the card stays clean. Every
-          footer row has a FIXED height (3-line title slot, one-line tags row),
-          so all cards are the same size and the rows align across the grid. */}
+          footer row has a grid-agreed fixed height (shared title slot,
+          one-line tags row), so all cards are the same size and the rows
+          align across the grid. */}
       <div className="border-t px-3 py-3 flex flex-col gap-2">
-        <ClampedTitle text={s.variation || s.journey} />
+        <ClampedTitle
+          text={s.variation || s.journey}
+          lines={titleLines}
+          onNaturalLines={reportLines}
+        />
         <div className="flex items-center" style={{ height: 24 }}>
           <TagsRow tags={s.tags} />
         </div>
@@ -501,6 +545,15 @@ function IssueDetail() {
   const [visibleCount, setVisibleCount] = React.useState(3);
   const searchTimer = React.useRef<number | undefined>(undefined);
 
+  // shared title slot: cards report their natural line counts here; the grid
+  // slots every title at the max the visible cards need (capped at 3)
+  const [titleLineCounts, setTitleLineCounts] = React.useState<
+    Record<string, number>
+  >({});
+  const reportTitleLines = React.useCallback((id: string, n: number) => {
+    setTitleLineCounts((prev) => (prev[id] === n ? prev : { ...prev, [id]: n }));
+  }, []);
+
   // segment scope arrival (Mehdi 07-20): a shared URL (?seg=) wins; otherwise
   // the list's "found in" filter propagates in — removable here either way.
   React.useEffect(() => {
@@ -605,11 +658,24 @@ function IssueDetail() {
   const loadMore = () =>
     setVisibleCount((c) => Math.min(MAX_EXAMPLES, c + 3));
 
+  // the slot only counts CURRENTLY VISIBLE cards, so it shrinks back when a
+  // long-titled card rotates or filters out
+  const titleLines = Math.min(
+    3,
+    Math.max(1, ...sessions.map((s) => titleLineCounts[s.sessionId] ?? 1)),
+  );
+
   // a card grid, like Spots — tiny data per card, click to open the replay
   const gridView = (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
       {sessions.map((s) => (
-        <SpotCard key={s.sessionId} s={s} onClick={() => openReplay(s)} />
+        <SpotCard
+          key={s.sessionId}
+          s={s}
+          onClick={() => openReplay(s)}
+          titleLines={titleLines}
+          onTitleLines={reportTitleLines}
+        />
       ))}
     </div>
   );
