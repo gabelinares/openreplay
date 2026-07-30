@@ -438,6 +438,7 @@ function IssuesList() {
             onSetMatch={issuesStore.setMatch}
             onClear={() => issuesStore.setLabels([])}
             onCreateTag={issuesStore.addCustomTag}
+            onManageTags={() => history.push('/client/agents')}
           />
           <SegmentFilter
             segments={issuesStore.originSegments.map((s) => ({ id: s.id, name: s.name, mine: s.mine }))}
