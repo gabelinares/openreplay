@@ -667,32 +667,43 @@ export default class IssuesStore {
       description the LLM matches against each session's journey. Attribution
       is automatic; the description is authored once. Kept even with zero
       matches so the tag stays discoverable in filters and (later) settings. */
-  customTags: { name: string; description: string }[] = [];
+  customTags: JourneyTag[] = [];
+  /** The predefined set is EDITABLE STATE, not a constant (Mehdi 07-28: he
+      checked with the team — predefined tags can be renamed and removed like
+      any other). Seeded from PREDEFINED_JOURNEY_TAGS; `source` in the settings
+      table is provenance, not permission. */
+  predefinedTags: JourneyTag[] = PREDEFINED_JOURNEY_TAGS.map((t) => ({ ...t }));
 
   constructor() {
     makeAutoObservable(this);
   }
 
-  addCustomTag = (name: string, description: string) => {
-    if (
-      this.customTags.some(
-        (t) => t.name.toLowerCase() === name.toLowerCase(),
-      )
-    )
-      return;
+  /** a tag the user authors is always theirs, so only this one is "custom";
+      editing and removing work on either list (see updateTag/removeTag).
+      Returns false when the name is already taken, so the caller can say so
+      instead of reporting a success that did not happen. */
+  addCustomTag = (name: string, description: string): boolean => {
+    const taken = [...this.predefinedTags, ...this.customTags].some(
+      (t) => t.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (taken) return false;
     this.customTags.push({ name, description });
+    return true;
   };
 
-  updateCustomTag = (oldName: string, name: string, description: string) => {
-    this.customTags = this.customTags.map((t) =>
-      t.name === oldName ? { name, description } : t,
-    );
+  updateTag = (oldName: string, name: string, description: string) => {
+    const rename = (t: JourneyTag) =>
+      t.name === oldName ? { name, description } : t;
+    this.predefinedTags = this.predefinedTags.map(rename);
+    this.customTags = this.customTags.map(rename);
     // an active filter follows the rename instead of going stale
     this.labels = this.labels.map((l) => (l === oldName ? name : l));
   };
 
-  removeCustomTag = (name: string) => {
-    this.customTags = this.customTags.filter((t) => t.name !== name);
+  removeTag = (name: string) => {
+    const keep = (t: JourneyTag) => t.name !== name;
+    this.predefinedTags = this.predefinedTags.filter(keep);
+    this.customTags = this.customTags.filter(keep);
     this.labels = this.labels.filter((l) => l !== name);
   };
 
@@ -1107,14 +1118,16 @@ export default class IssuesStore {
   };
 }
 
-/** The predefined journey labels (Mehdi 07-27): static, high-level on purpose
- *  ("applicable to 80-90% of websites"), each with the description the LLM
- *  matches against a session's journey. Customers extend them with their own
- *  tags in Preferences > Agents. */
-export const PREDEFINED_JOURNEY_TAGS: {
-  name: string;
-  description: string;
-}[] = [
+/** A journey tag: the name the agent applies, and the plain-words description
+ *  it matches a session's journey against. Same shape whichever list it is in
+ *  — the settings table's source column is provenance only. */
+export type JourneyTag = { name: string; description: string };
+
+/** The journey tags OpenReplay ships with (Mehdi 07-27): high-level on purpose
+ *  ("applicable to 80-90% of websites"). This is the SEED for
+ *  issuesStore.predefinedTags, which the customer can rename and remove
+ *  (Mehdi 07-28); customers add their own on top in Preferences > Agents. */
+export const PREDEFINED_JOURNEY_TAGS: JourneyTag[] = [
   { name: 'Navigation', description: 'The user browses across pages or sections without a transactional goal.' },
   { name: 'Onboarding', description: 'First-run steps: signup, initial setup, tutorials or welcome flows.' },
   { name: 'Checkout', description: 'The user moves through a cart or order flow toward placing an order.' },
