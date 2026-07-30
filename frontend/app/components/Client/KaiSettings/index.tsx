@@ -80,7 +80,7 @@ function KaiSettings() {
           <Button
             type="text"
             icon={<SettingsIcon size={14} />}
-            onClick={() => history.push('/client/agents')}
+            onClick={() => history.push('/client/agents?agent=tests')}
           >
             {t('Settings')}
           </Button>
