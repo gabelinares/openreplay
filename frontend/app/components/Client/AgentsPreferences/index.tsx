@@ -1,11 +1,11 @@
 import withPageTitle from 'HOCs/withPageTitle';
-import { Button, Divider, Switch, Tooltip, Typography } from 'antd';
+import { Button, Divider, Switch, Tabs, Tooltip, Typography } from 'antd';
 import { ArrowLeft, Info } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useHistory } from 'App/routing';
+import { useHistory, useLocation } from 'App/routing';
 
 import { kaiStore, useKaiStore } from '../KaiSettings/components/shared/store';
 import JourneyTags from './JourneyTags';
@@ -15,12 +15,21 @@ import JourneyTags from './JourneyTags';
    preferences, notifications and behavior toggles live HERE — otherwise every
    agent grows a Settings tab that competes with Preferences.
 
-   Organized BY AGENT (Mehdi 07-28: "it's not clear what's for issues, what's
-   for test, and what's for audit"). One section per agent, each holding its own
-   notifications and settings, so attribution is readable and a fourth agent is
-   one more section. It stays ONE page, which was the point of not giving each
-   agent its own Settings tab; the rows are self-describing, so there is no
-   "Notifications" sub-heading repeated three times. */
+   ONE TAB PER AGENT (Gabriel 07-30, replacing the three stacked sections that
+   answered Mehdi's "it's not clear what's for issues, what's for test, and
+   what's for audit"). The tab says which agent, so the sections inside are free
+   to say what they are — Notifications, Journey tags, Behaviour. It also stays
+   flat as agents are added, where stacked sections would grow a longer and
+   longer scroll.
+
+   The chrome is the Tests agent page's, deliberately (KaiSettings/index.tsx):
+   bordered white card, one border-b header row with the 18px semibold title,
+   then antd Tabs with the same 16px tab-bar padding, and each panel is `p-5`
+   with Title level 5 sections split by Dividers, exactly like the Environments
+   tab. Width is set per section (see PrefSection), not per panel. */
+
+type AgentKey = 'issues' | 'tests' | 'audits';
+const AGENTS: AgentKey[] = ['issues', 'tests', 'audits'];
 
 /** one preferences row: what it is on the left, its controls stacked on the
     right. Controls are a COLUMN (Gabriel 07-30): channels read down a list
@@ -72,21 +81,28 @@ function Channel({
   );
 }
 
-/** one agent's block; the title is what answers "what is this for" */
-function AgentSection({
+/** a titled group inside a panel — the Environments tab's section shape.
+    Width is per section, not per panel: prose and toggles stay at a readable
+    3xl, while a section holding a table gets 5xl so it is not squeezed into
+    half the card the way Data Management's wide tables never are. */
+function PrefSection({
   title,
   hint,
+  wide,
   children,
 }: {
   title: string;
   hint: string;
+  /** the section holds a table rather than prose and controls */
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    /* one rhythm on the page, and the heading stays attached to its own section:
-       ~9px inside a control group, ~16px from the heading to its first row,
-       ~21px between rows, and the divider's 48px between agents */
-    <section className="flex flex-col gap-6">
+    /* rhythm: ~9px inside a control group, ~16px from the heading to its first
+       row, ~21px between rows, and the divider's 48px between sections */
+    <section
+      className={`flex flex-col gap-6 ${wide ? 'max-w-5xl' : 'max-w-3xl'}`}
+    >
       <div className="flex flex-col gap-0.5 -mb-1.5">
         <Typography.Title level={5} style={{ marginBottom: 0 }}>
           {title}
@@ -104,6 +120,21 @@ function AgentsPreferences() {
   const { t } = useTranslation();
   const { pauseOnRevision } = useKaiStore();
   const history = useHistory();
+  const location = useLocation();
+
+  // the agent pages' Settings buttons deep-link to their own tab, the same
+  // query-param pattern Data Management's Properties page uses (?view=)
+  const requested = new URLSearchParams(location.search).get(
+    'agent',
+  ) as AgentKey | null;
+  const [agent, setAgent] = React.useState<AgentKey>(
+    requested && AGENTS.includes(requested) ? requested : 'issues',
+  );
+  const openTab = (key: string) => {
+    setAgent(key as AgentKey);
+    // replace, not push: switching tabs should not stack up back steps
+    history.replace(`/client/agents?agent=${key}`);
+  };
 
   // notification preferences — mock-local, the shape is the spec
   const [issuesDaily, setIssuesDaily] = React.useState(true);
@@ -114,44 +145,15 @@ function AgentsPreferences() {
   const [auditEmail, setAuditEmail] = React.useState(true);
   const [auditSlack, setAuditSlack] = React.useState(false);
 
-  return (
-    <div className="flex flex-col gap-2">
-      {/* the Settings shortcut on the agent pages lands here mid-flow — the
-          same back button as the issue detail page returns the user */}
-      <Button
-        type="text"
-        size="small"
-        icon={<ArrowLeft size={15} />}
-        onClick={() => history.goBack()}
-        className="self-start -ml-2"
-      >
-        {t('Back')}
-      </Button>
-      <div className="flex flex-col rounded-lg border bg-white">
-        {/* header — mirrors the agent pages' header grammar */}
-        <div className="flex items-center gap-2 border-b px-4 py-2">
-          <span className="font-semibold text-lg">{t('Agents')}</span>
-          <Tooltip
-            placement="bottom"
-            title={t(
-              'Preferences shared by the Issues, Tests and Audits agents. Environments and run defaults live with each agent.',
-            )}
-          >
-            <span
-              className="flex items-center cursor-help"
-              style={{ color: 'var(--color-gray-medium)' }}
-            >
-              <Info size={15} />
-            </span>
-          </Tooltip>
-        </div>
-
-        <div className="flex flex-col px-6 py-6 max-w-3xl">
-          <AgentSection
-            title={t('Issues agent')}
-            hint={t(
-              'Finds issues in captured sessions, groups them, and tags what each session was doing.',
-            )}
+  const tabItems = [
+    {
+      key: 'issues',
+      label: t('Issues'),
+      children: (
+        <div className="flex flex-col p-5">
+          <PrefSection
+            title={t('Notifications')}
+            hint={t('How you hear from the Issues agent.')}
           >
             <PrefRow
               label={t('New issues')}
@@ -173,28 +175,31 @@ function AgentsPreferences() {
                 onChange={setIssuesSlack}
               />
             </PrefRow>
-
-            {/* journey tags — §13. The description IS the matching rule. */}
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-0.5">
-                <span className="font-medium">{t('Journey tags')}</span>
-                <Typography.Text type="secondary" className="text-sm! block">
-                  {t(
-                    'The tags the agent applies to each session. Write descriptions in plain words; matching is automatic.',
-                  )}
-                </Typography.Text>
-              </div>
-              <JourneyTags />
-            </div>
-          </AgentSection>
+          </PrefSection>
 
           <Divider />
 
-          <AgentSection
-            title={t('Tests agent')}
+          {/* journey tags — §13. The description IS the matching rule. */}
+          <PrefSection
+            wide
+            title={t('Journey tags')}
             hint={t(
-              'Writes tests from real sessions and runs them against your environments.',
+              'The tags the agent applies to each session. Write descriptions in plain words; matching is automatic.',
             )}
+          >
+            <JourneyTags />
+          </PrefSection>
+        </div>
+      ),
+    },
+    {
+      key: 'tests',
+      label: t('Tests'),
+      children: (
+        <div className="flex flex-col p-5">
+          <PrefSection
+            title={t('Notifications')}
+            hint={t('How you hear from the Tests agent.')}
           >
             <PrefRow
               label={t('Failed test runs')}
@@ -211,8 +216,15 @@ function AgentsPreferences() {
                 onChange={setRunFailSlack}
               />
             </PrefRow>
+          </PrefSection>
 
-            {/* moved here from the Tests page's old Settings tab */}
+          <Divider />
+
+          {/* moved here from the Tests page's old Settings tab */}
+          <PrefSection
+            title={t('Behaviour')}
+            hint={t('What the agent does when it proposes a new version.')}
+          >
             <PrefRow
               label={t('Pause tests on new revisions')}
               hint={t(
@@ -225,13 +237,18 @@ function AgentsPreferences() {
                 onChange={kaiStore.setPauseOnRevision}
               />
             </PrefRow>
-          </AgentSection>
-
-          <Divider />
-
-          <AgentSection
-            title={t('Audits agent')}
-            hint={t('Reviews a whole flow and reports what to fix.')}
+          </PrefSection>
+        </div>
+      ),
+    },
+    {
+      key: 'audits',
+      label: t('Audits'),
+      children: (
+        <div className="flex flex-col p-5">
+          <PrefSection
+            title={t('Notifications')}
+            hint={t('How you hear from the Audits agent.')}
           >
             <PrefRow
               label={t('Audit ready')}
@@ -250,8 +267,49 @@ function AgentsPreferences() {
                 onChange={setAuditSlack}
               />
             </PrefRow>
-          </AgentSection>
+          </PrefSection>
         </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* the Settings shortcut on the agent pages lands here mid-flow — the
+          same back button as the issue detail page returns the user */}
+      <Button
+        type="text"
+        size="small"
+        icon={<ArrowLeft size={15} />}
+        onClick={() => history.goBack()}
+        className="self-start -ml-2"
+      >
+        {t('Back')}
+      </Button>
+      <div className="flex flex-col rounded-lg border bg-white">
+        {/* header — mirrors the agent pages' header grammar */}
+        <div className="flex items-center gap-2 border-b px-4 py-2">
+          <span className="font-semibold text-lg">{t('Agents')}</span>
+          <Tooltip
+            placement="bottom"
+            title={t(
+              'Notifications and behaviour for each agent. Core configuration like environments and run defaults lives with the agent itself.',
+            )}
+          >
+            <span
+              className="flex items-center cursor-help"
+              style={{ color: 'var(--color-gray-medium)' }}
+            >
+              <Info size={15} />
+            </span>
+          </Tooltip>
+        </div>
+        <Tabs
+          activeKey={agent}
+          onChange={openTab}
+          items={tabItems}
+          tabBarStyle={{ paddingLeft: 16, paddingRight: 16, marginBottom: 0 }}
+        />
       </div>
     </div>
   );
