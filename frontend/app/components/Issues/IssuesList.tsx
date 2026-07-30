@@ -44,7 +44,8 @@ import {
 import SelectDateRange from 'Shared/SelectDateRange';
 import Period, { LAST_24_HOURS } from 'Types/app/period';
 import { Pagination } from 'UI';
-import TagFilter, { CountSuffix, SegmentFilter } from './TagFilter';
+import CountSuffix from 'Shared/CountSuffix';
+import TagFilter, { SegmentFilter } from './TagFilter';
 import SegmentsIndicator from './segments/SegmentsIndicator';
 import { ImpactGauge, ReasonChip } from './ProblemCard';
 import './issues.css';
@@ -357,7 +358,7 @@ function IssuesList() {
         checked={issuesStore.relevantToMe}
         onChange={(e) => issuesStore.setRelevantToMe(e.target.checked)}
       >
-        Critical to me ({issuesStore.relevantCount})
+        Critical to me · {issuesStore.relevantCount}
       </Checkbox>
     </div>
   );

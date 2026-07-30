@@ -12,6 +12,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import React from 'react';
+
+import CountSuffix from 'Shared/CountSuffix';
 import { useHistory } from 'App/routing';
 import { withSiteId, auditReport as auditReportRoute } from 'App/routes';
 import { useStore } from 'App/mstore';
@@ -75,9 +77,7 @@ function AuditsList() {
   const download = (kind: 'PDF' | 'slides') =>
     message.success(`Export started — the ${kind} will be emailed to you.`);
 
-  const faded = (n: number) => (
-    <span style={{ opacity: 0.5, marginLeft: 5 }}>{n}</span>
-  );
+  const faded = (n: number) => <CountSuffix n={n} />;
 
   const columns: TableColumnsType<Audit> = [
     {
