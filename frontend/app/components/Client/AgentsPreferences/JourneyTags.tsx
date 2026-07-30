@@ -1,4 +1,4 @@
-import { Button, Dropdown, Input, Table, message } from 'antd';
+import { Button, Dropdown, Input, Segmented, Table, message } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { EllipsisVertical, Plus } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from 'App/mstore';
 import type { JourneyTag } from 'App/mstore/issuesStore';
 import TagDialog from 'Components/Issues/TagDialog';
-import Tabs from 'Shared/Tabs';
+import { CountSuffix } from 'Components/Issues/TagFilter';
 
 import { useConfirms } from '../KaiSettings/components/shared/confirms';
 
@@ -16,28 +16,36 @@ import { useConfirms } from '../KaiSettings/components/shared/confirms';
 
    Mehdi 07-28: the predefined tags CAN be renamed and removed like any other
    ("we can have a mixed list… on each line you can change it or you can remove
-   it"), and the page should wear the Data Management > Events chrome he pointed
-   at — tabs over one table, controls on the right of the tab bar ("same as in
-   events. Exactly."). So `source` here is provenance, not permission: every row
-   edits and deletes, whichever tab it sits in.
+   it"), and it takes the Data Management > Events shape he pointed at — a
+   switcher over one table with the controls beside it ("same as in events.
+   Exactly."). So `source` here is provenance, not permission: every row edits
+   and deletes, whichever side it sits on.
 
-   Reference implementation for the chrome: DataManagement/Properties/ListPage.
+   The switcher is a Segmented, NOT tabs (Gabriel 07-30): the page itself is now
+   one tab per agent, so a second tab bar nested inside a tab would read as
+   duplicated chrome. Segmented over a table with the controls on the right is
+   the Issues list's own bar (IssuesList.tsx: category Segmented left, filters
+   right), so this stays inside the platform's grammar either way.
+
    The critical-definitions table (§14) will want the same shell; extract a
    shared one when its columns are settled, not before. */
 
-type TabKey = 'openreplay' | 'yours';
+type SourceKey = 'openreplay' | 'yours';
 
 function JourneyTags() {
   const { t } = useTranslation();
   const { issuesStore } = useStore();
   const { confirmDelete } = useConfirms();
 
-  const [tab, setTab] = React.useState<TabKey>('openreplay');
+  const [source, setSource] = React.useState<SourceKey>('openreplay');
   const [q, setQ] = React.useState('');
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<JourneyTag | null>(null);
 
-  const rows = tab === 'openreplay' ? issuesStore.predefinedTags : issuesStore.customTags;
+  const rows =
+    source === 'openreplay'
+      ? issuesStore.predefinedTags
+      : issuesStore.customTags;
   const ql = q.trim().toLowerCase();
   const shown = rows.filter(
     (r) =>
@@ -66,8 +74,8 @@ function JourneyTags() {
       issuesStore.updateTag(editing.name, name, description);
     } else {
       issuesStore.addCustomTag(name, description);
-      // a tag you author is yours, so show the tab it landed in
-      setTab('yours');
+      // a tag you author is yours, so show the side it landed on
+      setSource('yours');
       message.success(
         t('Tag created. The agent starts applying it to new sessions.'),
       );
@@ -130,20 +138,23 @@ function JourneyTags() {
     },
   ];
 
-  const tabItems = [
+  // the Issues list's category-switcher grammar: Segmented + a faded count
+  const sourceOptions = [
     {
-      key: 'openreplay',
+      value: 'openreplay',
       label: (
-        <span className="font-medium">
-          {t('By OpenReplay')} · {issuesStore.predefinedTags.length}
+        <span>
+          {t('By OpenReplay')}
+          <CountSuffix n={issuesStore.predefinedTags.length} />
         </span>
       ),
     },
     {
-      key: 'yours',
+      value: 'yours',
       label: (
-        <span className="font-medium">
-          {t('Your tags')} · {issuesStore.customTags.length}
+        <span>
+          {t('Yours')}
+          <CountSuffix n={issuesStore.customTags.length} />
         </span>
       ),
     },
@@ -151,7 +162,7 @@ function JourneyTags() {
 
   const emptyText = ql
     ? t('No tags match “{{q}}”', { q: q.trim() })
-    : tab === 'yours'
+    : source === 'yours'
       ? t(
           'No tags of your own yet. Add one and describe the journey in plain words; the agent applies it automatically.',
         )
@@ -159,27 +170,28 @@ function JourneyTags() {
 
   return (
     <div className="flex flex-col rounded-lg border">
-      {/* tab bar + controls, the Events page's header row */}
-      <div className="flex flex-col gap-2 md:gap-0 md:flex-row md:items-center md:justify-between border-b px-4">
-        <Tabs
-          activeKey={tab}
-          onChange={(key) => {
-            setTab(key as TabKey);
+      {/* source switcher + controls on one bar — the Issues list's controls row
+          (px-4 py-3, Segmented left, controls right) */}
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap">
+        <Segmented
+          size="small"
+          value={source}
+          onChange={(v) => {
+            setSource(v as SourceKey);
             setQ('');
           }}
-          items={tabItems}
+          options={sourceOptions}
         />
-        <div className="flex items-center gap-2 pb-2 md:pb-0">
-          <div className="w-full md:w-48">
-            <Input.Search
-              size="small"
-              allowClear
-              maxLength={256}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t('Filter by name or description')}
-            />
-          </div>
+        <div className="flex items-center gap-2">
+          <Input.Search
+            size="small"
+            allowClear
+            maxLength={256}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t('Filter by name or description')}
+            style={{ width: 190 }}
+          />
           <Button size="small" icon={<Plus size={15} />} onClick={openCreate}>
             {t('Add tag')}
           </Button>

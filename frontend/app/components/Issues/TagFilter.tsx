@@ -25,6 +25,13 @@ import TagDialog from './TagDialog';
    opens the creation dialog: name + a natural-language description the agent
    matches automatically. */
 
+/** the faded count that rides a Segmented option's label (the Issues list's
+ *  category switcher grammar). Shared so the journey-tag manager's source
+ *  switcher counts read identically instead of being a lookalike. */
+export function CountSuffix({ n }: { n: number }) {
+  return <span style={{ opacity: 0.5, marginLeft: 5 }}>{n}</span>;
+}
+
 export function CheckRow({
   on,
   onClick,
@@ -141,7 +148,12 @@ export default function TagFilter({
           type="link"
           size="small"
           icon={<Plus size={14} />}
-          onClick={() => setCreating(true)}
+          onClick={() => {
+            // the popover has to go: two stacked surfaces for one action read
+            // as a bug, and the dialog is where the action continues
+            setOpen(false);
+            setCreating(true);
+          }}
           className="self-start px-0!"
         >
           New tag
