@@ -8,6 +8,7 @@ import {
   Info,
   Plus,
   Presentation,
+  Settings as SettingsIcon,
   Trash2,
 } from 'lucide-react';
 import React from 'react';
@@ -246,6 +247,15 @@ function AuditsList() {
           </Tooltip>
         </div>
         <div className="flex items-center gap-2">
+          {/* same shortcut the Issues and Tests headers carry, now that the
+              Audits agent has preferences of its own (Gabriel 07-30) */}
+          <Button
+            type="text"
+            icon={<SettingsIcon size={14} />}
+            onClick={() => history.push('/client/agents?agent=audits')}
+          >
+            Settings
+          </Button>
           <a href="https://docs.openreplay.com/" target="_blank" rel="noreferrer">
             <Button type="text" icon={<Album size={14} />}>
               Docs
