@@ -42,9 +42,11 @@ import {
   JOURNEY_SEARCH_SUGGESTIONS,
 } from 'App/mstore/issuesStore';
 import ProblemCard, { ReasonChip } from './ProblemCard';
-import TagFilter, { SegmentFilter } from './TagFilter';
-import TagsRow from './TagsRow';
-import { FoundInChips, syncScopeToUrl } from './segments/SegmentScope';
+import {
+  FoundInChips,
+  SegmentScopeFilter,
+  syncScopeToUrl,
+} from './segments/SegmentScope';
 import { MOCK_THUMB } from './mockThumb';
 
 /* Issue detail — the intermediary page, built from real app primitives to keep
@@ -291,77 +293,20 @@ function ReplayStage({
   );
 }
 
-/* Card title in a shared slot the GRID agrees on (Mehdi/Gabriel 07-28): every
-   card reports its natural line count and all titles get slotted at the max
-   the VISIBLE cards actually need, capped at 3 — cards stay one size, but a
-   grid where every title is one line doesn't carry a two-line dead gap.
-   Titles past the slot truncate with an ellipsis and surface whole in a
-   tooltip. */
-function ClampedTitle({
-  text,
-  lines,
-  onNaturalLines,
-}: {
-  text: string;
-  /** the grid-agreed slot height, in lines */
-  lines: number;
-  /** reports how many lines this title would take unclamped */
-  onNaturalLines: (n: number) => void;
-}) {
-  const measureRef = React.useRef<HTMLSpanElement>(null);
-  const [natural, setNatural] = React.useState(1);
-  React.useLayoutEffect(() => {
-    const el = measureRef.current;
-    if (!el) return undefined;
-    const report = () => {
-      // re-read the ref and skip detached nodes: ResizeObserver fires a final
-      // 0-size event for removed elements, which would reset the count
-      const node = measureRef.current;
-      if (!node || !node.isConnected) return;
-      const lineHeight = parseFloat(getComputedStyle(node).lineHeight) || 1;
-      const n = Math.max(1, Math.round(node.scrollHeight / lineHeight));
-      setNatural(n);
-      onNaturalLines(n);
-    };
-    report();
-    const ro = new ResizeObserver(report);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [text, onNaturalLines]);
-  const styleBase = {
-    color: 'var(--color-gray-darkest)',
-    lineHeight: 1.35,
-  } as const;
-  const title = (
-    <span className="relative block">
-      {/* hidden unclamped clone — the line-count measurement */}
-      <span
-        ref={measureRef}
-        aria-hidden
-        className="text-sm font-medium invisible absolute inset-x-0 top-0"
-        style={styleBase}
-      >
-        {text}
-      </span>
-      <span
-        className="text-sm font-medium"
-        style={{
-          ...styleBase,
-          display: '-webkit-box',
-          WebkitLineClamp: lines,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-          height: `${lines * 1.35}em`,
-        }}
-      >
-        {text}
-      </span>
+function TagChip({ label }: { label: string }) {
+  return (
+    // one chip size across the Issues surface — the list's (smaller) size
+    <span
+      className="text-xs px-2 py-0.5 rounded-md border whitespace-nowrap"
+      style={{
+        borderColor: 'var(--color-gray-light)',
+        background: 'var(--color-gray-lightest)',
+        color: 'var(--color-gray-dark)',
+      }}
+    >
+      {label}
     </span>
   );
-  // ALWAYS wrapped: an empty title just never opens. Flipping between wrapped
-  // and bare would remount the measured DOM — the ResizeObserver then reads
-  // the detached clone as 0 lines and the tooltip kills itself.
-  return <Tooltip title={natural > lines ? text : ''}>{title}</Tooltip>;
 }
 
 /* Session card — the Spots card (same thumbnail block: hover play overlay, teal
@@ -371,20 +316,11 @@ function SpotCard({
   s,
   active,
   onClick,
-  titleLines,
-  onTitleLines,
 }: {
   s: IssueSessionCard;
   active?: boolean;
   onClick: () => void;
-  /** grid-agreed title slot, in lines (max the visible cards need, ≤3) */
-  titleLines: number;
-  onTitleLines: (sessionId: string, n: number) => void;
 }) {
-  const reportLines = React.useCallback(
-    (n: number) => onTitleLines(s.sessionId, n),
-    [onTitleLines, s.sessionId],
-  );
   return (
     <div
       className={`bg-white rounded-lg overflow-hidden shadow-xs border transition hover:border-teal ${
@@ -421,19 +357,21 @@ function SpotCard({
       </div>
       {/* This card is a VARIATION of the issue, not a user profile — lead with
           how this session experienced it, then the behavioral tags. The session's
-          environment specs live behind "More" so the card stays clean. Every
-          footer row has a grid-agreed fixed height (shared title slot,
-          one-line tags row), so all cards are the same size and the rows
-          align across the grid. */}
+          environment specs live behind "More" so the card stays clean. */}
       <div className="border-t px-3 py-3 flex flex-col gap-2">
-        <ClampedTitle
-          text={s.variation || s.journey}
-          lines={titleLines}
-          onNaturalLines={reportLines}
-        />
-        <div className="flex items-center" style={{ height: 24 }}>
-          <TagsRow tags={s.tags} />
-        </div>
+        <span
+          className="text-sm font-medium"
+          style={{ color: 'var(--color-gray-darkest)', lineHeight: 1.35 }}
+        >
+          {s.variation || s.journey}
+        </span>
+        {s.tags.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {s.tags.slice(0, 3).map((t) => (
+              <TagChip key={t} label={t} />
+            ))}
+          </div>
+        )}
         <div
           className="flex items-center justify-between text-xs"
           style={{ color: 'var(--color-gray-medium)' }}
@@ -552,15 +490,6 @@ function IssueDetail() {
   const [visibleCount, setVisibleCount] = React.useState(3);
   const searchTimer = React.useRef<number | undefined>(undefined);
 
-  // shared title slot: cards report their natural line counts here; the grid
-  // slots every title at the max the visible cards need (capped at 3)
-  const [titleLineCounts, setTitleLineCounts] = React.useState<
-    Record<string, number>
-  >({});
-  const reportTitleLines = React.useCallback((id: string, n: number) => {
-    setTitleLineCounts((prev) => (prev[id] === n ? prev : { ...prev, [id]: n }));
-  }, []);
-
   // segment scope arrival (Mehdi 07-20): a shared URL (?seg=) wins; otherwise
   // the list's "found in" filter propagates in — removable here either way.
   React.useEffect(() => {
@@ -576,12 +505,6 @@ function IssueDetail() {
       issuesStore.setDetailScope(fromList);
       syncScopeToUrl(issuesStore.detailScope);
     }
-    // the list's tag filter propagates in too (only tags this issue carries —
-    // a leftover label from an OR match would filter against nothing here)
-    issuesStore.setDetailMatch(issuesStore.match);
-    issuesStore.setDetailLabels(
-      issue ? issuesStore.labels.filter((t) => issue.tags.includes(t)) : [],
-    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [issue?.id]);
 
@@ -617,11 +540,6 @@ function IssueDetail() {
   // quiet matched-sessions total bottom-left of the grid. Search rotates `seed`;
   // "load more" reveals up to 10 (it replaced the refresh button).
   const allExamples = issuesStore.exampleSessions(issue);
-  // tag options mirror the segment dropdown's issue-scoped set: the tags this
-  // issue's sessions carry, plus custom tags (discoverable even at zero matches)
-  const detailTagOptions = [
-    ...new Set([...issue.tags, ...issuesStore.customTags.map((t) => t.name)]),
-  ].sort();
   const rot = allExamples.length ? seed % allExamples.length : 0;
   const rotated = [...allExamples.slice(rot), ...allExamples.slice(0, rot)];
   const MAX_EXAMPLES = Math.min(10, allExamples.length);
@@ -665,24 +583,11 @@ function IssueDetail() {
   const loadMore = () =>
     setVisibleCount((c) => Math.min(MAX_EXAMPLES, c + 3));
 
-  // the slot only counts CURRENTLY VISIBLE cards, so it shrinks back when a
-  // long-titled card rotates or filters out
-  const titleLines = Math.min(
-    3,
-    Math.max(1, ...sessions.map((s) => titleLineCounts[s.sessionId] ?? 1)),
-  );
-
   // a card grid, like Spots — tiny data per card, click to open the replay
   const gridView = (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
       {sessions.map((s) => (
-        <SpotCard
-          key={s.sessionId}
-          s={s}
-          onClick={() => openReplay(s)}
-          titleLines={titleLines}
-          onTitleLines={reportTitleLines}
-        />
+        <SpotCard key={s.sessionId} s={s} onClick={() => openReplay(s)} />
       ))}
     </div>
   );
@@ -777,38 +682,8 @@ function IssueDetail() {
                 <Info size={15} style={{ color: 'var(--color-gray-medium)' }} />
               </Tooltip>
             </div>
-            {/* sessions-only filters (Gabriel 07-21): headline stats stay
-                global. Tags + Segments are the list page's exact two dropdowns
-                (Mehdi 07-28) — same components, wired to the detail scope. */}
-            <div className="flex items-center gap-2">
-              <TagFilter
-                allTags={detailTagOptions}
-                labels={issuesStore.detailLabels}
-                match={issuesStore.detailMatch}
-                onToggle={issuesStore.toggleDetailLabel}
-                onSetMatch={issuesStore.setDetailMatch}
-                onClear={issuesStore.clearDetailLabels}
-                onCreateTag={issuesStore.addCustomTag}
-              />
-              <SegmentFilter
-                segments={issuesStore.issueSegments(issue).map(({ segment }) => ({
-                  id: segment.id,
-                  name: segment.name,
-                  mine: segment.mine,
-                }))}
-                origins={issuesStore.detailScope}
-                onToggleOrigin={(o) => {
-                  if (typeof o !== 'number') return; // no "Full traffic" here
-                  issuesStore.toggleDetailScope(o);
-                  syncScopeToUrl(issuesStore.detailScope);
-                }}
-                onClear={() => {
-                  issuesStore.clearDetailScope();
-                  syncScopeToUrl([]);
-                }}
-                showFullTraffic={false}
-              />
-            </div>
+            {/* sessions-only scope (Gabriel 07-21): headline stats stay global */}
+            <SegmentScopeFilter issue={issue} />
           </div>
           {/* no refresh button — "Load more" covers picking up other examples */}
           <AutoComplete
@@ -848,31 +723,20 @@ function IssueDetail() {
             className="p-6 text-center rounded-lg border bg-white text-sm flex flex-col items-center gap-2"
             style={{ color: 'var(--color-gray-medium)' }}
           >
-            {issuesStore.detailScope.length > 0 ||
-            issuesStore.detailLabels.length > 0 ? (
+            {issuesStore.detailScope.length > 0 ? (
               <>
                 <span>
                   No sampled sessions match the selected{' '}
-                  {issuesStore.detailScope.length && issuesStore.detailLabels.length
-                    ? 'filters'
-                    : issuesStore.detailScope.length
-                      ? issuesStore.detailScope.length === 1
-                        ? 'segment'
-                        : 'segments'
-                      : issuesStore.detailLabels.length === 1
-                        ? 'tag'
-                        : 'tags'}
-                  .
+                  {issuesStore.detailScope.length === 1 ? 'segment' : 'segments'}.
                 </span>
                 <Button
                   size="small"
                   onClick={() => {
                     issuesStore.clearDetailScope();
-                    issuesStore.clearDetailLabels();
                     syncScopeToUrl([]);
                   }}
                 >
-                  Clear filters
+                  Clear segment filter
                 </Button>
               </>
             ) : (
@@ -903,15 +767,6 @@ function IssueDetail() {
                       .map((id) => issuesStore.segmentById(id)?.name)
                       .filter(Boolean)
                       .join(', ')}
-                  </>
-                )}
-                {issuesStore.detailLabels.length > 0 && (
-                  <>
-                    {' '}
-                    · tagged{' '}
-                    {issuesStore.detailLabels.join(
-                      issuesStore.detailMatch === 'any' ? ' or ' : ' and ',
-                    )}
                   </>
                 )}
               </div>
