@@ -2,6 +2,8 @@ import { Divider, Typography } from 'antd';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { PANEL_SIZES } from 'App/constants/panelSizes';
+
 import Defaults from './Defaults';
 import Environments from './Environments';
 import { kaiStore, useKaiStore } from './shared/store';
@@ -20,7 +22,14 @@ function SettingsTab() {
   const setEnvironments = kaiStore.setEnvironments;
 
   return (
-    <div className="flex flex-col p-5 max-w-3xl">
+    /* the same settings width as Preferences > Agents (Gabriel 07-30), so the
+       two agent settings surfaces agree instead of one sitting at 672 and the
+       other at 1024. The card itself stays at the app width because the Tests
+       and Runs tabs next door are wide data tables. */
+    <div
+      className="flex flex-col p-5"
+      style={{ maxWidth: PANEL_SIZES.settingsMaxWidth }}
+    >
       <Environments
         environments={environments}
         setEnvironments={setEnvironments}
