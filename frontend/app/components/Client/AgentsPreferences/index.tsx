@@ -22,7 +22,11 @@ import JourneyTags from './JourneyTags';
    agent its own Settings tab; the rows are self-describing, so there is no
    "Notifications" sub-heading repeated three times. */
 
-/** one preferences row: what it is on the left, its controls on the right */
+/** one preferences row: what it is on the left, its controls stacked on the
+    right. Controls are a COLUMN (Gabriel 07-30): channels read down a list
+    instead of across a line, and every switch on the page lands on the same
+    right-hand axis. Top-aligned so the first switch sits with the label, not
+    with the middle of a three-line description. */
 function PrefRow({
   label,
   hint,
@@ -33,20 +37,24 @@ function PrefRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex items-start justify-between gap-6">
       <div className="flex flex-col">
         <span className="font-medium">{label}</span>
         <Typography.Text type="secondary" className="text-sm!">
           {hint}
         </Typography.Text>
       </div>
-      <div className="flex items-center gap-4 shrink-0">{children}</div>
+      <div className="flex flex-col items-end gap-3 shrink-0 min-w-48">
+        {children}
+      </div>
     </div>
   );
 }
 
 /** a labelled switch — every channel reads at a glance (Gabriel 07-27: toggles,
-    not a dropdown, and the rows share one control grammar) */
+    not a dropdown, and the rows share one control grammar). ONE switch size on
+    the page (Gabriel 07-30), so this is antd's default, same as the behaviour
+    toggles it sits above. */
 function Channel({
   label,
   checked,
@@ -57,9 +65,9 @@ function Channel({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <span className="flex items-center gap-2 text-sm">
+    <span className="w-full flex items-center justify-between gap-4">
       {label}
-      <Switch size="small" checked={checked} onChange={onChange} />
+      <Switch checked={checked} onChange={onChange} />
     </span>
   );
 }
