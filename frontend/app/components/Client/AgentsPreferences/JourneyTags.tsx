@@ -1,6 +1,6 @@
-import { Button, Dropdown, Input, Segmented, Table, message } from 'antd';
+import { Button, Input, Segmented, Table, message } from 'antd';
 import type { TableColumnsType } from 'antd';
-import { EllipsisVertical, Plus } from 'lucide-react';
+import { PencilIcon, Plus, Tag as TagIcon, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from 'App/mstore';
 import type { JourneyTag } from 'App/mstore/issuesStore';
 import TagDialog from 'Components/Issues/TagDialog';
-import { CountSuffix } from 'Components/Issues/TagFilter';
+import CountSuffix from 'Shared/CountSuffix';
 
 import { useConfirms } from '../KaiSettings/components/shared/confirms';
 
@@ -101,21 +101,30 @@ function JourneyTags() {
     {
       title: '',
       key: 'actions',
-      width: 48,
+      width: 84,
       render: (_, row) => (
-        <Dropdown
-          trigger={['click']}
-          menu={{
-            items: [
-              { key: 'edit', label: t('Edit') },
-              { key: 'delete', label: t('Delete'), danger: true },
-            ],
-            onClick: ({ key }) => {
-              if (key === 'edit') {
-                setEditing(row);
-                setDialogOpen(true);
-                return;
-              }
+        /* the Environments list's action pair, verbatim (KaiSettings/components/
+           Environments.tsx): a direct pencil and a danger trash revealed on row
+           hover, not a menu. Two actions do not need a menu to hide behind, and
+           the agent surfaces already do it this way. */
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            type="text"
+            className="invisible group-hover:visible"
+            icon={<PencilIcon size={16} />}
+            aria-label={t('Edit')}
+            onClick={() => {
+              setEditing(row);
+              setDialogOpen(true);
+            }}
+          />
+          <Button
+            type="text"
+            danger
+            className="invisible group-hover:visible"
+            icon={<Trash2 size={16} />}
+            aria-label={t('Delete')}
+            onClick={() =>
               confirmDelete({
                 what: 'tag',
                 name: row.name,
@@ -123,17 +132,10 @@ function JourneyTags() {
                   'The agent stops applying it to new sessions; sessions already tagged keep it.',
                 ),
                 onOk: () => issuesStore.removeTag(row.name),
-              });
-            },
-          }}
-        >
-          <Button
-            type="text"
-            size="small"
-            icon={<EllipsisVertical size={14} />}
-            aria-label={t('Tag actions')}
+              })
+            }
           />
-        </Dropdown>
+        </div>
       ),
     },
   ];
@@ -153,23 +155,33 @@ function JourneyTags() {
       value: 'yours',
       label: (
         <span>
-          {t('Yours')}
+          {t('Mine')}
           <CountSuffix n={issuesStore.customTags.length} />
         </span>
       ),
     },
   ];
 
-  const emptyText = ql
-    ? t('No tags match “{{q}}”', { q: q.trim() })
-    : source === 'yours'
-      ? t(
-          'No tags of your own yet. Add one and describe the journey in plain words; the agent applies it automatically.',
-        )
-      : t('No tags left in OpenReplay’s set. Your own tags still apply.');
+  /* empty states wear the Environments list's quiet grammar (a muted lucide
+     icon at 36 over centered text), not a plain sentence and not an
+     illustration — the ghost artwork read off-brand in the 07-15 review */
+  const emptyText = ql ? (
+    t('No tags match “{{q}}”', { q: q.trim() })
+  ) : (
+    <div className="flex flex-col items-center justify-center py-4">
+      <TagIcon size={36} style={{ color: 'var(--color-gray-medium)' }} />
+      <div className="text-center my-4">
+        {source === 'yours'
+          ? t(
+              'No tags of your own yet. Add one and describe the journey in plain words; the agent applies it automatically.',
+            )
+          : t('No tags left in OpenReplay’s set. Your own tags still apply.')}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="flex flex-col rounded-lg border">
+    <div className="flex flex-col rounded-lg border bg-white">
       {/* source switcher + controls on one bar — the Issues list's controls row
           (px-4 py-3, Segmented left, controls right) */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap">
@@ -190,9 +202,10 @@ function JourneyTags() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={t('Filter by name or description')}
-            style={{ width: 190 }}
+            // 170 is the width the Audits list's search uses on the same bar
+            style={{ width: 170 }}
           />
-          <Button size="small" icon={<Plus size={15} />} onClick={openCreate}>
+          <Button size="small" icon={<Plus size={14} />} onClick={openCreate}>
             {t('Add tag')}
           </Button>
         </div>
@@ -204,6 +217,8 @@ function JourneyTags() {
         columns={columns}
         dataSource={shown}
         pagination={false}
+        // the row is the hover group the actions above reveal against
+        rowClassName="group"
         locale={{ emptyText }}
       />
 
