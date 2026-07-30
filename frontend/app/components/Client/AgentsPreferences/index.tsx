@@ -24,9 +24,11 @@ import JourneyTags from './JourneyTags';
 
 /** one preferences row: what it is on the left, its controls stacked on the
     right. Controls are a COLUMN (Gabriel 07-30): channels read down a list
-    instead of across a line, and every switch on the page lands on the same
-    right-hand axis. Top-aligned so the first switch sits with the label, not
-    with the middle of a three-line description. */
+    instead of across a line. The column is sized by its content and aligned to
+    the end, so each label sits one gap from its switch — no canyon between them
+    — while every switch on the page still lands on the same right-hand axis,
+    because the switch is the last thing in each row. Top-aligned so the first
+    switch sits with the label, not with the middle of a three-line hint. */
 function PrefRow({
   label,
   hint,
@@ -37,16 +39,14 @@ function PrefRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-6">
-      <div className="flex flex-col">
+    <div className="flex items-start justify-between gap-8">
+      <div className="flex flex-col gap-0.5">
         <span className="font-medium">{label}</span>
         <Typography.Text type="secondary" className="text-sm!">
           {hint}
         </Typography.Text>
       </div>
-      <div className="flex flex-col items-end gap-3 shrink-0 min-w-48">
-        {children}
-      </div>
+      <div className="flex flex-col items-end gap-2.5 shrink-0">{children}</div>
     </div>
   );
 }
@@ -65,7 +65,7 @@ function Channel({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <span className="w-full flex items-center justify-between gap-4">
+    <span className="flex items-center gap-3">
       {label}
       <Switch checked={checked} onChange={onChange} />
     </span>
@@ -83,8 +83,11 @@ function AgentSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-4">
-      <div>
+    /* one rhythm on the page, and the heading stays attached to its own section:
+       ~9px inside a control group, ~16px from the heading to its first row,
+       ~21px between rows, and the divider's 48px between agents */
+    <section className="flex flex-col gap-6">
+      <div className="flex flex-col gap-0.5 -mb-1.5">
         <Typography.Title level={5} style={{ marginBottom: 0 }}>
           {title}
         </Typography.Title>
@@ -143,7 +146,7 @@ function AgentsPreferences() {
           </Tooltip>
         </div>
 
-        <div className="flex flex-col p-5 max-w-3xl">
+        <div className="flex flex-col px-6 py-6 max-w-3xl">
           <AgentSection
             title={t('Issues agent')}
             hint={t(
@@ -173,12 +176,9 @@ function AgentsPreferences() {
 
             {/* journey tags — §13. The description IS the matching rule. */}
             <div className="flex flex-col gap-3">
-              <div>
+              <div className="flex flex-col gap-0.5">
                 <span className="font-medium">{t('Journey tags')}</span>
-                <Typography.Text
-                  type="secondary"
-                  className="text-sm! block"
-                >
+                <Typography.Text type="secondary" className="text-sm! block">
                   {t(
                     'The tags the agent applies to each session. Write descriptions in plain words; matching is automatic.',
                   )}
