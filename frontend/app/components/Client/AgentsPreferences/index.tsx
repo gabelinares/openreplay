@@ -53,8 +53,8 @@ function PrefRow({
 
 /** a labelled switch — every channel reads at a glance (Gabriel 07-27: toggles,
     not a dropdown, and the rows share one control grammar). ONE switch size on
-    the page (Gabriel 07-30), so this is antd's default, same as the behaviour
-    toggles it sits above. */
+    the page (Gabriel 07-30), and it is the small one the other agent surfaces
+    already use — Environments, the segment drawer, the capture pill. */
 function Channel({
   label,
   checked,
@@ -67,7 +67,7 @@ function Channel({
   return (
     <span className="flex items-center gap-3">
       {label}
-      <Switch checked={checked} onChange={onChange} />
+      <Switch size="small" checked={checked} onChange={onChange} />
     </span>
   );
 }
@@ -220,6 +220,7 @@ function AgentsPreferences() {
               )}
             >
               <Switch
+                size="small"
                 checked={pauseOnRevision}
                 onChange={kaiStore.setPauseOnRevision}
               />
