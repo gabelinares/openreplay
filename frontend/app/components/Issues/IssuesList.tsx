@@ -44,7 +44,7 @@ import {
 import SelectDateRange from 'Shared/SelectDateRange';
 import Period, { LAST_24_HOURS } from 'Types/app/period';
 import { Pagination } from 'UI';
-import TagFilter, { SegmentFilter } from './TagFilter';
+import TagFilter, { CountSuffix, SegmentFilter } from './TagFilter';
 import SegmentsIndicator from './segments/SegmentsIndicator';
 import { ImpactGauge, ReasonChip } from './ProblemCard';
 import './issues.css';
@@ -107,9 +107,8 @@ function IssuesList() {
   // category, single-select. "All" maps to no category filter.
   const catValue: 'All' | CategoryName =
     issuesStore.cats.length === 1 ? issuesStore.cats[0] : 'All';
-  const faded = (n: number) => (
-    <span style={{ opacity: 0.5, marginLeft: 5 }}>{n}</span>
-  );
+  // one definition of the faded count, shared with the journey-tag manager
+  const faded = (n: number) => <CountSuffix n={n} />;
   // mirror SessionTags.tsx: Segmented with the icon passed via the `icon` prop
   const catTabOptions = [
     { value: 'All', label: <span>All{faded(issuesStore.all.length)}</span> },
@@ -391,7 +390,7 @@ function IssuesList() {
           <Button
             type="text"
             icon={<SettingsIcon size={14} />}
-            onClick={() => history.push('/client/agents')}
+            onClick={() => history.push('/client/agents?agent=issues')}
           >
             Settings
           </Button>
@@ -438,7 +437,7 @@ function IssuesList() {
             onSetMatch={issuesStore.setMatch}
             onClear={() => issuesStore.setLabels([])}
             onCreateTag={issuesStore.addCustomTag}
-            onManageTags={() => history.push('/client/agents')}
+            onManageTags={() => history.push('/client/agents?agent=issues')}
           />
           <SegmentFilter
             segments={issuesStore.originSegments.map((s) => ({ id: s.id, name: s.name, mine: s.mine }))}
