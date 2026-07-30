@@ -2,8 +2,6 @@ import { Divider, Typography } from 'antd';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { PANEL_SIZES } from 'App/constants/panelSizes';
-
 import Defaults from './Defaults';
 import Environments from './Environments';
 import { kaiStore, useKaiStore } from './shared/store';
@@ -22,14 +20,12 @@ function SettingsTab() {
   const setEnvironments = kaiStore.setEnvironments;
 
   return (
-    /* the same settings width as Preferences > Agents (Gabriel 07-30), so the
-       two agent settings surfaces agree instead of one sitting at 672 and the
-       other at 1024. The card itself stays at the app width because the Tests
-       and Runs tabs next door are wide data tables. */
-    <div
-      className="flex flex-col p-5"
-      style={{ maxWidth: PANEL_SIZES.settingsMaxWidth }}
-    >
+    /* full width, like the Tests and Runs tabs beside it (Gabriel 07-30): the
+       672px cap left a white gap down the right of this one tab. Nothing here is
+       pinned to the right edge — the environment rows live in a bordered list
+       and the run defaults are a label-above-control grid — so filling the card
+       maroons nothing. */
+    <div className="flex flex-col p-5">
       <Environments
         environments={environments}
         setEnvironments={setEnvironments}
