@@ -5,7 +5,6 @@ import { observer } from 'mobx-react-lite';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { PANEL_SIZES } from 'App/constants/panelSizes';
 import { useHistory, useLocation } from 'App/routing';
 
 import { kaiStore, useKaiStore } from '../KaiSettings/components/shared/store';
@@ -27,19 +26,27 @@ import JourneyTags from './JourneyTags';
    bordered white card, one border-b header row with the 18px semibold title,
    then antd Tabs with the same 16px tab-bar padding, and each panel is `p-5`
    with Title level 5 sections split by Dividers, exactly like the Environments
-   tab. ONE width for the page: the card is capped at
-   PANEL_SIZES.settingsMaxWidth and everything inside fills it. */
+   tab. FULL WIDTH: the page fills the 1360 the Preferences wrapper already
+   gives every page, which only works because no control is pinned right (see
+   PrefRow) — so nothing is ever marooned from its label. */
+
+/* full width is for tables and controls, never for a line of prose: hints stay
+   at a readable measure so they wrap where the eye expects, not at 1300px */
+// display:block is load-bearing — Typography.Text renders a span, and
+// max-width does nothing to an inline element
+const PROSE = { display: 'block', maxWidth: '72ch' } as const;
 
 type AgentKey = 'issues' | 'tests' | 'audits';
 const AGENTS: AgentKey[] = ['issues', 'tests', 'audits'];
 
-/** one preferences row: what it is on the left, its controls stacked on the
-    right. Controls are a COLUMN (Gabriel 07-30): channels read down a list
-    instead of across a line. The column is sized by its content and aligned to
-    the end, so each label sits one gap from its switch — no canyon between them
-    — while every switch on the page still lands on the same right-hand axis,
-    because the switch is the last thing in each row. Top-aligned so the first
-    switch sits with the label, not with the middle of a three-line hint. */
+/** one preference: label, hint, then its controls DIRECTLY BENEATH, left
+    aligned (Gabriel 07-30). A label on the left with its control pinned right
+    puts an arbitrary 700 to 1000px between two things that belong together, and
+    padding cannot fix a gap that size — so the pairing goes vertical instead and
+    the distance is a constant ~12px at any width. This is the grammar the
+    Weekly Report preferences page already uses, and the same shape as the Tests
+    page's run defaults (Field: label above control). It is what lets these
+    surfaces run full width with nothing marooned. */
 function PrefRow({
   label,
   hint,
@@ -50,14 +57,12 @@ function PrefRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-8">
-      <div className="flex flex-col gap-0.5">
-        <span className="font-medium">{label}</span>
-        <Typography.Text type="secondary" className="text-sm!">
-          {hint}
-        </Typography.Text>
-      </div>
-      <div className="flex flex-col items-end gap-2.5 shrink-0">{children}</div>
+    <div className="flex flex-col gap-0.5">
+      <span className="font-medium">{label}</span>
+      <Typography.Text type="secondary" className="text-sm!" style={PROSE}>
+        {hint}
+      </Typography.Text>
+      <div className="flex flex-col gap-2.5 mt-3">{children}</div>
     </div>
   );
 }
@@ -65,7 +70,8 @@ function PrefRow({
 /** a labelled switch — every channel reads at a glance (Gabriel 07-27: toggles,
     not a dropdown, and the rows share one control grammar). ONE switch size on
     the page (Gabriel 07-30), and it is the small one the other agent surfaces
-    already use — Environments, the segment drawer, the capture pill. */
+    already use — Environments, the segment drawer, the capture pill. The switch
+    leads and the label follows, as on the Weekly Report page. */
 function Channel({
   label,
   checked,
@@ -76,18 +82,17 @@ function Channel({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <span className="flex items-center gap-3">
-      {label}
+    <span className="flex items-center gap-2.5">
       <Switch size="small" checked={checked} onChange={onChange} />
+      {label}
     </span>
   );
 }
 
 /** a titled group inside a panel — the Environments tab's section shape.
-    No width of its own: the CARD carries the one width (PANEL_SIZES
-    .settingsMaxWidth), so sections, dividers and the tags table all share the
-    same edge. Capping sections instead put four widths on one page — card and
-    divider at 1360, tags at 896, notifications at 672 (Gabriel 07-30). */
+    No width of its own: sections, dividers and the tags table all fill the card,
+    so the page has ONE edge. Capping sections instead put four widths on one
+    page — card and divider at 1360, tags at 896, rows at 672 (Gabriel 07-30). */
 function PrefSection({
   title,
   hint,
@@ -105,7 +110,7 @@ function PrefSection({
         <Typography.Title level={5} style={{ marginBottom: 0 }}>
           {title}
         </Typography.Title>
-        <Typography.Text type="secondary" className="text-sm!">
+        <Typography.Text type="secondary" className="text-sm!" style={PROSE}>
           {hint}
         </Typography.Text>
       </div>
@@ -228,8 +233,11 @@ function AgentsPreferences() {
                 'A changed flow usually breaks the current steps. When on, tests pause until the new version is reviewed; when off, they keep running on the current version.',
               )}
             >
-              <Switch
-                size="small"
+              {/* a lone boolean still gets a word beside it, the way the Weekly
+                  Report page pairs its switch with Yes/No — a naked switch under
+                  a paragraph leaves you guessing which way is on */}
+              <Channel
+                label={pauseOnRevision ? t('On') : t('Off')}
                 checked={pauseOnRevision}
                 onChange={kaiStore.setPauseOnRevision}
               />
@@ -271,10 +279,7 @@ function AgentsPreferences() {
   ];
 
   return (
-    <div
-      className="flex flex-col gap-2 w-full mx-auto"
-      style={{ maxWidth: PANEL_SIZES.settingsMaxWidth }}
-    >
+    <div className="flex flex-col gap-2">
       {/* the Settings shortcut on the agent pages lands here mid-flow — the
           same back button as the issue detail page returns the user */}
       <Button
