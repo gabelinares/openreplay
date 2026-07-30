@@ -5,6 +5,7 @@ import { observer } from 'mobx-react-lite';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { PANEL_SIZES } from 'App/constants/panelSizes';
 import { useHistory, useLocation } from 'App/routing';
 
 import { kaiStore, useKaiStore } from '../KaiSettings/components/shared/store';
@@ -26,7 +27,8 @@ import JourneyTags from './JourneyTags';
    bordered white card, one border-b header row with the 18px semibold title,
    then antd Tabs with the same 16px tab-bar padding, and each panel is `p-5`
    with Title level 5 sections split by Dividers, exactly like the Environments
-   tab. Width is set per section (see PrefSection), not per panel. */
+   tab. ONE width for the page: the card is capped at
+   PANEL_SIZES.settingsMaxWidth and everything inside fills it. */
 
 type AgentKey = 'issues' | 'tests' | 'audits';
 const AGENTS: AgentKey[] = ['issues', 'tests', 'audits'];
@@ -82,27 +84,23 @@ function Channel({
 }
 
 /** a titled group inside a panel — the Environments tab's section shape.
-    Width is per section, not per panel: prose and toggles stay at a readable
-    3xl, while a section holding a table gets 5xl so it is not squeezed into
-    half the card the way Data Management's wide tables never are. */
+    No width of its own: the CARD carries the one width (PANEL_SIZES
+    .settingsMaxWidth), so sections, dividers and the tags table all share the
+    same edge. Capping sections instead put four widths on one page — card and
+    divider at 1360, tags at 896, notifications at 672 (Gabriel 07-30). */
 function PrefSection({
   title,
   hint,
-  wide,
   children,
 }: {
   title: string;
   hint: string;
-  /** the section holds a table rather than prose and controls */
-  wide?: boolean;
   children: React.ReactNode;
 }) {
   return (
     /* rhythm: ~9px inside a control group, ~16px from the heading to its first
        row, ~21px between rows, and the divider's 48px between sections */
-    <section
-      className={`flex flex-col gap-6 ${wide ? 'max-w-5xl' : 'max-w-3xl'}`}
-    >
+    <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-0.5 -mb-1.5">
         <Typography.Title level={5} style={{ marginBottom: 0 }}>
           {title}
@@ -181,7 +179,6 @@ function AgentsPreferences() {
 
           {/* journey tags — §13. The description IS the matching rule. */}
           <PrefSection
-            wide
             title={t('Journey tags')}
             hint={t(
               'The tags the agent applies to each session. Write descriptions in plain words; matching is automatic.',
@@ -274,7 +271,10 @@ function AgentsPreferences() {
   ];
 
   return (
-    <div className="flex flex-col gap-2">
+    <div
+      className="flex flex-col gap-2 w-full mx-auto"
+      style={{ maxWidth: PANEL_SIZES.settingsMaxWidth }}
+    >
       {/* the Settings shortcut on the agent pages lands here mid-flow — the
           same back button as the issue detail page returns the user */}
       <Button
