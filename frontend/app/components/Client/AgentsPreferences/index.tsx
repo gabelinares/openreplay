@@ -31,11 +31,19 @@ import JourneyTags from './JourneyTags';
    gives every page, which only works because no control is pinned right (see
    PrefRow) — so nothing is ever marooned from its label. */
 
-/* full width is for tables and controls, never for a line of prose: hints stay
-   at a readable measure so they wrap where the eye expects, not at 1300px */
-// display:block is load-bearing — Typography.Text renders a span, and
-// max-width does nothing to an inline element
-const PROSE = { display: 'block', maxWidth: '72ch' } as const;
+/* Hints run the full width of the card (Gabriel 07-31). They used to carry a
+   72ch measure so prose would wrap "where the eye expects", but once the card
+   itself went full width that cap stopped reading as a measure and started
+   reading as a BUG: a one-sentence hint broke onto a second line halfway
+   across the card, leaving a visibly empty right half. Every hint here is one
+   or two sentences, so at full width they simply sit on one line, which is what
+   Gabriel meant by "should be normal".
+
+   The constraint this buys: hints must STAY short. A genuinely long paragraph
+   would now stretch to ~1300px, which is an unreadable measure. If one ever
+   needs that much text, it is a sign the hint should be shorter, not that the
+   cap should come back. */
+const PROSE = { display: 'block' } as const;
 
 type AgentKey = 'issues' | 'tests' | 'audits';
 const AGENTS: AgentKey[] = ['issues', 'tests', 'audits'];
