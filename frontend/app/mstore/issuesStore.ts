@@ -422,9 +422,9 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
       // demo pair for the shared title slot (07-28): the first variation runs
       // PAST three lines (truncated + tooltip), the second sits at ~three
       // lines untruncated — together they exercise both ends of the clamp
-      { email: 'daniel@black-bird.io', plan: 'paid', browser: 'Chrome', os: 'Mac OS X', loc: 'Frankfurt am Main', dur: '12m1s', variation: 'The order failed silently after the processor declined the card: the spinner ran for a few seconds, the button reset with no message anywhere on the page, and nothing acknowledged the failure — he retried the exact same card twice, checked his bank app for a pending charge, and finally left the cart without completing the purchase.', tags: ['Payment', 'Checkout', 'Error'], journey: 'Filled in card details, hit "Place order", watched the spinner end with nothing, re-entered the same card twice, then left the cart.' },
-      { email: 'lucas@finhub.io', plan: 'paid', browser: 'Chrome', os: 'Windows', loc: 'Toronto', dur: '9m12s', variation: 'Submitted payment and was silently bounced back to the checkout form with every field still filled and no error or toast in sight, grew visibly frustrated and abandoned the order after two attempts.', tags: ['Checkout', 'Frustration', 'Drop-off'], journey: 'Reached checkout, submitted payment, got silently bounced back to the form, grew visibly frustrated and abandoned.' },
-      { email: 'amara@shopwave.co', plan: 'trial', browser: 'Safari', os: 'iOS', loc: 'Lagos', dur: '6m03s', variation: 'Pay button reset on mobile', tags: ['Payment', 'Drop-off'], journey: 'Tried to pay on her phone, saw the button reset with no message, and gave up after a single attempt.' },
+      { email: 'daniel@black-bird.io', plan: 'paid', browser: 'Chrome', os: 'Mac OS X', loc: 'Frankfurt am Main', dur: '12m1s', variation: 'The order failed silently after the processor declined the card: the spinner ran for a few seconds, the button reset with no message anywhere on the page, and nothing acknowledged the failure — he retried the exact same card twice, checked his bank app for a pending charge, and finally left the cart without completing the purchase.', tags: ['Payment', 'Checkout', 'Error encountered'], journey: 'Filled in card details, hit "Place order", watched the spinner end with nothing, re-entered the same card twice, then left the cart.' },
+      { email: 'lucas@finhub.io', plan: 'paid', browser: 'Chrome', os: 'Windows', loc: 'Toronto', dur: '9m12s', variation: 'Submitted payment and was silently bounced back to the checkout form with every field still filled and no error or toast in sight, grew visibly frustrated and abandoned the order after two attempts.', tags: ['Checkout', 'Error encountered'], journey: 'Reached checkout, submitted payment, got silently bounced back to the form, grew visibly frustrated and abandoned.' },
+      { email: 'amara@shopwave.co', plan: 'trial', browser: 'Safari', os: 'iOS', loc: 'Lagos', dur: '6m03s', variation: 'Pay button reset on mobile', tags: ['Payment', 'Checkout'], journey: 'Tried to pay on her phone, saw the button reset with no message, and gave up after a single attempt.' },
     ],
   },
   {
@@ -438,8 +438,8 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
     journey: 'User reached the checkout step on a phone, tapped "Place order" seven times in a row, scrolled up and back down looking for an error, then left.',
     sessions: [
       // ~two lines: this issue's grid slots titles at 2 (no three-line gap)
-      { email: 'main@badmanners.gg', plan: 'trial', browser: 'Safari', os: 'iOS', loc: 'Islamabad', dur: '8m7s', variation: 'Tapped "Place order" seven times on a phone, nothing fired and no error appeared anywhere, then quit the checkout for good.', tags: ['Checkout', 'Rage Clicks', 'Frustration'], journey: 'Tapped "Place order" seven times in a row on a phone, nothing fired, scrolled up and down hunting for an error, then quit.' },
-      { email: 'priya@meshcart.in', plan: 'free', browser: 'Chrome', os: 'Android', loc: 'Mumbai', dur: '5m44s', variation: 'Looped between cart and checkout', tags: ['Checkout', 'Back-and-Forth'], journey: 'Tapped the order button, looped back to the cart and forward again twice, and never got a response.' },
+      { email: 'main@badmanners.gg', plan: 'trial', browser: 'Safari', os: 'iOS', loc: 'Islamabad', dur: '8m7s', variation: 'Tapped "Place order" seven times on a phone, nothing fired and no error appeared anywhere, then quit the checkout for good.', tags: ['Checkout', 'Frustration'], journey: 'Tapped "Place order" seven times in a row on a phone, nothing fired, scrolled up and down hunting for an error, then quit.' },
+      { email: 'priya@meshcart.in', plan: 'free', browser: 'Chrome', os: 'Android', loc: 'Mumbai', dur: '5m44s', variation: 'Looped between cart and checkout', tags: ['Checkout', 'Back and forth'], journey: 'Tapped the order button, looped back to the cart and forward again twice, and never got a response.' },
     ],
   },
   {
@@ -453,8 +453,8 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
     real: 'The expiry-date field rejects correctly formatted future dates (MM/YY) with an "invalid date" validation error, blocking payment submission. The check appears to run on every keystroke rather than on blur, so the field flags itself as invalid mid-entry and never clears. Users re-type the same valid date several different ways, grow frustrated, and abandon the payment step.',
     journey: 'User entered a valid expiry three different ways, each rejected with "invalid date", re-typed slowly, then gave up on the payment step.',
     sessions: [
-      { email: 'dev@dosetech.co', plan: 'paid', browser: 'Firefox', os: 'Linux', loc: 'Lahore (Sher Kot)', dur: '9m1s', variation: 'Valid expiry rejected three times', tags: ['Payment', 'Form Completion', 'Error'], journey: 'Entered a valid expiry three different ways, each rejected as "invalid date", re-typed it slowly, then abandoned payment.' },
-      { email: 'sofia@oakmont.eu', plan: 'paid', browser: 'Chrome', os: 'Windows', loc: 'Madrid', dur: '7m20s', variation: 'Fought a false validation error', tags: ['Form Completion', 'Data Entry'], journey: 'Corrected the expiry field over and over against a false validation error before giving up on the order.' },
+      { email: 'dev@dosetech.co', plan: 'paid', browser: 'Firefox', os: 'Linux', loc: 'Lahore (Sher Kot)', dur: '9m1s', variation: 'Valid expiry rejected three times', tags: ['Payment', 'Form submission', 'Error encountered'], journey: 'Entered a valid expiry three different ways, each rejected as "invalid date", re-typed it slowly, then abandoned payment.' },
+      { email: 'sofia@oakmont.eu', plan: 'paid', browser: 'Chrome', os: 'Windows', loc: 'Madrid', dur: '7m20s', variation: 'Fought a false validation error', tags: ['Form submission', 'Error encountered'], journey: 'Corrected the expiry field over and over against a false validation error before giving up on the order.' },
     ],
   },
   {
@@ -467,8 +467,8 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
     real: 'The checkout page takes around eight seconds to become interactive. The order summary and payment fields render well after the rest of the page, so users stare at a half-loaded screen with no clear signal that anything is still loading. Many tab away while they wait, and a portion never return to finish the order — directly bleeding revenue at the most critical step of the funnel.',
     journey: 'User clicked through to checkout, stared at a half-loaded page for several seconds, switched tabs, came back, and a portion of users left before it finished.',
     sessions: [
-      { email: 'rajesh+support@acme.com', plan: 'paid', browser: 'Chrome', os: 'Windows', loc: 'Newark', dur: '15m20s', variation: 'Tab-switched while it loaded', tags: ['Checkout', 'Slow Performance'], journey: 'Clicked through to checkout, stared at a half-loaded page, switched tabs while it loaded, and came back several seconds later.' },
-      { email: 'elena@brightbox.io', plan: 'trial', browser: 'Chrome', os: 'Mac OS X', loc: 'Berlin', dur: '11m02s', variation: 'Left before fields rendered', tags: ['Slow Performance', 'Drop-off'], journey: 'Waited on the slow checkout, lost patience before the payment fields rendered, and left without ordering.' },
+      { email: 'rajesh+support@acme.com', plan: 'paid', browser: 'Chrome', os: 'Windows', loc: 'Newark', dur: '15m20s', variation: 'Tab-switched while it loaded', tags: ['Checkout', 'Frustration'], journey: 'Clicked through to checkout, stared at a half-loaded page, switched tabs while it loaded, and came back several seconds later.' },
+      { email: 'elena@brightbox.io', plan: 'trial', browser: 'Chrome', os: 'Mac OS X', loc: 'Berlin', dur: '11m02s', variation: 'Left before fields rendered', tags: ['Checkout', 'Drop off'], journey: 'Waited on the slow checkout, lost patience before the payment fields rendered, and left without ordering.' },
     ],
   },
   {
@@ -481,8 +481,8 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
     real: 'Step 4 of onboarding is a single overwhelming form with 14 required fields presented all at once. Completion drops sharply at this point — users who breezed through the first three steps stall here, hesitate over several inputs, and a large share close the tab without finishing. The sheer length of the form, with no progress indication or grouping, is the clearest driver of the drop-off.',
     journey: 'User progressed smoothly through steps 1–3, hit the long form at step 4, scrolled the whole thing, hesitated on several fields, then closed the tab.',
     sessions: [
-      { email: 'muhammad.hadayat@swipbox.com', plan: 'trial', browser: 'Chrome', os: 'Mac OS X', loc: 'Saidpur', dur: '11m31s', variation: 'Stalled on the 14-field form', tags: ['Onboarding', 'Form Completion', 'Hesitation'], journey: 'Breezed through steps 1–3, hit the 14-field form at step 4, hesitated on several inputs, then closed the tab.' },
-      { email: 'tom@layerlabs.dev', plan: 'trial', browser: 'Firefox', os: 'Windows', loc: 'Austin', dur: '8m49s', variation: 'Never started the long form', tags: ['Onboarding', 'Drop-off'], journey: 'Scrolled the long step-4 form top to bottom, never started filling it, and abandoned onboarding.' },
+      { email: 'muhammad.hadayat@swipbox.com', plan: 'trial', browser: 'Chrome', os: 'Mac OS X', loc: 'Saidpur', dur: '11m31s', variation: 'Stalled on the 14-field form', tags: ['Onboarding', 'Form submission', 'Drop off'], journey: 'Breezed through steps 1–3, hit the 14-field form at step 4, hesitated on several inputs, then closed the tab.' },
+      { email: 'tom@layerlabs.dev', plan: 'trial', browser: 'Firefox', os: 'Windows', loc: 'Austin', dur: '8m49s', variation: 'Never started the long form', tags: ['Onboarding', 'Drop off'], journey: 'Scrolled the long step-4 form top to bottom, never started filling it, and abandoned onboarding.' },
     ],
   },
   {
@@ -495,8 +495,8 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
     real: 'Product thumbnails on the category listing take several seconds to appear, loading one at a time as the user scrolls instead of being reserved and lazy-loaded. On first paint the grid is a wall of empty placeholders, so it reads as broken rather than loading. Users pause, scroll past the gaps, and often scroll back up once the images finally trickle in — a janky first impression on a page meant to drive browsing.',
     journey: 'User opened a category, scrolled a grid of empty image placeholders, paused waiting for thumbnails, and scrolled back up once they finally loaded.',
     sessions: [
-      { email: 'apps@vfairs.com', plan: 'free', browser: 'Chrome', os: 'Windows', loc: 'Poznan', dur: '7m55s', variation: 'Scrolled past empty placeholders', tags: ['Navigation', 'Slow Performance'], journey: 'Opened a category, scrolled a grid of empty placeholders, waited, then scrolled back up once the thumbnails finally loaded.' },
-      { email: 'kenji@miraisoft.jp', plan: 'paid', browser: 'Safari', os: 'Mac OS X', loc: 'Osaka', dur: '6m10s', variation: 'Images trickled in one by one', tags: ['Search', 'Slow Performance'], journey: 'Searched the listing, watched images trickle in one by one, and paused before interacting with the grid.' },
+      { email: 'apps@vfairs.com', plan: 'free', browser: 'Chrome', os: 'Windows', loc: 'Poznan', dur: '7m55s', variation: 'Scrolled past empty placeholders', tags: ['Navigation', 'Frustration'], journey: 'Opened a category, scrolled a grid of empty placeholders, waited, then scrolled back up once the thumbnails finally loaded.' },
+      { email: 'kenji@miraisoft.jp', plan: 'paid', browser: 'Safari', os: 'Mac OS X', loc: 'Osaka', dur: '6m10s', variation: 'Images trickled in one by one', tags: ['Navigation'], journey: 'Searched the listing, watched images trickle in one by one, and paused before interacting with the grid.' },
     ],
   },
   {
@@ -509,8 +509,8 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
     real: 'The search request fails silently at the network layer — there is no timeout and no error state, so the results spinner keeps spinning indefinitely. Users wait, clear the query and retry a couple of times, and eventually give up and try to navigate to the category by hand. Because nothing ever surfaces the failure, it looks to the user like the product simply does not work.',
     journey: 'User typed a query, waited on the spinner, cleared and retried twice, then tried navigating to the category manually instead.',
     sessions: [
-      { email: 'mehdi+new@openreplay.cloud', plan: 'paid', browser: 'Firefox', os: 'Mac OS X', loc: 'Schieren', dur: '10m26s', variation: 'Spinner hung, browsed manually', tags: ['Search', 'Error'], journey: 'Typed a query, watched the spinner hang, cleared and retried twice, then tried browsing to the category by hand instead.' },
-      { email: 'hana@coralpay.io', plan: 'trial', browser: 'Chrome', os: 'Windows', loc: 'Seoul', dur: '6m38s', variation: 'Filter spinner never resolved', tags: ['Filtering', 'Frustration'], journey: 'Applied a filter, hit a spinner that never resolved, retried it a few times and grew frustrated before leaving.' },
+      { email: 'mehdi+new@openreplay.cloud', plan: 'paid', browser: 'Firefox', os: 'Mac OS X', loc: 'Schieren', dur: '10m26s', variation: 'Spinner hung, browsed manually', tags: ['Navigation', 'Error encountered'], journey: 'Typed a query, watched the spinner hang, cleared and retried twice, then tried browsing to the category by hand instead.' },
+      { email: 'hana@coralpay.io', plan: 'trial', browser: 'Chrome', os: 'Windows', loc: 'Seoul', dur: '6m38s', variation: 'Filter spinner never resolved', tags: ['Navigation', 'Frustration'], journey: 'Applied a filter, hit a spinner that never resolved, retried it a few times and grew frustrated before leaving.' },
     ],
   },
   {
@@ -523,8 +523,8 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
     real: 'Active filter chips are silently dropped the moment the user paginates, so page 2 onward shows unfiltered results while the controls still imply the filters are applied. The filter state lives only in component memory and is not persisted to the URL or query, so any navigation resets it. Users re-apply the same filters repeatedly, page back and forth, and lose trust that the listing reflects what they asked for.',
     journey: 'User applied two filters, reviewed page 1, clicked to page 2, saw the filters gone and results changed, went back and re-applied them repeatedly.',
     sessions: [
-      { email: 'apps@vfairs.com', plan: 'free', browser: 'Chrome', os: 'Windows', loc: 'Nong Sung', dur: '9m20s', variation: 'Filters cleared on page 2', tags: ['Filtering', 'Lost Filters'], journey: 'Set two filters, reviewed page 1, clicked to page 2 and found them silently cleared, then re-applied them repeatedly.' },
-      { email: 'omar@gridly.io', plan: 'paid', browser: 'Chrome', os: 'Linux', loc: 'Cairo', dur: '7m02s', variation: 'Lost filters paging back and forth', tags: ['Search', 'Back-and-Forth'], journey: 'Filtered the results, paged forward and back, lost the filters each time, and eventually gave up.' },
+      { email: 'apps@vfairs.com', plan: 'free', browser: 'Chrome', os: 'Windows', loc: 'Nong Sung', dur: '9m20s', variation: 'Filters cleared on page 2', tags: ['Navigation', 'Error encountered'], journey: 'Set two filters, reviewed page 1, clicked to page 2 and found them silently cleared, then re-applied them repeatedly.' },
+      { email: 'omar@gridly.io', plan: 'paid', browser: 'Chrome', os: 'Linux', loc: 'Cairo', dur: '7m02s', variation: 'Lost filters paging back and forth', tags: ['Navigation', 'Back and forth'], journey: 'Filtered the results, paged forward and back, lost the filters each time, and eventually gave up.' },
     ],
   },
   {
@@ -537,8 +537,8 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
     real: 'The "Help Center" link in the footer points to a dead URL and returns a 404. Users who are already stuck and actively seeking help hit a wall at the exact moment they need support most. There is no redirect or monitoring in place, so the broken link has likely been failing silently for a while, quietly pushing frustrated users toward churn instead of resolution.',
     journey: 'User scrolled to the footer, clicked "Help Center", landed on a 404 page, hit back, and tried the contact link instead.',
     sessions: [
-      { email: 'daniel@black-bird.io', plan: 'paid', browser: 'Chrome', os: 'Mac OS X', loc: 'Thung Khru', dur: '5m44s', variation: 'Help Center link 404’d', tags: ['Navigation', 'Help Seeking'], journey: 'Scrolled to the footer, clicked "Help Center", landed on a 404, hit back, and tried the contact link instead.' },
-      { email: 'greta@nordkit.se', plan: 'free', browser: 'Firefox', os: 'Windows', loc: 'Stockholm', dur: '4m12s', variation: 'Hit a dead support page', tags: ['Help Seeking', 'Error'], journey: 'Went looking for support, clicked the footer Help Center link, hit the dead 404 page, and abandoned the attempt.' },
+      { email: 'daniel@black-bird.io', plan: 'paid', browser: 'Chrome', os: 'Mac OS X', loc: 'Thung Khru', dur: '5m44s', variation: 'Help Center link 404’d', tags: ['Navigation', 'Error encountered'], journey: 'Scrolled to the footer, clicked "Help Center", landed on a 404, hit back, and tried the contact link instead.' },
+      { email: 'greta@nordkit.se', plan: 'free', browser: 'Firefox', os: 'Windows', loc: 'Stockholm', dur: '4m12s', variation: 'Hit a dead support page', tags: ['Navigation', 'Error encountered', 'Drop off'], journey: 'Went looking for support, clicked the footer Help Center link, hit the dead 404 page, and abandoned the attempt.' },
     ],
   },
   {
@@ -551,7 +551,7 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
     real: 'The account dashboard charts take around five seconds to fetch and draw after the page shell loads, leaving every panel blank in the meantime. With no skeletons or loading states, returning users land on what looks like an empty, broken dashboard. The data eventually appears, but the dead first impression makes the product feel slow and unreliable on the page users see most often.',
     journey: 'User opened the dashboard, waited on blank chart panels, moved the cursor around expecting data, and continued once the charts appeared.',
     sessions: [
-      { email: 'rajesh+support@acme.com', plan: 'trial', browser: 'Chrome', os: 'Linux', loc: 'Lahore (Sher Kot)', dur: '6m32s', variation: 'Waited on blank chart panels', tags: ['Navigation', 'Slow Performance'], journey: 'Opened the dashboard, waited on blank chart panels, moved the cursor around expecting data, and carried on once it drew.' },
+      { email: 'rajesh+support@acme.com', plan: 'trial', browser: 'Chrome', os: 'Linux', loc: 'Lahore (Sher Kot)', dur: '6m32s', variation: 'Waited on blank chart panels', tags: ['Navigation'], journey: 'Opened the dashboard, waited on blank chart panels, moved the cursor around expecting data, and carried on once it drew.' },
       { email: 'bea@finchly.com', plan: 'paid', browser: 'Chrome', os: 'Mac OS X', loc: 'Lisbon', dur: '5m18s', variation: 'Sat through an empty dashboard', tags: ['Navigation'], journey: 'Landed on the dashboard and sat through several seconds of empty panels before the charts finally appeared.' },
     ],
   },
@@ -566,8 +566,8 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
     real: 'A noticeable share of sessions land on the pricing page from ads and leave within a few seconds with no scroll and no click. The instant bounce suggests the above-the-fold content is not matching the intent the ad set up — the value proposition or the plan they expected is not immediately visible. These are paid arrivals leaving before they engage at all, so the wasted acquisition spend compounds the lost conversions.',
     journey: 'User landed on pricing from an ad, stayed under ten seconds without scrolling or interacting, and closed the tab.',
     sessions: [
-      { email: 'visitor@gmail.com', plan: 'free', browser: 'Chrome', os: 'Windows', loc: 'Manila', dur: '8s', variation: 'Bounced in under ten seconds', tags: ['Bounce', 'Inactive'], journey: 'Landed on pricing from an ad, stayed under ten seconds without scrolling or clicking, and closed the tab.' },
-      { email: 'guest@yahoo.com', plan: 'free', browser: 'Safari', os: 'iOS', loc: 'Jakarta', dur: '6s', variation: 'Left pricing without scrolling', tags: ['Navigation', 'Bounce'], journey: 'Arrived on the pricing page from a link, did not scroll or interact at all, and bounced within seconds.' },
+      { email: 'visitor@gmail.com', plan: 'free', browser: 'Chrome', os: 'Windows', loc: 'Manila', dur: '8s', variation: 'Bounced in under ten seconds', tags: ['Navigation', 'Drop off'], journey: 'Landed on pricing from an ad, stayed under ten seconds without scrolling or clicking, and closed the tab.' },
+      { email: 'guest@yahoo.com', plan: 'free', browser: 'Safari', os: 'iOS', loc: 'Jakarta', dur: '6s', variation: 'Left pricing without scrolling', tags: ['Navigation', 'Drop off'], journey: 'Arrived on the pricing page from a link, did not scroll or interact at all, and bounced within seconds.' },
     ],
   },
 ];
