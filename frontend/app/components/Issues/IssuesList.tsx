@@ -46,6 +46,7 @@ import Period, { LAST_24_HOURS } from 'Types/app/period';
 import { Pagination } from 'UI';
 import CountSuffix from 'Shared/CountSuffix';
 import CriticalDialog from './CriticalDialog';
+import NotCriticalDialog from './NotCriticalDialog';
 import TagFilter, { SegmentFilter } from './TagFilter';
 import SegmentsIndicator from './segments/SegmentsIndicator';
 import { ImpactGauge, ReasonChip } from './ProblemCard';
@@ -81,8 +82,6 @@ function IssuesList() {
   const [hideTags, setHideTags] = React.useState<string[]>([]);
   const [critDialog, setCritDialog] = React.useState<Issue | null>(null);
   const [critTarget, setCritTarget] = React.useState<Issue | null>(null);
-  const [critReason, setCritReason] = React.useState('');
-  const [critTags, setCritTags] = React.useState<string[]>([]);
   const [renameTarget, setRenameTarget] = React.useState<Issue | null>(null);
   const [renameValue, setRenameValue] = React.useState('');
   const [page, setPage] = React.useState(1);
@@ -301,8 +300,6 @@ function IssuesList() {
                   setRenameValue(r.head);
                 } else if (key === 'notCritical') {
                   setCritTarget(r);
-                  setCritReason('');
-                  setCritTags([]);
                 } else if (key === 'restoreCritical') {
                   issuesStore.restoreCritical(r.id);
                 } else if (key === 'hide') {
@@ -453,7 +450,6 @@ function IssuesList() {
             onSetMatch={issuesStore.setMatch}
             onClear={() => issuesStore.setLabels([])}
             onCreateTag={issuesStore.addCustomTag}
-            onManageTags={() => history.push('/client/agents?agent=issues')}
           />
           <SegmentFilter
             segments={issuesStore.originSegments.map((s) => ({ id: s.id, name: s.name, mine: s.mine }))}
@@ -589,52 +585,10 @@ function IssuesList() {
         issueId={critDialog?.id ?? null}
         issueHead={critDialog?.head ?? ''}
         onClose={() => setCritDialog(null)}
-        onManage={() => {
-          setCritDialog(null);
-          history.push('/client/agents?agent=issues');
-        }}
       />
 
-      {/* not-critical reason modal — the reason is what teaches the agent */}
-      <Modal
-        title="Not critical for you?"
-        open={critTarget != null}
-        onCancel={() => setCritTarget(null)}
-        onOk={() => {
-          if (critTarget)
-            issuesStore.setNotCriticalForMe(
-              critTarget.id,
-              [...critTags, critReason.trim()].filter(Boolean).join(' · '),
-            );
-          setCritTarget(null);
-        }}
-        okText="Not critical for me"
-      >
-        <p className="mb-3" style={{ color: 'var(--color-gray-dark)' }}>
-          “{critTarget?.head}” stops showing as critical for you. Teammates keep
-          their own view, and your reason helps the agent learn.
-        </p>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {CRITICAL_REASONS.map((t) => (
-            <ReasonChip
-              key={t}
-              label={t}
-              checked={critTags.includes(t)}
-              onChange={(on) =>
-                setCritTags((prev) =>
-                  on ? [...prev, t] : prev.filter((x) => x !== t),
-                )
-              }
-            />
-          ))}
-        </div>
-        <Input.TextArea
-          rows={3}
-          placeholder="Add a note (optional)…"
-          value={critReason}
-          onChange={(e) => setCritReason(e.target.value)}
-        />
-      </Modal>
+      {/* the shared not-critical dialog — the detail page opens the same one */}
+      <NotCriticalDialog issue={critTarget} onClose={() => setCritTarget(null)} />
     </div>
   );
 }

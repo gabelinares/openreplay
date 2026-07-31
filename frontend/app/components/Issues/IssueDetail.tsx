@@ -8,6 +8,7 @@ import {
   Tooltip,
 } from 'antd';
 import {
+  AlertTriangle,
   ArrowLeft,
   ExternalLink,
   EyeOff,
@@ -42,6 +43,7 @@ import {
   JOURNEY_SEARCH_SUGGESTIONS,
 } from 'App/mstore/issuesStore';
 import CriticalDialog from './CriticalDialog';
+import NotCriticalDialog from './NotCriticalDialog';
 import ProblemCard, { ReasonChip } from './ProblemCard';
 import {
   FoundInChips,
@@ -481,6 +483,7 @@ function IssueDetail() {
 
   const [ticketHover, setTicketHover] = React.useState(false);
   const [critDialog, setCritDialog] = React.useState(false);
+  const [notCritOpen, setNotCritOpen] = React.useState(false);
   const [hideOpen, setHideOpen] = React.useState(false);
   const [hideReason, setHideReason] = React.useState('');
   const [hideTags, setHideTags] = React.useState<string[]>([]);
@@ -638,6 +641,15 @@ function IssueDetail() {
               >
                 Create ticket
               </Button>
+              {issuesStore.matchedRules(issue.id).length > 0 && (
+                <Button
+                  size="small"
+                  icon={<AlertTriangle size={14} />}
+                  onClick={() => setNotCritOpen(true)}
+                >
+                  Not critical for me
+                </Button>
+              )}
               {issuesStore.hidden.includes(issue.id) ? (
                 <Button
                   size="small"
@@ -792,10 +804,12 @@ function IssueDetail() {
         issueId={critDialog ? issue.id : null}
         issueHead={issue.head}
         onClose={() => setCritDialog(false)}
-        onManage={() => {
-          setCritDialog(false);
-          history.push('/client/agents?agent=issues');
-        }}
+      />
+
+      {/* the same not-critical dialog the list's row menu opens */}
+      <NotCriticalDialog
+        issue={notCritOpen ? issue : null}
+        onClose={() => setNotCritOpen(false)}
       />
 
       {/* hide-with-reason modal — mirrors the issue list */}

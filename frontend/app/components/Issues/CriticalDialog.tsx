@@ -1,12 +1,9 @@
-import { Button, Input, Modal } from 'antd';
+import { Input, Modal } from 'antd';
 import { AlertTriangle } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
 
 import { useStore } from 'App/mstore';
-import { CRITICAL_REASONS } from 'App/mstore/issuesStore';
-
-import { ReasonChip } from './ProblemCard';
 
 /** The description field + its expectation caption. Shared with the manager in
  *  Preferences so the two places you can author a description are literally the
@@ -46,127 +43,66 @@ export function CriticalRuleFields({
    its author so "critical to me" can filter by it. Gabriel argued that sending
    someone from a small triangle straight into a settings page breaks the flow,
    and Mehdi agreed ("we need something intermediary. Yes. Correct."), so the
-   description is authored HERE, in place, with a way through to the full list.
+   description is authored HERE, in place.
 
-   One dialog, two jobs, because they are the same question asked from either
-   side of the flag:
-     · already critical → it says WHICH descriptions matched and whose, which is
-       the only honest answer to "why is this flagged?" now that the agent
-       decides. If none of them are mine, adding my own is offered right there.
-     · not critical → author the description that makes it so, prefilled from
-       the issue's own title so it is one edit away from a real rule rather
-       than a blank field.
-
-   Dialog grammar is the app's (Issues Hide modal): no icon, default width,
-   the subject quoted in a gray body line, expectation set in a caption. */
+   ONE JOB, ONE FOOTER (Gabriel 07-31). The first build put three choices in the
+   body — a manage link, a destructive action and a hidden OK — and you could not
+   tell what the dialog was for. So the body only ever holds the quoted issue
+   plus ONE of two things, and the buttons live in the footer where the Hide
+   modal keeps them:
+     · a description already matched → it says which and whose, footer is Close.
+       Pure explanation, nothing to confirm.
+     · none of mine matched → the field, prefilled from the issue so a rule is
+       one edit away from blank, footer is Cancel / Save.
+   Everything else moved to where the app already keeps it: "not critical for me"
+   to the row menu and the detail page's action bar (NotCriticalDialog), and the
+   way to the full list to the header's Settings button. */
 export default observer(function CriticalDialog({
   issueId,
   issueHead,
   onClose,
-  onManage,
 }: {
   /** null closes it */
   issueId: number | null;
   issueHead: string;
   onClose: () => void;
-  /** the way through to the full list in Preferences > Agents */
-  onManage?: () => void;
 }) {
   const { issuesStore } = useStore();
   const [desc, setDesc] = React.useState('');
-  // second step: saying it is not critical for me, where the reason is the
-  // agent's feedback. Reachable from every surface because the control always
-  // opens this dialog, so no page needs its own copy of the reason picker.
-  const [unsetting, setUnsetting] = React.useState(false);
-  const [reasons, setReasons] = React.useState<string[]>([]);
-  const [note, setNote] = React.useState('');
 
   const open = issueId != null;
   const matched = open ? issuesStore.matchedRules(issueId) : [];
   const hasMine = matched.some((r) => r.mine);
   // prefilled from the issue, so the description starts as something real
   React.useEffect(() => {
-    if (open) {
-      setDesc(hasMine ? '' : issueHead);
-      setUnsetting(false);
-      setReasons([]);
-      setNote('');
-    }
+    if (open) setDesc(hasMine ? '' : issueHead);
   }, [open, issueHead, hasMine]);
 
   const save = () => {
-    if (issueId == null) return;
-    if (unsetting) {
-      issuesStore.setNotCriticalForMe(
-        issueId,
-        [...reasons, note.trim()].filter(Boolean).join(' · '),
-      );
-      onClose();
-      return;
-    }
-    if (!desc.trim()) return;
+    if (issueId == null || !desc.trim()) return;
     issuesStore.addCriticalRule(desc.trim(), issueId);
     onClose();
   };
 
-  const title = unsetting
-    ? 'Not critical for you?'
-    : matched.length
-      ? 'Why this is critical'
-      : 'What makes this critical?';
-
   return (
     <Modal
-      title={title}
+      title={hasMine ? 'Why this is critical' : 'What makes this critical?'}
       open={open}
       onCancel={onClose}
       onOk={save}
-      okText={unsetting ? 'Not critical for me' : 'Save'}
-      okButtonProps={{
-        danger: unsetting,
-        disabled: unsetting ? false : !desc.trim() || hasMine,
-        // nothing to confirm when the dialog is purely an explanation
-        style: !unsetting && hasMine ? { display: 'none' } : undefined,
-      }}
-      cancelText={hasMine && !unsetting ? 'Close' : 'Cancel'}
+      okText="Save"
+      okButtonProps={{ disabled: !desc.trim() }}
+      // explaining has nothing to confirm, so the footer is a single Close
+      footer={
+        hasMine ? (_, { CancelBtn }) => <CancelBtn /> : undefined
+      }
+      cancelText={hasMine ? 'Close' : 'Cancel'}
     >
       <p className="mb-3" style={{ color: 'var(--color-gray-dark)' }}>
-        {unsetting ? (
-          <>
-            “{issueHead}” stops showing as critical for you. Teammates keep their
-            own view, and your reason helps the agent learn.
-          </>
-        ) : (
-          <>“{issueHead}”</>
-        )}
+        “{issueHead}”
       </p>
 
-      {unsetting && (
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
-            {CRITICAL_REASONS.map((r) => (
-              <ReasonChip
-                key={r}
-                label={r}
-                checked={reasons.includes(r)}
-                onChange={(on) =>
-                  setReasons((prev) =>
-                    on ? [...prev, r] : prev.filter((x) => x !== r),
-                  )
-                }
-              />
-            ))}
-          </div>
-          <Input.TextArea
-            rows={2}
-            placeholder="Add a note (optional)…"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </div>
-      )}
-
-      {!unsetting && matched.length > 0 && (
+      {matched.length > 0 && (
         <div className="flex flex-col gap-2 mb-4">
           {matched.map((r) => (
             <div
@@ -192,7 +128,7 @@ export default observer(function CriticalDialog({
         </div>
       )}
 
-      {!unsetting && !hasMine && (
+      {!hasMine && (
         <div className="flex flex-col gap-3">
           <span style={{ color: 'var(--color-gray-dark)' }}>
             {matched.length
@@ -205,33 +141,6 @@ export default observer(function CriticalDialog({
             onChange={setDesc}
             caption="This issue is flagged straight away. Anything else it matches is flagged as the agent reviews new sessions."
           />
-        </div>
-      )}
-
-      {!unsetting && (
-        <div className="flex items-center gap-3 mt-1">
-          {onManage && (
-            /* the quiet link grammar the tag dialog uses for the same job */
-            <Button
-              type="link"
-              size="small"
-              onClick={onManage}
-              className="px-0!"
-            >
-              Manage what’s critical
-            </Button>
-          )}
-          {matched.length > 0 && (
-            <Button
-              type="link"
-              size="small"
-              danger
-              onClick={() => setUnsetting(true)}
-              className="px-0! ml-auto"
-            >
-              Not critical for me
-            </Button>
-          )}
         </div>
       )}
     </Modal>

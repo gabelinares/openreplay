@@ -365,10 +365,6 @@ const HeaderCriticalToggle = observer(({ issue }: { issue: Issue }) => {
         issueId={dialog ? issue.id : null}
         issueHead={issue.head}
         onClose={() => setDialog(false)}
-        onManage={() => {
-          setDialog(false);
-          history.push('/client/agents?agent=issues');
-        }}
       />
     </Tooltip>
   );

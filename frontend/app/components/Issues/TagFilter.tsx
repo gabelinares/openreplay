@@ -77,7 +77,6 @@ export default function TagFilter({
   onSetMatch,
   onClear,
   onCreateTag,
-  onManageTags,
 }: {
   allTags: string[];
   labels: string[];
@@ -88,8 +87,6 @@ export default function TagFilter({
   /** creates a customer-defined journey tag (name + NL description); returns
       false when the name is already taken */
   onCreateTag?: (name: string, description: string) => boolean | void;
-  /** the way through from the creation dialog to the full list in Preferences */
-  onManageTags?: () => void;
 }) {
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState('');
@@ -183,13 +180,6 @@ export default function TagFilter({
       <TagDialog
         open={creating}
         onCancel={() => setCreating(false)}
-        onManage={
-          onManageTags &&
-          (() => {
-            setCreating(false);
-            onManageTags();
-          })
-        }
         onSave={(name, description) => {
           if (onCreateTag?.(name, description) === false) {
             // dialog stays open so the name can be fixed in place
