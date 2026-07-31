@@ -45,6 +45,19 @@ export function CriticalRuleFields({
    and Mehdi agreed ("we need something intermediary. Yes. Correct."), so the
    description is authored HERE, in place.
 
+   FOUR STATES, and only one of them offers each action (Gabriel 07-31 walked
+   the scenarios):
+     · undescribed — nothing matched. Title asks, body is the field, footer
+       Cancel / Save.
+     · mine — one of MY descriptions matched. Body explains which, footer holds
+       "Not critical for me" on the left and Close on the right. This is the ONLY
+       state where dropping it makes sense: I am overriding my own rule.
+     · team — only a teammate's description matched. Body explains whose and
+       offers to add mine, footer Cancel / Save. NO "not critical for me" here
+       (Gabriel): their signal is not mine to mute, and it kept the footer at
+       three buttons, which is what made this dialog unreadable.
+     · muted — I dropped it. Body says so, footer offers the way back.
+
    ONE JOB, ONE FOOTER (Gabriel 07-31). The first build put three choices in the
    body — a manage link, a destructive action and a hidden OK — and you could not
    tell what the dialog was for. So the body only ever holds the quoted issue
@@ -74,12 +87,23 @@ export default observer(function CriticalDialog({
   const [desc, setDesc] = React.useState('');
 
   const open = issueId != null;
+  const muted = open && issuesStore.notCritical[issueId] != null;
   const matched = open ? issuesStore.matchedRules(issueId) : [];
   const hasMine = matched.some((r) => r.mine);
+  /** the state machine the footer and body branch on */
+  const state: 'undescribed' | 'mine' | 'team' | 'muted' = muted
+    ? 'muted'
+    : !matched.length
+      ? 'undescribed'
+      : hasMine
+        ? 'mine'
+        : 'team';
+  // the field only exists where a description can be authored
+  const authoring = state === 'undescribed' || state === 'team';
   // prefilled from the issue, so the description starts as something real
   React.useEffect(() => {
-    if (open) setDesc(hasMine ? '' : issueHead);
-  }, [open, issueHead, hasMine]);
+    if (open) setDesc(authoring ? issueHead : '');
+  }, [open, issueHead, authoring]);
 
   /** removes this issue from my critical list, immediately — no confirmation
       (Gabriel 07-31). Nothing is lost that a click cannot restore: my
@@ -99,7 +123,13 @@ export default observer(function CriticalDialog({
 
   return (
     <Modal
-      title={hasMine ? 'Why this is critical' : 'What makes this critical?'}
+      title={
+        state === 'muted'
+          ? 'Not critical for you'
+          : state === 'undescribed'
+            ? 'What makes this critical?'
+            : 'Why this is critical'
+      }
       open={open}
       onCancel={onClose}
       onOk={save}
@@ -110,30 +140,41 @@ export default observer(function CriticalDialog({
          Explaining has nothing to confirm, so Save is simply absent there. */
       footer={(_, { OkBtn, CancelBtn }) => (
         <div className="flex items-center">
-          {matched.length > 0 && (
+          {state === 'mine' && (
             <Tooltip
               placement="topLeft"
-              title={
-                hasMine
-                  ? 'Removes this issue from your critical list. Your description stays and keeps flagging everything else it matches.'
-                  : 'Removes this issue from your critical list. Your teammate’s description is untouched, and their view does not change.'
-              }
+              title="Only this issue. Your description stays."
             >
               <Button type="text" danger onClick={removeFromCritical}>
                 Not critical for me
               </Button>
             </Tooltip>
           )}
+          {state === 'muted' && (
+            <Button
+              type="text"
+              onClick={() => {
+                if (issueId != null) issuesStore.restoreCritical(issueId);
+                onClose();
+              }}
+            >
+              Show as critical again
+            </Button>
+          )}
           <span className="ml-auto flex items-center gap-2">
             <CancelBtn />
-            {!hasMine && <OkBtn />}
+            {authoring && <OkBtn />}
           </span>
         </div>
       )}
-      cancelText={hasMine ? 'Close' : 'Cancel'}
+      cancelText={authoring ? 'Cancel' : 'Close'}
     >
       <p className="mb-3" style={{ color: 'var(--color-gray-dark)' }}>
-        “{issueHead}”
+        {state === 'muted' ? (
+          <>You removed “{issueHead}” from your critical list.</>
+        ) : (
+          <>“{issueHead}”</>
+        )}
       </p>
 
       {matched.length > 0 && (
@@ -162,7 +203,7 @@ export default observer(function CriticalDialog({
         </div>
       )}
 
-      {!hasMine && (
+      {authoring && (
         <div className="flex flex-col gap-3">
           <span style={{ color: 'var(--color-gray-dark)' }}>
             {matched.length

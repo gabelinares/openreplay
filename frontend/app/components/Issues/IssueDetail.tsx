@@ -641,7 +641,7 @@ function IssueDetail() {
               >
                 Create ticket
               </Button>
-              {issuesStore.matchedRules(issue.id).length > 0 && (
+              {issuesStore.critState(issue.id) === 'mine' && (
                 <Button
                   size="small"
                   icon={<AlertTriangle size={14} />}
