@@ -768,6 +768,13 @@ export default class IssuesStore {
       said it is not critical for me. */
   matchedRules(id: number): CriticalRule[] {
     if (this.notCritical[id] != null) return [];
+    return this.rulesFor(id);
+  }
+
+  /** the same descriptions IGNORING my suppression — what flagged this issue,
+      or what would flag it again if I restored it. One mapping, two views: the
+      muted dialog shows these so it can name what it is muting. */
+  rulesFor(id: number): CriticalRule[] {
     return (this.criticalBy[id] ?? [])
       .map((ruleId) => this.criticalRules.find((r) => r.id === ruleId))
       .filter(Boolean) as CriticalRule[];

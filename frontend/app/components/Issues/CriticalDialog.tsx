@@ -56,7 +56,10 @@ export function CriticalRuleFields({
        offers to add mine, footer Cancel / Save. NO "not critical for me" here
        (Gabriel): their signal is not mine to mute, and it kept the footer at
        three buttons, which is what made this dialog unreadable.
-     · muted — I dropped it. Body says so, footer offers the way back.
+     · muted — I dropped it. Body says so and still NAMES the description that
+       flagged it (Gabriel 07-31), because "how would it remember?" is the first
+       question the state raises; the card is the same one the other states use,
+       with a gray triangle since the flag is not active right now.
 
    ONE JOB, ONE FOOTER (Gabriel 07-31). The first build put three choices in the
    body — a manage link, a destructive action and a hidden OK — and you could not
@@ -90,6 +93,8 @@ export default observer(function CriticalDialog({
   const muted = open && issuesStore.notCritical[issueId] != null;
   const matched = open ? issuesStore.matchedRules(issueId) : [];
   const hasMine = matched.some((r) => r.mine);
+  /** what flagged it, suppression aside — the muted state shows these */
+  const underlying = open ? issuesStore.rulesFor(issueId) : [];
   /** the state machine the footer and body branch on */
   const state: 'undescribed' | 'mine' | 'team' | 'muted' = muted
     ? 'muted'
@@ -171,15 +176,17 @@ export default observer(function CriticalDialog({
     >
       <p className="mb-3" style={{ color: 'var(--color-gray-dark)' }}>
         {state === 'muted' ? (
-          <>You removed “{issueHead}” from your critical list.</>
+          <>
+            You removed “{issueHead}” from your critical list. It was flagged by:
+          </>
         ) : (
           <>“{issueHead}”</>
         )}
       </p>
 
-      {matched.length > 0 && (
+      {(state === 'muted' ? underlying : matched).length > 0 && (
         <div className="flex flex-col gap-2 mb-4">
-          {matched.map((r) => (
+          {(state === 'muted' ? underlying : matched).map((r) => (
             <div
               key={r.id}
               className="flex items-start gap-2.5 rounded-lg border p-3"
@@ -187,7 +194,14 @@ export default observer(function CriticalDialog({
               <AlertTriangle
                 size={15}
                 className="mt-0.5 shrink-0"
-                style={{ color: 'var(--color-red)' }}
+                style={{
+                  // gray while muted: the description is still there, it is
+                  // just not flagging this issue for me right now
+                  color:
+                    state === 'muted'
+                      ? 'var(--color-gray-medium)'
+                      : 'var(--color-red)',
+                }}
               />
               <div className="flex flex-col gap-0.5">
                 <span>{r.description}</span>
