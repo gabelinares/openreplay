@@ -1,4 +1,4 @@
-import { Input, Modal } from 'antd';
+import { Button, Input, Modal, Tooltip } from 'antd';
 import { AlertTriangle } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
@@ -51,12 +51,15 @@ export function CriticalRuleFields({
    plus ONE of two things, and the buttons live in the footer where the Hide
    modal keeps them:
      · a description already matched → it says which and whose, footer is Close.
-       Pure explanation, nothing to confirm.
      · none of mine matched → the field, prefilled from the issue so a rule is
        one edit away from blank, footer is Cancel / Save.
-   Everything else moved to where the app already keeps it: "not critical for me"
-   to the row menu and the detail page's action bar (NotCriticalDialog), and the
-   way to the full list to the header's Settings button. */
+   Whenever the issue IS critical, the footer's left holds the way out. It acts
+   immediately, no confirmation (Gabriel 07-31) — so the thing a confirm step
+   would have explained lives in the button's tooltip instead: the issue leaves
+   YOUR critical list, the description itself is untouched. The row menu offers
+   the way back. The path to the full list is the header's Settings button.
+   The same action with a reason attached still lives in the row menu and the
+   detail page's action bar (NotCriticalDialog), where there is room to ask. */
 export default observer(function CriticalDialog({
   issueId,
   issueHead,
@@ -78,6 +81,16 @@ export default observer(function CriticalDialog({
     if (open) setDesc(hasMine ? '' : issueHead);
   }, [open, issueHead, hasMine]);
 
+  /** removes this issue from my critical list, immediately — no confirmation
+      (Gabriel 07-31). Nothing is lost that a click cannot restore: my
+      description stays exactly as it is and keeps flagging everything else it
+      matches, and the row menu offers "Show as critical again". */
+  const removeFromCritical = () => {
+    if (issueId == null) return;
+    issuesStore.setNotCriticalForMe(issueId, '');
+    onClose();
+  };
+
   const save = () => {
     if (issueId == null || !desc.trim()) return;
     issuesStore.addCriticalRule(desc.trim(), issueId);
@@ -92,10 +105,31 @@ export default observer(function CriticalDialog({
       onOk={save}
       okText="Save"
       okButtonProps={{ disabled: !desc.trim() }}
-      // explaining has nothing to confirm, so the footer is a single Close
-      footer={
-        hasMine ? (_, { CancelBtn }) => <CancelBtn /> : undefined
-      }
+      /* one footer for every state: the way OUT of critical on the left, the
+         conventional place for a secondary exit, and the primary on the right.
+         Explaining has nothing to confirm, so Save is simply absent there. */
+      footer={(_, { OkBtn, CancelBtn }) => (
+        <div className="flex items-center">
+          {matched.length > 0 && (
+            <Tooltip
+              placement="topLeft"
+              title={
+                hasMine
+                  ? 'Removes this issue from your critical list. Your description stays and keeps flagging everything else it matches.'
+                  : 'Removes this issue from your critical list. Your teammate’s description is untouched, and their view does not change.'
+              }
+            >
+              <Button type="text" danger onClick={removeFromCritical}>
+                Not critical for me
+              </Button>
+            </Tooltip>
+          )}
+          <span className="ml-auto flex items-center gap-2">
+            <CancelBtn />
+            {!hasMine && <OkBtn />}
+          </span>
+        </div>
+      )}
       cancelText={hasMine ? 'Close' : 'Cancel'}
     >
       <p className="mb-3" style={{ color: 'var(--color-gray-dark)' }}>
