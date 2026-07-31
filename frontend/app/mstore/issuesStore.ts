@@ -1002,11 +1002,16 @@ export default class IssuesStore {
   /** MY not-critical: suppresses the flag for me only, and the reason is
       feedback for the agent (Gabriel 07-30). */
   setNotCriticalForMe = (id: number, reason: string) => {
-    this.notCritical[id] = reason;
+    // replace, never mutate a key: MobX does not track keys ADDED to a plain
+    // observable object, so `notCritical[id] = x` updated the data without
+    // waking the rows that read it (Gabriel 07-31 caught the row menu not
+    // offering the way back). Same pattern as customTags/criticalRules above.
+    this.notCritical = { ...this.notCritical, [id]: reason };
   };
 
   restoreCritical = (id: number) => {
-    delete this.notCritical[id];
+    const { [id]: _dropped, ...rest } = this.notCritical;
+    this.notCritical = rest;
   };
 
   // ---- issue-page segment scope ----
