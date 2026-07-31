@@ -324,7 +324,6 @@ function TagChip({ label }: { label: string }) {
    (Mehdi 07-28) and no surface sets it directly. Kept in sync via issuesStore. */
 const HeaderCriticalToggle = observer(({ issue }: { issue: Issue }) => {
   const { issuesStore } = useStore();
-  const history = useHistory();
   const [dialog, setDialog] = React.useState(false);
   const critState = issuesStore.critState(issue.id);
   const matched = issuesStore.matchedRules(issue.id);
@@ -337,38 +336,44 @@ const HeaderCriticalToggle = observer(({ issue }: { issue: Issue }) => {
           ? `Matches ${matched[0]?.createdBy}’s description`
           : 'Describe what’s critical';
   return (
-    <Tooltip title={critTip}>
-      <Button
-        type="text"
-        size="small"
-        aria-label={critTip}
-        aria-pressed={critState !== 'none'}
-        className={`critical-toggle flex items-center justify-center shrink-0${
-          critState !== 'none' ? ' critical-on' : ''
-        }${critState === 'mine' ? ' critical-mine' : ''}`}
-        icon={
-          // same chip-color language as the list (`critical-mine` in
-          // issues.css): gray chip = agent's critical, red chip = mine —
-          // the icon itself stays the project-critical red outline
-          <AlertTriangle
-            size={15}
-            strokeWidth={2}
-            style={{
-              // none-state color is left to issues.css so the hover preview
-              // (gray → red) can take effect; inline style would win over it
-              color: critState !== 'none' ? 'var(--color-red)' : undefined,
-              fill: 'none',
-            }}
-          />
-        }
-        onClick={() => setDialog(true)}
-      />
+    /* the dialog is a SIBLING of the tooltip, never its second child: antd's
+       trigger runs React.Children.only over whatever Tooltip wraps, so a second
+       child throws on render and takes the whole replay header down with it.
+       The list row and the detail chip already keep their dialog outside. */
+    <>
+      <Tooltip title={critTip}>
+        <Button
+          type="text"
+          size="small"
+          aria-label={critTip}
+          aria-pressed={critState !== 'none'}
+          className={`critical-toggle flex items-center justify-center shrink-0${
+            critState !== 'none' ? ' critical-on' : ''
+          }${critState === 'mine' ? ' critical-mine' : ''}`}
+          icon={
+            // same chip-color language as the list (`critical-mine` in
+            // issues.css): gray chip = agent's critical, red chip = mine —
+            // the icon itself stays the project-critical red outline
+            <AlertTriangle
+              size={15}
+              strokeWidth={2}
+              style={{
+                // none-state color is left to issues.css so the hover preview
+                // (gray → red) can take effect; inline style would win over it
+                color: critState !== 'none' ? 'var(--color-red)' : undefined,
+                fill: 'none',
+              }}
+            />
+          }
+          onClick={() => setDialog(true)}
+        />
+      </Tooltip>
       <CriticalDialog
         issueId={dialog ? issue.id : null}
         issueHead={issue.head}
         onClose={() => setDialog(false)}
       />
-    </Tooltip>
+    </>
   );
 });
 
