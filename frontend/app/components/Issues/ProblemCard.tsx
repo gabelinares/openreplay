@@ -230,33 +230,35 @@ const critContent = (text: string, withClose = false) => (
 );
 
 /* The critical flag on the detail page, built on antd Tag (red, same
-   AlertTriangle as the issues list). With `onSet` it's a two-way toggle:
-   marking is instant and personal-only (Mehdi 07-07). Removal depends on the
-   flag's source — `personalOnly` (my mark, no agent flag) removes instantly
-   and silently; an agent flag opens the "why" reason popover, since that
-   removal is for everyone and teaches the agent. Without `onSet` it's a
-   static red tag. */
+   AlertTriangle as the issues list).
+
+   Criticality is derived now (Mehdi 07-28): the agent flags what matches a
+   description someone wrote, so this chip reports state and opens the shared
+   CriticalDialog — the one place that explains WHICH description matched and
+   whose, lets you add your own, and holds the "not critical for me" reason
+   step. It no longer sets anything itself, and the reason picker that used to
+   live here in its own popover moved into that dialog so every surface asks the
+   question the same way. Without `onOpen` it's a static red tag. */
 function CriticalControl({
   critical,
-  personalOnly,
-  onSet,
+  mine,
+  by,
+  onOpen,
 }: {
   critical: boolean;
-  /** the flag has no agent/project source — it exists only in my layer */
-  personalOnly?: boolean;
-  onSet?: (val: boolean, reason?: string) => void;
+  /** one of MY descriptions matched */
+  mine?: boolean;
+  /** who wrote the description that matched, when it isn't mine */
+  by?: string;
+  onOpen?: () => void;
 }) {
-  const [open, setOpen] = React.useState(false);
-  const [reasons, setReasons] = React.useState<string[]>([]);
-  const [note, setNote] = React.useState('');
-
   if (!critical) {
-    if (!onSet) return null;
+    if (!onOpen) return null;
     return (
-      <Tooltip title="Mark critical for me">
+      <Tooltip title="Describe what makes this critical">
         <Tag
           bordered
-          onClick={() => onSet(true)}
+          onClick={onOpen}
           className="crit-tag cursor-pointer"
           style={{ margin: 0, color: 'var(--color-gray-medium)' }}
         >
@@ -266,91 +268,30 @@ function CriticalControl({
     );
   }
 
-  if (!onSet) {
-    return (
-      <Tag color="red" bordered style={{ margin: 0 }}>
-        {critContent('Critical')}
-      </Tag>
-    );
-  }
-
-  if (personalOnly) {
-    return (
-      <Tooltip title="Remove from my criticals">
-        <Tag
-          color="red"
-          bordered
-          onClick={() => onSet(false)}
-          className="crit-tag cursor-pointer"
-          style={{ margin: 0 }}
-        >
-          {critContent('Critical for me', true)}
-        </Tag>
-      </Tooltip>
-    );
-  }
-
-  const panel = (
-    <div className="flex flex-col gap-2" style={{ width: 264 }}>
-      <span className="text-sm" style={{ color: 'var(--color-gray-dark)' }}>
-        Removes the flag for everyone. Why isn’t it critical?
-      </span>
-      <div className="flex flex-wrap gap-1.5">
-        {CRITICAL_REASONS.map((t) => (
-          <ReasonChip
-            key={t}
-            label={t}
-            checked={reasons.includes(t)}
-            onChange={(on) =>
-              setReasons((p) => (on ? [...p, t] : p.filter((x) => x !== t)))
-            }
-          />
-        ))}
-      </div>
-      <Input.TextArea
-        rows={2}
-        placeholder="Add a note (optional)…"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
-      <div className="flex justify-end gap-2">
-        <Button size="small" type="text" onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
-        <Button
-          size="small"
-          type="primary"
-          danger
-          onClick={() => {
-            onSet(false, [...reasons, note.trim()].filter(Boolean).join(' · '));
-            setOpen(false);
-            setReasons([]);
-            setNote('');
-          }}
-        >
-          Mark as not critical
-        </Button>
-      </div>
-    </div>
+  const tag = (
+    <Tag
+      color="red"
+      bordered
+      onClick={onOpen}
+      className={`crit-tag${onOpen ? ' cursor-pointer' : ''}`}
+      style={{ margin: 0 }}
+    >
+      {critContent(mine ? 'Critical for me' : 'Critical', Boolean(onOpen))}
+    </Tag>
   );
 
+  if (!onOpen) return tag;
+
   return (
-    <Popover
-      open={open}
-      onOpenChange={setOpen}
-      trigger="click"
-      placement="bottomLeft"
-      content={panel}
+    <Tooltip
+      title={
+        mine
+          ? 'Critical: matches your description'
+          : `Critical: matches ${by ?? 'a teammate'}’s description`
+      }
     >
-      <Tag
-        color="red"
-        bordered
-        className="crit-tag cursor-pointer"
-        style={{ margin: 0 }}
-      >
-        {critContent('Critical', true)}
-      </Tag>
-    </Popover>
+      {tag}
+    </Tooltip>
   );
 }
 
@@ -360,10 +301,12 @@ interface Props {
   editable?: boolean;
   onRename?: (name: string) => void;
   /** when set, the Critical chip becomes a two-way toggle (issue detail page) */
-  onSetCritical?: (val: boolean, reason?: string) => void;
-  /** the critical flag exists only in my personal layer (no agent flag) —
-      removal is instant instead of the teaching popover */
-  criticalPersonalOnly?: boolean;
+  /** opens the shared CriticalDialog (explain / describe / not-critical) */
+  onOpenCritical?: () => void;
+  /** one of MY descriptions matched, not just a teammate's */
+  criticalMine?: boolean;
+  /** who wrote the description that matched, when it isn't mine */
+  criticalBy?: string;
   /** right-aligned actions on the title row (e.g. Create ticket / Hide) */
   actions?: React.ReactNode;
   /** detail-page framing: title+actions header, full-width divider, then body */
@@ -376,8 +319,9 @@ function ProblemCard({
   issue,
   editable,
   onRename,
-  onSetCritical,
-  criticalPersonalOnly,
+  onOpenCritical,
+  criticalMine,
+  criticalBy,
   actions,
   framed,
   hideProblem,
@@ -408,13 +352,14 @@ function ProblemCard({
           <ImpactGauge value={issue.impact} />
         </span>
       </Tooltip>
-      {(onSetCritical || issue.critical) && (
+      {(onOpenCritical || issue.critical) && (
         <>
           <span style={{ color: 'var(--color-gray-light)' }}>|</span>
           <CriticalControl
             critical={issue.critical}
-            personalOnly={criticalPersonalOnly}
-            onSet={onSetCritical}
+            mine={criticalMine}
+            by={criticalBy}
+            onOpen={onOpenCritical}
           />
         </>
       )}

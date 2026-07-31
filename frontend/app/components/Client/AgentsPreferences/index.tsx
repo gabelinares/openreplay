@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useHistory, useLocation } from 'App/routing';
 
 import { kaiStore, useKaiStore } from '../KaiSettings/components/shared/store';
+import CriticalRules from './CriticalRules';
 import JourneyTags from './JourneyTags';
 
 /* Preferences > Agents (Mehdi 07-27): the formula is MAIN components stay as
@@ -190,6 +191,20 @@ function AgentsPreferences() {
             )}
           >
             <JourneyTags />
+          </PrefSection>
+
+          <Divider />
+
+          {/* §14 — the centralized "what's critical" list (Mehdi 07-28). Same
+              shape as the tags manager above it on purpose: describe it once,
+              the agent applies it. */}
+          <PrefSection
+            title={t('Critical')}
+            hint={t(
+              'What matters to you, in plain words. The agent flags the issues that match, and “Critical to me” on the Issues list filters by whose description matched.',
+            )}
+          >
+            <CriticalRules />
           </PrefSection>
         </div>
       ),

@@ -90,8 +90,19 @@ export const HIDE_REASONS = [
   'Low priority',
 ];
 
-/* Reason chips offered when removing an issue's critical flag (shared by the
-   list + detail pages). */
+/** One line of "what critical means to me" (Mehdi 07-28): a plain-words
+ *  description plus its author. No name field — the description IS the rule,
+ *  and the author is what makes "critical to me" filterable. `mine` stands in
+ *  for `createdBy.id === currentUser.id` on the API. */
+export type CriticalRule = {
+  id: number;
+  description: string;
+  createdBy: string;
+  mine: boolean;
+};
+
+/* Reason chips offered when saying an issue is not critical for me (shared by
+   the list + detail pages). */
 export const CRITICAL_REASONS = [
   'Not actually critical',
   'Already resolved',
@@ -611,43 +622,74 @@ export default class IssuesStore {
   names: Record<number, string> = {};
   dismissReasons: Record<number, string> = {};
   dismissTags: Record<number, string[]> = {};
-  // per-issue override of the authored `critical` flag (Gmail-style toggle)
-  criticalOverride: Record<number, boolean> = {};
-  criticalReasons: Record<number, string> = {};
-  /* ---- per-user critical ("critical for me") ----
-     Red encodes project criticality; the CHIP BACKGROUND encodes my
-     relationship to it (icon stays the same red outline for everyone —
-     ownership is a different visual axis than severity). `mine` is my
-     personal layer and STAYS personal: marking — fresh from gray or
-     re-marking something un-flagged earlier — never touches the project-
-     wide flag; teammates don't see it (Mehdi 07-07, "keep it simple: for me
-     only"). Seeded: #3 = an agent-critical I adopted, #5 = my own personal
-     mark.
+  /* ---- critical DEFINITIONS (Mehdi 07-28/29 — replaces the 07-07 per-issue
+     flag) ----
+     Criticality is no longer something the UI puts on an issue. The customer
+     describes what critical means to them, one description per line, each
+     carrying its author; the engine (shipped 07-29) passes those descriptions
+     to the LLM with per-user attribution, and the LLM decides which issues are
+     critical and for whom. So in the UI criticality is always DERIVED:
+     `matchedRules(id)` is the whole truth, and every control is either an
+     explanation or a way to author a description.
 
-     BACKEND CONTRACT (for Nikita — this is mock/local-only today):
-     two independent flags per issue, both need persistence:
-       1. `critical: boolean` — PROJECT-WIDE. Set by the agent, or by any
-          user's manual mark on an issue with no existing source (see
-          `criticalOverride`/`criticalReasons` below). Visible to everyone.
-       2. `mine: boolean`, PER USER — this issue is critical *for me*.
-          Purely personal curation; never visible to teammates. A user can
-          have `mine=true` on an issue that is NOT project-critical (their
-          own manual mark) or on one that IS (they adopted an agent/teammate
-          critical as their own) — the two flags are independent, not a
-          hierarchy.
-     Today this is simulated client-side with three maps, which is the
-     shape the backend needs to replace:
-       - `criticalOverride: Record<issueId, boolean>` — explicit override of
-         the agent-authored `critical` flag (Gmail-style toggle: a user can
-         mark not-critical even if the agent flagged it, via the reason
-         modal below).
-       - `criticalReasons: Record<issueId, string>` — the free-text reason
-         captured when removing a critical (teaching moment for the agent).
-       - `mine: number[]` (this array) — per-user set of issue ids marked
-         critical-for-me. In the real backend this is naturally a per-user
-         table/relation, not a project-wide array like the mock. */
-  mine: number[] = [3, 5];
-  /** Display filter: my criticals ∪ issues surfaced by segments I own */
+     BACKEND CONTRACT (for Nikita):
+       · `GET/POST/PATCH/DELETE /critical-definitions` →
+         `{ id, description, createdBy: { id, name }, createdAt }`.
+         No name field — Mehdi 07-29: "you just need to give maybe a
+         description", and the user is the important part.
+       · every issue carries what matched it, server-side:
+         `criticalBy: [{ definitionId, userId }]`. The UI needs the attribution
+         to say WHY a row is critical and to filter "critical to me" by whose
+         description matched — it cannot be recomputed on the client.
+       · `POST /issues/:id/not-critical { reason }` — PER-USER suppression plus
+         the reason as agent feedback (Gabriel 07-30: my not-critical never
+         changes a teammate's view; the old copy said "for anyone").
+       · NOT needed: any per-issue "pin this one for me" table. The triangle
+         authors a description instead (Gabriel 07-30), which is the tradeoff
+         Mehdi took to avoid delaying the release.
+     `criticalBy` and `notCritical` below are the mock stand-ins for the first
+     two of those; both are keyed by issue id exactly as the API will be. */
+  criticalRules: CriticalRule[] = [
+    {
+      id: 1,
+      description:
+        'Anything that stops someone paying: declined cards, failed charges, or a payment form that rejects valid details.',
+      createdBy: 'Gabriel L.',
+      mine: true,
+    },
+    {
+      id: 2,
+      description:
+        'Checkout and cart steps that break, hang, or lose what the user already entered.',
+      createdBy: 'Gabriel L.',
+      mine: true,
+    },
+    {
+      id: 3,
+      description:
+        'Pages that take more than five seconds to become usable on mobile.',
+      createdBy: 'Mehdi O.',
+      mine: false,
+    },
+    {
+      id: 4,
+      description: 'Anything that blocks signup or login.',
+      createdBy: 'Nikita M.',
+      mine: false,
+    },
+  ];
+  /** what the engine matched, per issue — server-derived (see the contract
+      above). Seeded to explain the four criticals the mock ships with. */
+  criticalBy: Record<number, number[]> = {
+    1: [1], // card declined → my payment description
+    2: [2], // "Place order" unresponsive → my checkout description
+    3: [1], // expiry rejected → my payment description
+    4: [3], // 8s checkout → Mehdi's slow-page description
+  };
+  /** my own "not critical", with the reason that teaches the agent */
+  notCritical: Record<number, string> = {};
+  /** Display filter: issues my own descriptions flagged ∪ issues surfaced by
+      segments I own */
   relevantToMe = false;
 
   // ---- saved segments (shared with Data Management) ----
@@ -721,26 +763,30 @@ export default class IssuesStore {
     return this.all.filter((i) => i.cat === c).length;
   }
 
-  /** The flag's non-me source: the agent's authored critical, unless it was
-      explicitly removed with a reason. My own manual mark lives in `mine`,
-      never here — so this is exactly the "another source exists" test. */
-  agentCritical(id: number): boolean {
-    const raw = this.all.find((x) => x.id === id);
-    return Boolean(raw?.critical) && this.criticalOverride[id] !== false;
+  /** The descriptions that made this issue critical — the whole truth about
+      criticality, and the answer to "why is this flagged?". Empty once I have
+      said it is not critical for me. */
+  matchedRules(id: number): CriticalRule[] {
+    if (this.notCritical[id] != null) return [];
+    return (this.criticalBy[id] ?? [])
+      .map((ruleId) => this.criticalRules.find((r) => r.id === ruleId))
+      .filter(Boolean) as CriticalRule[];
   }
 
-  /** Three-state critical: none → critical (project) → critical for me. */
-  critState(id: number): 'none' | 'project' | 'mine' {
-    if (this.mine.includes(id)) return 'mine';
-    return this.agentCritical(id) ? 'project' : 'none';
+  /** Three states, now about WHOSE description matched: none, a teammate's
+      only, or one of mine (which is what "Critical to me" filters on). */
+  critState(id: number): 'none' | 'team' | 'mine' {
+    const matched = this.matchedRules(id);
+    if (!matched.length) return 'none';
+    return matched.some((r) => r.mine) ? 'mine' : 'team';
   }
 
-  /** Apply per-issue user overrides (rename + critical toggle) to a raw issue.
-      Displayed `critical` includes my personal layer — this is MY view of the
-      list; a personal mark doesn't exist for teammates. */
+  /** Apply per-issue user overrides (rename) and derive `critical` from the
+      descriptions that matched — this is MY view of the list, since my own
+      "not critical" suppresses the flag for me alone. */
   decorate = (i: Issue): Issue => {
     const head = this.names[i.id] ?? i.head;
-    const critical = this.agentCritical(i.id) || this.mine.includes(i.id);
+    const critical = this.matchedRules(i.id).length > 0;
     return head === i.head && critical === i.critical
       ? i
       : { ...i, head, critical };
@@ -888,10 +934,11 @@ export default class IssuesStore {
     ).length;
   }
 
-  // ---- per-user critical + "Critical to me" ----
-  /** relevant = critical for me, or surfaced by a segment I own */
+  // ---- "Critical to me" ----
+  /** relevant = one of MY descriptions flagged it, or a segment I own surfaced
+      it. The first half is exactly the per-user attribution the engine sends. */
   isRelevant = (i: Issue): boolean =>
-    this.mine.includes(i.id) ||
+    this.critState(i.id) === 'mine' ||
     (i.segmentId != null && Boolean(this.segmentById(i.segmentId)?.mine));
 
   /** count shown next to the Display checkbox (ignores other filters) */
@@ -903,17 +950,63 @@ export default class IssuesStore {
 
   setRelevantToMe = (v: boolean) => { this.relevantToMe = v; };
 
-  /** Mark critical for me — fresh from gray or adopting an agent critical.
-      Personal only, no ceremony: the project-wide flag is never touched. */
-  markMine = (id: number) => {
-    if (!this.mine.includes(id)) this.mine.push(id);
-    delete this.criticalReasons[id];
+  // ---- critical definitions ----
+  /** Author a description. When it comes from an issue (the triangle's
+      intermediary), that issue is flagged straight away so the click has a
+      visible effect; everything else it matches arrives with the next pass,
+      which is what the dialog's caption promises. */
+  addCriticalRule = (description: string, forIssueId?: number): CriticalRule => {
+    const rule: CriticalRule = {
+      id: Math.max(0, ...this.criticalRules.map((r) => r.id)) + 1,
+      description,
+      createdBy: 'Gabriel L.',
+      mine: true,
+    };
+    this.criticalRules.push(rule);
+    if (forIssueId != null) {
+      delete this.notCritical[forIssueId];
+      this.criticalBy[forIssueId] = [
+        ...(this.criticalBy[forIssueId] ?? []),
+        rule.id,
+      ];
+    }
+    return rule;
   };
 
-  /** Step my personal layer back — always silent: my layer never carries the
-      project flag, so nobody else is affected. */
-  removeMine = (id: number) => {
-    this.mine = this.mine.filter((x) => x !== id);
+  updateCriticalRule = (id: number, description: string) => {
+    this.criticalRules = this.criticalRules.map((r) =>
+      r.id === id ? { ...r, description } : r,
+    );
+  };
+
+  /** Removing a description un-flags everything it was the only match for —
+      the reason the delete confirm has to say how many issues that is. */
+  removeCriticalRule = (id: number) => {
+    this.criticalRules = this.criticalRules.filter((r) => r.id !== id);
+    Object.keys(this.criticalBy).forEach((key) => {
+      const issueId = Number(key);
+      this.criticalBy[issueId] = this.criticalBy[issueId].filter(
+        (r) => r !== id,
+      );
+    });
+  };
+
+  /** how many issues would stop being critical if this description went away */
+  rulesOnlyMatch(id: number): number {
+    return Object.keys(this.criticalBy).filter((key) => {
+      const ids = this.criticalBy[Number(key)];
+      return ids.includes(id) && ids.length === 1;
+    }).length;
+  }
+
+  /** MY not-critical: suppresses the flag for me only, and the reason is
+      feedback for the agent (Gabriel 07-30). */
+  setNotCriticalForMe = (id: number, reason: string) => {
+    this.notCritical[id] = reason;
+  };
+
+  restoreCritical = (id: number) => {
+    delete this.notCritical[id];
   };
 
   // ---- issue-page segment scope ----
@@ -1104,18 +1197,6 @@ export default class IssuesStore {
       not restore it. Unmarking clears my layer always, and lifts the project
       flag only where one exists — that removal carries the reason so the
       agent can learn what wasn't actually critical. */
-  setCritical = (id: number, val: boolean, reason = '') => {
-    if (val) {
-      delete this.criticalReasons[id];
-      this.markMine(id);
-    } else {
-      this.removeMine(id);
-      if (this.agentCritical(id)) {
-        this.criticalOverride[id] = false;
-        this.criticalReasons[id] = reason;
-      }
-    }
-  };
 }
 
 /** A journey tag: the name the agent applies, and the plain-words description
