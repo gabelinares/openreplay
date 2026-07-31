@@ -41,6 +41,7 @@ import {
   HIDE_REASONS,
   JOURNEY_SEARCH_SUGGESTIONS,
 } from 'App/mstore/issuesStore';
+import CriticalDialog from './CriticalDialog';
 import ProblemCard, { ReasonChip } from './ProblemCard';
 import {
   FoundInChips,
@@ -479,6 +480,7 @@ function IssueDetail() {
   const issue = issuesStore.byId(Number(params.issueId));
 
   const [ticketHover, setTicketHover] = React.useState(false);
+  const [critDialog, setCritDialog] = React.useState(false);
   const [hideOpen, setHideOpen] = React.useState(false);
   const [hideReason, setHideReason] = React.useState('');
   const [hideTags, setHideTags] = React.useState<string[]>([]);
@@ -616,10 +618,9 @@ function IssueDetail() {
           issue={issue}
           editable
           onRename={(name) => issuesStore.rename(issue.id, name)}
-          onSetCritical={(val, reason) =>
-            issuesStore.setCritical(issue.id, val, reason)
-          }
-          criticalPersonalOnly={!issuesStore.agentCritical(issue.id)}
+          onOpenCritical={() => setCritDialog(true)}
+          criticalMine={issuesStore.critState(issue.id) === 'mine'}
+          criticalBy={issuesStore.matchedRules(issue.id)[0]?.createdBy}
           actions={
             <>
               <Button
@@ -784,6 +785,18 @@ function IssueDetail() {
           </>
         )}
       </div>
+
+      {/* the same critical dialog the list opens — one place to explain the
+          flag, describe your own, or say it is not critical for you */}
+      <CriticalDialog
+        issueId={critDialog ? issue.id : null}
+        issueHead={issue.head}
+        onClose={() => setCritDialog(false)}
+        onManage={() => {
+          setCritDialog(false);
+          history.push('/client/agents?agent=issues');
+        }}
+      />
 
       {/* hide-with-reason modal — mirrors the issue list */}
       <Modal
