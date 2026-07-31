@@ -195,7 +195,7 @@ function CriticalRules() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={t('Filter by description or author')}
-            style={{ width: 170 }}
+            style={{ width: 264 }}
           />
           <Button size="small" icon={<Plus size={14} />} onClick={openCreate}>
             {t('Add description')}

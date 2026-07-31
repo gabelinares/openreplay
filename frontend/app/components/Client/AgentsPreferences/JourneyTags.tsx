@@ -202,8 +202,9 @@ function JourneyTags() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={t('Filter by name or description')}
-            // 170 is the width the Audits list's search uses on the same bar
-            style={{ width: 170 }}
+            // wide enough that the placeholder is not clipped (Gabriel 07-31);
+            // there is room for it now that the surface runs full width
+            style={{ width: 264 }}
           />
           <Button size="small" icon={<Plus size={14} />} onClick={openCreate}>
             {t('Add tag')}
