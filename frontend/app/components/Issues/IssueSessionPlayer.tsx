@@ -734,7 +734,7 @@ function IssueSessionPlayer() {
   );
   const card: IssueSessionCard | undefined = issue
     ? issuesStore
-        .exampleSessions(issue, { ignoreScope: true })
+        .exampleSessions(issue, { ignoreFilters: true })
         .find((c) => c.sessionId === sessionId)
     : undefined;
   // which segments THIS session matches (Mehdi 07-20) — computed from segment

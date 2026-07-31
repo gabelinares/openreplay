@@ -7,7 +7,6 @@ import {
   Tooltip,
   Dropdown,
   Popover,
-  Checkbox,
   Modal,
   Button,
 } from 'antd';
@@ -47,7 +46,7 @@ import { Pagination } from 'UI';
 import CountSuffix from 'Shared/CountSuffix';
 import CriticalDialog from './CriticalDialog';
 import NotCriticalDialog from './NotCriticalDialog';
-import TagFilter, { SegmentFilter } from './TagFilter';
+import TagFilter, { CheckRow, SegmentFilter } from './TagFilter';
 import SegmentsIndicator from './segments/SegmentsIndicator';
 import { ImpactGauge, ReasonChip } from './ProblemCard';
 import './issues.css';
@@ -352,29 +351,34 @@ function IssuesList() {
     },
   ];
 
+  /* Rows are the shared CheckRow, the same one the Tags and Segments popovers
+     next to this one use (Gabriel 07-31). These were bare antd Checkboxes, so
+     three sibling popovers on one toolbar had two different row treatments:
+     no hover target, no selected tint, and a click area only as wide as the
+     label. */
   const displayContent = (
-    <div className="flex flex-col gap-2 p-1" style={{ minWidth: 170 }}>
-      <Checkbox
-        checked={issuesStore.critOnly}
-        onChange={(e) => issuesStore.setCritOnly(e.target.checked)}
+    <div className="flex flex-col p-1" style={{ minWidth: 170 }}>
+      <CheckRow
+        on={issuesStore.critOnly}
+        onClick={() => issuesStore.setCritOnly(!issuesStore.critOnly)}
       >
         Critical only · {issuesStore.criticalCount}
-      </Checkbox>
-      <Checkbox
-        checked={issuesStore.showHidden}
-        onChange={(e) => issuesStore.setShowHidden(e.target.checked)}
+      </CheckRow>
+      <CheckRow
+        on={issuesStore.showHidden}
+        onClick={() => issuesStore.setShowHidden(!issuesStore.showHidden)}
       >
         Hidden · {issuesStore.hidden.length}
-      </Checkbox>
+      </CheckRow>
       {/* one toggle for "what's mine": critical-for-me ∪ my segments' finds
           (Mehdi 07-07 — "just show me what's relevant to me"; labeled around
           "critical" per Gabriel 07-07 since that's the flag it's built on) */}
-      <Checkbox
-        checked={issuesStore.relevantToMe}
-        onChange={(e) => issuesStore.setRelevantToMe(e.target.checked)}
+      <CheckRow
+        on={issuesStore.relevantToMe}
+        onClick={() => issuesStore.setRelevantToMe(!issuesStore.relevantToMe)}
       >
         Critical to me · {issuesStore.relevantCount}
-      </Checkbox>
+      </CheckRow>
     </div>
   );
 
