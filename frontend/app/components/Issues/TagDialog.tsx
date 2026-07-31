@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Input, Modal } from 'antd';
+import { Input, Modal } from 'antd';
 
 /* THE journey-tag dialog — creating (from the Tags filter) and editing (from
    Preferences > Agents) share it: one dialog component, never per-callsite
@@ -9,24 +9,21 @@ import { Button, Input, Modal } from 'antd';
 
    This dialog IS the intermediary layer (Gabriel 07-28, Mehdi: "we need
    something intermediary. Yes. Correct."): a small control in the Issues list
-   must never drop the user straight into a settings page, so the definition is
-   authored here, in flow, and `onManage` offers the way through to the full
-   list for the users who want it. */
+   must never drop the user straight into a settings page, so the tag is
+   authored here, in flow. It holds no other action — one job, and the buttons
+   in the footer (Gabriel 07-31); the way to the full list is the Settings
+   button in the page header. */
 export default function TagDialog({
   open,
   initial,
   onCancel,
   onSave,
-  onManage,
 }: {
   open: boolean;
   /** editing an existing tag; omit when creating */
   initial?: { name: string; description: string } | null;
   onCancel: () => void;
   onSave: (name: string, description: string) => void;
-  /** shows the way through to the full list; omit where the dialog is already
-      opened from it (Preferences > Agents) */
-  onManage?: () => void;
 }) {
   const [name, setName] = React.useState('');
   const [desc, setDesc] = React.useState('');
@@ -69,18 +66,6 @@ export default function TagDialog({
           Applies to sessions captured from now on; existing sessions are not
           re-scanned.
         </span>
-        {/* same quiet link grammar as the filter's "New tag" and the segment
-            drawer's "Add instructions" */}
-        {onManage && (
-          <Button
-            type="link"
-            size="small"
-            onClick={onManage}
-            className="self-start px-0!"
-          >
-            Manage all tags
-          </Button>
-        )}
       </div>
     </Modal>
   );
