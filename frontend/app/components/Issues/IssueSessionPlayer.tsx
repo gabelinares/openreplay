@@ -329,11 +329,13 @@ const HeaderCriticalToggle = observer(({ issue }: { issue: Issue }) => {
   const critState = issuesStore.critState(issue.id);
   const matched = issuesStore.matchedRules(issue.id);
   const critTip =
-    critState === 'mine'
-      ? 'Critical: matches your description'
-      : critState === 'team'
-        ? `Critical: matches ${matched[0]?.createdBy}’s description`
-        : 'Describe what makes this critical';
+    issuesStore.notCritical[issue.id] != null
+      ? 'Not critical for you'
+      : critState === 'mine'
+        ? 'Matches your description'
+        : critState === 'team'
+          ? `Matches ${matched[0]?.createdBy}’s description`
+          : 'Describe what’s critical';
   return (
     <Tooltip title={critTip}>
       <Button

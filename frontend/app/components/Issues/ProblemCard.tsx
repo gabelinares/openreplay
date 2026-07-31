@@ -255,7 +255,7 @@ function CriticalControl({
   if (!critical) {
     if (!onOpen) return null;
     return (
-      <Tooltip title="Describe what makes this critical">
+      <Tooltip title="Describe what’s critical">
         <Tag
           bordered
           onClick={onOpen}
@@ -286,8 +286,8 @@ function CriticalControl({
     <Tooltip
       title={
         mine
-          ? 'Critical: matches your description'
-          : `Critical: matches ${by ?? 'a teammate'}’s description`
+          ? 'Matches your description'
+          : `Matches ${by ?? 'a teammate'}’s description`
       }
     >
       {tag}

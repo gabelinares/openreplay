@@ -167,12 +167,15 @@ function IssuesList() {
         // attribution exists to answer.
         const critState = issuesStore.critState(r.id);
         const matchedRules = issuesStore.matchedRules(r.id);
+        // four states, four tooltips, each as short as it can be (Gabriel 07-31)
         const critTip =
-          critState === 'mine'
-            ? 'Critical: matches your description'
-            : critState === 'team'
-              ? `Critical: matches ${matchedRules[0]?.createdBy}’s description`
-              : 'Describe what makes this critical';
+          issuesStore.notCritical[r.id] != null
+            ? 'Not critical for you'
+            : critState === 'mine'
+              ? 'Matches your description'
+              : critState === 'team'
+                ? `Matches ${matchedRules[0]?.createdBy}’s description`
+                : 'Describe what’s critical';
         return (
         <div className="flex items-center gap-2 min-w-0">
           <Tooltip title={critTip}>
@@ -284,10 +287,10 @@ function IssuesList() {
       align: 'center',
       render: (_: unknown, r: Issue) => {
         const isHidden = issuesStore.hidden.includes(r.id);
-        // "not critical for me" only makes sense while a description is
-        // actually flagging this row; once suppressed, the menu offers the
-        // way back instead
-        const isCritical = issuesStore.matchedRules(r.id).length > 0;
+        // dropping a critical only makes sense when MY OWN description flagged
+        // it (Gabriel 07-31) — muting a teammate's signal changes nothing worth
+        // offering. Once I have dropped it, the menu offers the way back.
+        const isCritical = issuesStore.critState(r.id) === 'mine';
         return (
           <Dropdown
             trigger={['click']}
