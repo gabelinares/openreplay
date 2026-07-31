@@ -1,23 +1,38 @@
-import { Divider, Switch, Typography } from 'antd';
-import React, { useState } from 'react';
+import { Divider, Typography } from 'antd';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Defaults from './Defaults';
 import Environments from './Environments';
 import { kaiStore, useKaiStore } from './shared/store';
 
+/* The "Environments" tab (renamed from Settings, Mehdi 07-27): only what is
+   CORE to running tests lives here — environments and the default run
+   configuration. Behavior toggles (pause on revisions) and notifications
+   moved to Preferences > Agents, so agent pages don't grow Settings tabs
+   that compete with Preferences. */
 function SettingsTab() {
   const { t } = useTranslation();
 
   // environments + defaults live in the shared store — deleting an environment has
   // to reach the tests, and the defaults pre-fill new drafts / manual tests
-  const { environments, defaults, pauseOnRevision } = useKaiStore();
+  const { environments, defaults } = useKaiStore();
   const setEnvironments = kaiStore.setEnvironments;
-  const [dailySummary, setDailySummary] = useState(false);
-  const [weeklySummary, setWeeklySummary] = useState(true);
 
   return (
-    <div className="flex flex-col p-5 max-w-3xl">
+    /* full width, like the Tests and Runs tabs beside it (Gabriel 07-30): the
+       672px cap left a white gap down the right of this one tab. Nothing here is
+       pinned to the right edge — the environment rows live in a bordered list
+       and the run defaults are a label-above-control grid — so filling the card
+       maroons nothing. */
+    <div className="flex flex-col p-5">
+      <Environments
+        environments={environments}
+        setEnvironments={setEnvironments}
+      />
+
+      <Divider />
+
       {/* Defaults — pre-fill new tests' run settings */}
       <section className="flex flex-col gap-3">
         <div>
@@ -33,78 +48,6 @@ function SettingsTab() {
           value={defaults}
           onChange={(patch) => kaiStore.setDefaults(patch)}
         />
-      </section>
-
-      <Divider />
-
-      {/* Revisions — applies to ALL tests (Mehdi 07-06); per-test can come later */}
-      <section className="flex flex-col gap-4">
-        <div>
-          <Typography.Title level={5} style={{ marginBottom: 0 }}>
-            {t('Revisions')}
-          </Typography.Title>
-          <Typography.Text type="secondary" className="text-sm!">
-            {t('What happens when the agent proposes a new version of a test.')}
-          </Typography.Text>
-        </div>
-
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex flex-col">
-            <span className="font-medium">
-              {t('Pause tests on new revisions')}
-            </span>
-            <Typography.Text type="secondary" className="text-sm!">
-              {t(
-                'A changed flow usually breaks the current steps. When on, tests pause until the new version is reviewed; when off, they keep running on the current version.',
-              )}
-            </Typography.Text>
-          </div>
-          <Switch
-            checked={pauseOnRevision}
-            onChange={kaiStore.setPauseOnRevision}
-          />
-        </div>
-      </section>
-
-      <Divider />
-
-      <Environments
-        environments={environments}
-        setEnvironments={setEnvironments}
-      />
-
-      <Divider />
-
-      {/* Notifications */}
-      <section className="flex flex-col gap-4">
-        <div>
-          <Typography.Title level={5} style={{ marginBottom: 0 }}>
-            {t('Notifications')}
-          </Typography.Title>
-          <Typography.Text type="secondary" className="text-sm!">
-            {t('How you hear about your test runs.')}
-          </Typography.Text>
-        </div>
-
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex flex-col">
-            <span className="font-medium">{t('Daily summary')}</span>
-            <Typography.Text type="secondary" className="text-sm!">
-              {t('A daily digest of all test runs, sent to your email.')}
-            </Typography.Text>
-          </div>
-          <Switch checked={dailySummary} onChange={setDailySummary} />
-        </div>
-
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex flex-col">
-            <span className="font-medium">{t('Weekly summary')}</span>
-            <Typography.Text type="secondary" className="text-sm!">
-              {t('A weekly digest of all test runs, sent to your email.')}
-            </Typography.Text>
-          </div>
-          <Switch checked={weeklySummary} onChange={setWeeklySummary} />
-        </div>
       </section>
     </div>
   );

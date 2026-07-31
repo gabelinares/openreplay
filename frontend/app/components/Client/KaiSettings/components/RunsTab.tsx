@@ -11,6 +11,8 @@ import { RotateCw } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import CountSuffix from 'Shared/CountSuffix';
+
 import { formatDateTimeDefault } from 'App/date';
 import { Pagination } from 'UI';
 
@@ -138,9 +140,7 @@ function RunsTab() {
   const rerun = (run: RunData) =>
     message.success(`${run.testName} — ${t('rerun started, see Runs')}`);
 
-  const faded = (n: number) => (
-    <span style={{ opacity: 0.5, marginLeft: 5 }}>{n}</span>
-  );
+  const faded = (n: number) => <CountSuffix n={n} />;
   const statusOptions = [
     {
       value: 'all',

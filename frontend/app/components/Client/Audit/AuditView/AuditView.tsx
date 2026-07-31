@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { PageTitle, Icon } from 'UI';
+import { Icon } from 'UI';
 import { Button } from 'antd';
 import { useStore } from 'App/mstore';
 import { useObserver } from 'mobx-react-lite';
@@ -33,53 +33,44 @@ function AuditView() {
   };
 
   return useObserver(() => (
-    <div className="bg-white rounded-lg shadow-xs border">
-      <div className="flex items-center mb-4 px-5 pt-5">
-        <PageTitle
-          title={
-            <div className="flex items-center">
-              <span>{t('Audit Trail')}</span>
-              <span className="color-gray-medium ml-2">{total}</span>
-            </div>
-          }
-        />
-        <div className="flex items-center ml-auto">
-          <div className="mx-2">
-            <SelectDateRange
-              period={auditStore.period}
-              onChange={onChange}
-              right
-            />
-          </div>
-          <div className="mx-2">
-            <Select
-              options={[
-                { label: t('Newest First'), value: 'desc' },
-                { label: t('Oldest First'), value: 'asc' },
-              ]}
-              defaultValue={order}
-              plain
-              onChange={({ value }) =>
-                auditStore.updateKey('order', value.value)
-              }
-            />
-          </div>
+    /* container + header follow the shared preferences grammar (Gabriel
+       07-27, first page of the consistency pass): bordered white card, NO
+       shadow, one bordered header row with the 18px semibold title, count as
+       a gray suffix, controls right with uniform gaps */
+    <div className="flex flex-col bg-white rounded-lg border">
+      <div className="flex items-center gap-2 border-b px-4 py-2">
+        <span className="font-semibold text-lg">{t('Audit Trail')}</span>
+        <span style={{ color: 'var(--color-gray-medium)' }}>{total}</span>
+        <div className="flex items-center gap-2 ml-auto">
+          <SelectDateRange
+            period={auditStore.period}
+            onChange={onChange}
+            right
+          />
+          <Select
+            options={[
+              { label: t('Newest First'), value: 'desc' },
+              { label: t('Oldest First'), value: 'asc' },
+            ]}
+            defaultValue={order}
+            plain
+            onChange={({ value }) =>
+              auditStore.updateKey('order', value.value)
+            }
+          />
           <AuditSearchField
             onChange={(value) => {
               auditStore.updateKey('searchQuery', value);
               auditStore.updateKey('page', 1);
             }}
           />
-          <div>
-            <Button
-              type="text"
-              icon={<Icon name="grid-3x3" color="teal" />}
-              className="ml-3"
-              onClick={exportToCsv}
-            >
-              <span className="ml-2">{t('Export to CSV')}</span>
-            </Button>
-          </div>
+          <Button
+            type="text"
+            icon={<Icon name="grid-3x3" color="teal" />}
+            onClick={exportToCsv}
+          >
+            {t('Export to CSV')}
+          </Button>
         </div>
       </div>
 

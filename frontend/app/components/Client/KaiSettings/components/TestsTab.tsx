@@ -15,6 +15,8 @@ import { Calendar, EllipsisVertical, Merge, Play, Plus, Radar } from 'lucide-rea
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import CountSuffix from 'Shared/CountSuffix';
+
 import { Pagination } from 'UI';
 
 import DraftDrawer from './drawers/DraftDrawer';
@@ -365,9 +367,7 @@ function TestsTab() {
   const runNow = (tc: TestCase) =>
     message.success(`${tc.title} — ${t('run started, see Runs')}`);
 
-  const faded = (n: number) => (
-    <span style={{ opacity: 0.5, marginLeft: 5 }}>{n}</span>
-  );
+  const faded = (n: number) => <CountSuffix n={n} />;
   const statusOptions = [
     {
       value: 'all',

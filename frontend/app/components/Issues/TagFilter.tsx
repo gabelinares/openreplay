@@ -1,5 +1,5 @@
 import React from 'react';
-import { Popover, Button, Input, Checkbox, Modal, Segmented, message } from 'antd';
+import { Popover, Button, Input, Checkbox, Segmented, message } from 'antd';
 import {
   Search,
   Tag as TagIcon,
@@ -10,6 +10,7 @@ import {
   Globe,
 } from 'lucide-react';
 import type { IssueOrigin } from 'App/mstore/issuesStore';
+import TagDialog from './TagDialog';
 
 /* The list's attribute filters, modeled on OpenReplay's FilterSelection +
    ValueAutoComplete: STABLE trigger buttons (they never resize as you select)
@@ -83,28 +84,16 @@ export default function TagFilter({
   onToggle: (t: string) => void;
   onSetMatch: (m: 'all' | 'any') => void;
   onClear: () => void;
-  /** creates a customer-defined journey tag (name + NL description) */
-  onCreateTag?: (name: string, description: string) => void;
+  /** creates a customer-defined journey tag (name + NL description); returns
+      false when the name is already taken */
+  onCreateTag?: (name: string, description: string) => boolean | void;
 }) {
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState('');
   const [creating, setCreating] = React.useState(false);
-  const [newName, setNewName] = React.useState('');
-  const [newDesc, setNewDesc] = React.useState('');
   const n = labels.length;
   const ql = q.toLowerCase().trim();
   const shown = allTags.filter((t) => t.toLowerCase().includes(ql));
-
-  const closeCreate = () => {
-    setCreating(false);
-    setNewName('');
-    setNewDesc('');
-  };
-  const createTag = () => {
-    onCreateTag?.(newName.trim(), newDesc.trim());
-    message.success('Tag created. The agent starts applying it to new sessions.');
-    closeCreate();
-  };
 
   const panel = (
     <div style={{ width: 272 }} className="flex flex-col gap-2">
@@ -145,15 +134,25 @@ export default function TagFilter({
       {/* creation entry rides the filter (Mehdi 07-27) — the same quiet link
           grammar as the segment drawer's "Add instructions" */}
       {onCreateTag && (
-        <Button
-          type="link"
-          size="small"
-          icon={<Plus size={14} />}
-          onClick={() => setCreating(true)}
-          className="self-start px-0!"
-        >
-          New tag
-        </Button>
+        /* the SEGMENTS popover's add affordance, verbatim (SegmentsIndicator's
+           "Add segment"): a full-width text button in a top-bordered block, so
+           the two dropdowns offer creation the same way instead of one hovering
+           like a menu row and the other like a bare link */
+        <div className="border-t mt-2.5 pt-2 -mx-1 px-1">
+          <Button
+            type="text"
+            icon={<Plus size={15} />}
+            onClick={() => {
+              // the popover has to go: two stacked surfaces for one action read
+              // as a bug, and the dialog is where the action continues
+              setOpen(false);
+              setCreating(true);
+            }}
+            className="w-full"
+          >
+            New tag
+          </Button>
+        </div>
       )}
 
       {panelFooter(n, onClear)}
@@ -177,43 +176,20 @@ export default function TagFilter({
         </Button>
       </Popover>
 
-      {/* new-tag dialog — the app dialog grammar (Issues Hide modal): no icon,
-          default width, explanation in a gray body line. Attribution is
-          automatic from the description; the caption sets expectations so a
-          zero-match tag is never a surprise discovered weeks later. */}
-      <Modal
-        title="New journey tag"
+      {/* the SAME dialog Preferences > Agents uses (one dialog component) */}
+      <TagDialog
         open={creating}
-        onCancel={closeCreate}
-        onOk={createTag}
-        okText="Create tag"
-        okButtonProps={{ disabled: !newName.trim() || !newDesc.trim() }}
-      >
-        <p className="mb-3" style={{ color: 'var(--color-gray-dark)' }}>
-          Describe the journey in plain words. The agent reads every captured
-          session and applies the tag automatically when it matches.
-        </p>
-        <div className="flex flex-col gap-3">
-          <Input
-            autoFocus
-            maxLength={40}
-            placeholder="Name, e.g. Offer scheduling"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-          />
-          <Input.TextArea
-            rows={3}
-            maxLength={300}
-            placeholder="e.g. Any session where the user schedules or reschedules an offer, from the offers page or the email link."
-            value={newDesc}
-            onChange={(e) => setNewDesc(e.target.value)}
-          />
-          <span className="text-xs" style={{ color: 'var(--color-gray-medium)' }}>
-            Applies to sessions captured from now on; existing sessions are not
-            re-scanned.
-          </span>
-        </div>
-      </Modal>
+        onCancel={() => setCreating(false)}
+        onSave={(name, description) => {
+          if (onCreateTag?.(name, description) === false) {
+            // dialog stays open so the name can be fixed in place
+            message.warning(`A tag called “${name}” already exists.`);
+            return;
+          }
+          message.success('Tag created. The agent starts applying it to new sessions.');
+          setCreating(false);
+        }}
+      />
     </>
   );
 }

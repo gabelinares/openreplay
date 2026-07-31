@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   SlidersHorizontal,
   Album,
+  Settings as SettingsIcon,
   ChevronDown,
   Split,
   Globe,
@@ -43,6 +44,9 @@ import {
 import SelectDateRange from 'Shared/SelectDateRange';
 import Period, { LAST_24_HOURS } from 'Types/app/period';
 import { Pagination } from 'UI';
+import CountSuffix from 'Shared/CountSuffix';
+import CriticalDialog from './CriticalDialog';
+import NotCriticalDialog from './NotCriticalDialog';
 import TagFilter, { SegmentFilter } from './TagFilter';
 import SegmentsIndicator from './segments/SegmentsIndicator';
 import { ImpactGauge, ReasonChip } from './ProblemCard';
@@ -76,9 +80,8 @@ function IssuesList() {
   const [hideTarget, setHideTarget] = React.useState<Issue | null>(null);
   const [hideReason, setHideReason] = React.useState('');
   const [hideTags, setHideTags] = React.useState<string[]>([]);
+  const [critDialog, setCritDialog] = React.useState<Issue | null>(null);
   const [critTarget, setCritTarget] = React.useState<Issue | null>(null);
-  const [critReason, setCritReason] = React.useState('');
-  const [critTags, setCritTags] = React.useState<string[]>([]);
   const [renameTarget, setRenameTarget] = React.useState<Issue | null>(null);
   const [renameValue, setRenameValue] = React.useState('');
   const [page, setPage] = React.useState(1);
@@ -106,9 +109,8 @@ function IssuesList() {
   // category, single-select. "All" maps to no category filter.
   const catValue: 'All' | CategoryName =
     issuesStore.cats.length === 1 ? issuesStore.cats[0] : 'All';
-  const faded = (n: number) => (
-    <span style={{ opacity: 0.5, marginLeft: 5 }}>{n}</span>
-  );
+  // one definition of the faded count, shared with the journey-tag manager
+  const faded = (n: number) => <CountSuffix n={n} />;
   // mirror SessionTags.tsx: Segmented with the icon passed via the `icon` prop
   const catTabOptions = [
     { value: 'All', label: <span>All{faded(issuesStore.all.length)}</span> },
@@ -157,19 +159,23 @@ function IssuesList() {
       sorter: (a, b) => a.head.localeCompare(b.head),
       showSorterTooltip: false,
       render: (head: string, r: Issue) => {
-        // three-state critical: red = project criticality, FILL = mine.
-        // Click cycles my personal layer only (Mehdi 07-07): gray → mine,
-        // agent-critical → adopt as mine, mine → step back. Always silent —
-        // my layer never carries the project flag, so nobody else is
-        // affected. Removing an agent critical (for everyone, with a
-        // teaching reason) lives in the row ellipsis, not here.
+        // Criticality is DERIVED now (Mehdi 07-28): the agent flags what
+        // matches a description someone wrote, so the triangle reports state
+        // and opens the intermediary — it never sets a flag itself. Red = a
+        // description matched, tinted fill = one of MINE did. The tooltip
+        // names whose, because "why is this critical?" is the question the
+        // attribution exists to answer.
         const critState = issuesStore.critState(r.id);
+        const matchedRules = issuesStore.matchedRules(r.id);
+        // four states, four tooltips, each as short as it can be (Gabriel 07-31)
         const critTip =
-          critState === 'mine'
-            ? 'Remove from my criticals'
-            : critState === 'project'
-              ? 'Add to my criticals'
-              : 'Mark critical for me';
+          issuesStore.notCritical[r.id] != null
+            ? 'Not critical for you'
+            : critState === 'mine'
+              ? 'Matches your description'
+              : critState === 'team'
+                ? `Matches ${matchedRules[0]?.createdBy}’s description`
+                : 'Describe what’s critical';
         return (
         <div className="flex items-center gap-2 min-w-0">
           <Tooltip title={critTip}>
@@ -197,8 +203,7 @@ function IssuesList() {
               }
               onClick={(e) => {
                 e.stopPropagation();
-                if (critState === 'mine') issuesStore.removeMine(r.id);
-                else issuesStore.markMine(r.id);
+                setCritDialog(r);
               }}
             />
           </Tooltip>
@@ -282,10 +287,10 @@ function IssuesList() {
       align: 'center',
       render: (_: unknown, r: Issue) => {
         const isHidden = issuesStore.hidden.includes(r.id);
-        // the triangle only cycles my personal layer, so removing the
-        // project-wide (agent) flag — the teaching modal — lives here; a
-        // personal mark has nothing to remove for the team
-        const isCritical = issuesStore.agentCritical(r.id);
+        // dropping a critical only makes sense when MY OWN description flagged
+        // it (Gabriel 07-31) — muting a teammate's signal changes nothing worth
+        // offering. Once I have dropped it, the menu offers the way back.
+        const isCritical = issuesStore.critState(r.id) === 'mine';
         return (
           <Dropdown
             trigger={['click']}
@@ -298,8 +303,8 @@ function IssuesList() {
                   setRenameValue(r.head);
                 } else if (key === 'notCritical') {
                   setCritTarget(r);
-                  setCritReason('');
-                  setCritTags([]);
+                } else if (key === 'restoreCritical') {
+                  issuesStore.restoreCritical(r.id);
                 } else if (key === 'hide') {
                   setHideTarget(r);
                   setHideReason('');
@@ -308,15 +313,26 @@ function IssuesList() {
               },
               items: [
                 { key: 'rename', icon: <Pencil size={14} />, label: 'Rename' },
+                // per-user now (Gabriel 07-30): my not-critical suppresses the
+                // flag for me and teaches the agent, it does not overrule the
+                // teammate whose description matched
                 ...(isCritical
                   ? [
                       {
                         key: 'notCritical',
                         icon: <AlertTriangle size={14} />,
-                        label: 'Mark as not critical',
+                        label: 'Not critical for me',
                       },
                     ]
-                  : []),
+                  : issuesStore.notCritical[r.id] != null
+                    ? [
+                        {
+                          key: 'restoreCritical',
+                          icon: <AlertTriangle size={14} />,
+                          label: 'Show as critical again',
+                        },
+                      ]
+                    : []),
                 { type: 'divider' as const },
                 isHidden
                   ? { key: 'unhide', icon: <Eye size={14} />, label: 'Unhide' }
@@ -357,7 +373,7 @@ function IssuesList() {
         checked={issuesStore.relevantToMe}
         onChange={(e) => issuesStore.setRelevantToMe(e.target.checked)}
       >
-        Critical to me ({issuesStore.relevantCount})
+        Critical to me · {issuesStore.relevantCount}
       </Checkbox>
     </div>
   );
@@ -385,6 +401,15 @@ function IssuesList() {
           <SegmentsIndicator />
         </div>
         <div className="flex items-center gap-2">
+          {/* shortcut to Preferences > Agents (Gabriel 07-27) — same treatment
+              as the Tests page header */}
+          <Button
+            type="text"
+            icon={<SettingsIcon size={14} />}
+            onClick={() => history.push('/client/agents?agent=issues')}
+          >
+            Settings
+          </Button>
           <a
             href="https://docs.openreplay.com/"
             target="_blank"
@@ -558,46 +583,15 @@ function IssuesList() {
         />
       </Modal>
 
-      {/* remove-critical reason modal — unmarking is a teaching moment */}
-      <Modal
-        title="Remove critical flag?"
-        open={critTarget != null}
-        onCancel={() => setCritTarget(null)}
-        onOk={() => {
-          if (critTarget)
-            issuesStore.setCritical(
-              critTarget.id,
-              false,
-              [...critTags, critReason.trim()].filter(Boolean).join(' · '),
-            );
-          setCritTarget(null);
-        }}
-        okText="Mark as not critical"
-      >
-        <p className="mb-3" style={{ color: 'var(--color-gray-dark)' }}>
-          “{critTarget?.head}” will no longer be critical for anyone. Your reason helps the agent learn.
-        </p>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {CRITICAL_REASONS.map((t) => (
-            <ReasonChip
-              key={t}
-              label={t}
-              checked={critTags.includes(t)}
-              onChange={(on) =>
-                setCritTags((prev) =>
-                  on ? [...prev, t] : prev.filter((x) => x !== t),
-                )
-              }
-            />
-          ))}
-        </div>
-        <Input.TextArea
-          rows={3}
-          placeholder="Add a note (optional)…"
-          value={critReason}
-          onChange={(e) => setCritReason(e.target.value)}
-        />
-      </Modal>
+      {/* the intermediary: why this is critical, and where you describe it */}
+      <CriticalDialog
+        issueId={critDialog?.id ?? null}
+        issueHead={critDialog?.head ?? ''}
+        onClose={() => setCritDialog(null)}
+      />
+
+      {/* the shared not-critical dialog — the detail page opens the same one */}
+      <NotCriticalDialog issue={critTarget} onClose={() => setCritTarget(null)} />
     </div>
   );
 }

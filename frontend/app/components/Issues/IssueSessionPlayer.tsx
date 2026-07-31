@@ -45,6 +45,8 @@ import 'Components/shared/AutoplayToggle/AutoplayToggle.css';
 
 import { useStore } from 'App/mstore';
 import { useHistory, useParams } from 'App/routing';
+
+import CriticalDialog from './CriticalDialog';
 import {
   withSiteId,
   issues as issuesRoute,
@@ -315,51 +317,63 @@ function TagChip({ label }: { label: string }) {
   );
 }
 
-/* Critical toggle for the header — the exact issue-list control (three-state
-   triangle: red outline = project criticality, tinted fill = mine). Click
-   cycles my personal layer only (Mehdi 07-07), always silently — removing the
-   project-wide flag (with a teaching reason) lives on the detail page and in
-   the list's row ellipsis. Kept in sync via the shared issuesStore. */
+/* Critical control for the header — the exact issue-list control (triangle:
+   red outline = a description matched, tinted fill = one of MINE did). It
+   reports state and opens the shared CriticalDialog, exactly like the list row
+   and the detail chip, because criticality is derived from descriptions now
+   (Mehdi 07-28) and no surface sets it directly. Kept in sync via issuesStore. */
 const HeaderCriticalToggle = observer(({ issue }: { issue: Issue }) => {
   const { issuesStore } = useStore();
+  const [dialog, setDialog] = React.useState(false);
   const critState = issuesStore.critState(issue.id);
+  const matched = issuesStore.matchedRules(issue.id);
   const critTip =
-    critState === 'mine'
-      ? 'Remove from my criticals'
-      : critState === 'project'
-        ? 'Add to my criticals'
-        : 'Mark critical for me';
+    issuesStore.notCritical[issue.id] != null
+      ? 'Not critical for you'
+      : critState === 'mine'
+        ? 'Matches your description'
+        : critState === 'team'
+          ? `Matches ${matched[0]?.createdBy}’s description`
+          : 'Describe what’s critical';
   return (
-    <Tooltip title={critTip}>
-      <Button
-        type="text"
-        size="small"
-        aria-label={critTip}
-        aria-pressed={critState !== 'none'}
-        className={`critical-toggle flex items-center justify-center shrink-0${
-          critState !== 'none' ? ' critical-on' : ''
-        }${critState === 'mine' ? ' critical-mine' : ''}`}
-        icon={
-          // same chip-color language as the list (`critical-mine` in
-          // issues.css): gray chip = agent's critical, red chip = mine —
-          // the icon itself stays the project-critical red outline
-          <AlertTriangle
-            size={15}
-            strokeWidth={2}
-            style={{
-              // none-state color is left to issues.css so the hover preview
-              // (gray → red) can take effect; inline style would win over it
-              color: critState !== 'none' ? 'var(--color-red)' : undefined,
-              fill: 'none',
-            }}
-          />
-        }
-        onClick={() => {
-          if (critState === 'mine') issuesStore.removeMine(issue.id);
-          else issuesStore.markMine(issue.id);
-        }}
+    /* the dialog is a SIBLING of the tooltip, never its second child: antd's
+       trigger runs React.Children.only over whatever Tooltip wraps, so a second
+       child throws on render and takes the whole replay header down with it.
+       The list row and the detail chip already keep their dialog outside. */
+    <>
+      <Tooltip title={critTip}>
+        <Button
+          type="text"
+          size="small"
+          aria-label={critTip}
+          aria-pressed={critState !== 'none'}
+          className={`critical-toggle flex items-center justify-center shrink-0${
+            critState !== 'none' ? ' critical-on' : ''
+          }${critState === 'mine' ? ' critical-mine' : ''}`}
+          icon={
+            // same chip-color language as the list (`critical-mine` in
+            // issues.css): gray chip = agent's critical, red chip = mine —
+            // the icon itself stays the project-critical red outline
+            <AlertTriangle
+              size={15}
+              strokeWidth={2}
+              style={{
+                // none-state color is left to issues.css so the hover preview
+                // (gray → red) can take effect; inline style would win over it
+                color: critState !== 'none' ? 'var(--color-red)' : undefined,
+                fill: 'none',
+              }}
+            />
+          }
+          onClick={() => setDialog(true)}
+        />
+      </Tooltip>
+      <CriticalDialog
+        issueId={dialog ? issue.id : null}
+        issueHead={issue.head}
+        onClose={() => setDialog(false)}
       />
-    </Tooltip>
+    </>
   );
 });
 

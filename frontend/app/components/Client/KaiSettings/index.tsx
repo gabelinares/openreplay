@@ -1,8 +1,9 @@
 import withPageTitle from 'HOCs/withPageTitle';
 import { Button, Input, Tabs, Tooltip } from 'antd';
-import { Album, Info } from 'lucide-react';
+import { Album, Info, Settings as SettingsIcon } from 'lucide-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { useHistory } from 'App/routing';
 
 import RunsTab from './components/RunsTab';
 import SettingsTab from './components/SettingsTab';
@@ -13,6 +14,7 @@ function KaiSettings() {
   const { t } = useTranslation();
   // controlled by the store so drawers can deep-link across tabs ("View runs")
   const { activeTab, testsQuery, runsQuery } = useKaiStore();
+  const history = useHistory();
 
   // search sits on the main tab line (Gabriel 07-27: keeps each tab's controls
   // bar to a single line) and targets whichever tab is active
@@ -44,8 +46,10 @@ function KaiSettings() {
       children: <RunsTab />,
     },
     {
+      // renamed from "Settings" (Mehdi 07-27): only core config lives here;
+      // behavior toggles + notifications moved to Preferences > Agents
       key: 'settings',
-      label: t('Settings'),
+      label: t('Environments'),
       children: <SettingsTab />,
     },
   ];
@@ -71,6 +75,15 @@ function KaiSettings() {
           </Tooltip>
         </div>
         <div className="flex items-center gap-2">
+          {/* shortcut to the shared agent preferences (Gabriel 07-27) — same
+              treatment on the Issues page so the grammar is identical */}
+          <Button
+            type="text"
+            icon={<SettingsIcon size={14} />}
+            onClick={() => history.push('/client/agents?agent=tests')}
+          >
+            {t('Settings')}
+          </Button>
           <a
             href="https://docs.openreplay.com/"
             target="_blank"
