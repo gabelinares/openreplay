@@ -14,6 +14,7 @@ export interface MenuItem {
   leading?: any;
   isEnterprise?: boolean;
   isAdmin?: boolean;
+  tag?: { label: string; color: string; border?: boolean };
 }
 
 interface Category {
