@@ -33,6 +33,7 @@ const components: any = {
   SpotPure: lazy(() => import('Components/Spots/SpotPlayer')),
   HighlightsPure: lazy(() => import('Components/Highlights/HighlightsList')),
   KaiPure: lazy(() => import('Components/Kai/KaiChat')),
+  TestAgentsPure: lazy(() => import('Components/Client/KaiSettings/StandalonePage')),
   ActivityPure: lazy(
     () => import('Components/DataManagement/Activity/ActivityPage'),
   ),
@@ -66,6 +67,7 @@ const enhancedComponents: any = {
   Spot: components.SpotPure,
   Highlights: withSiteIdUpdater(components.HighlightsPure),
   Kai: withSiteIdUpdater(components.KaiPure),
+  TestAgents: withSiteIdUpdater(components.TestAgentsPure),
   ScopeSetup: components.ScopeSetup,
   Activity: withSiteIdUpdater(components.ActivityPure),
   UserPage: withSiteIdUpdater(components.UserPage),
@@ -111,6 +113,7 @@ const SPOT_PATH = routes.spot();
 
 const HIGHLIGHTS_PATH = routes.highlights();
 const KAI_PATH = routes.kai();
+const TEST_AGENTS_PATH = routes.testAgents();
 
 function PrivateRoutes() {
   const {
@@ -338,6 +341,11 @@ function PrivateRoutes() {
         <Route
           path={withSiteId(HIGHLIGHTS_PATH, siteIdList)}
           element={<enhancedComponents.Highlights />}
+        />
+
+        <Route
+          path={withSiteId(TEST_AGENTS_PATH, siteIdList)}
+          element={<enhancedComponents.TestAgents />}
         />
 
         <Route

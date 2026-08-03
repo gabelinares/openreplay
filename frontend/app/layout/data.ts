@@ -37,6 +37,7 @@ export const enum PREFERENCES_MENU {
   NOTIFICATIONS = 'notifications',
   BILLING = 'billing',
   EXPORTED_VIDEOS = 'exported-videos',
+  TEST_AGENTS = 'test-agents',
 }
 
 export const enum MENU {
@@ -56,6 +57,8 @@ export const enum MENU {
   EXIT = 'exit',
   SPOTS = 'spots',
   KAI = 'kai',
+  AGENTS = 'agents',
+  TEST_AGENTS = 'agents-tests',
   ACTIVITY = 'activity',
   USER = 'user-page',
   USERS = 'data-users',
@@ -94,6 +97,22 @@ export const categories: (t: TFunction) => Category[] = (t) => [
         label: t('Highlights'),
         key: MENU.HIGHLIGHTS,
         icon: 'chat-square-quote',
+      },
+    ],
+  },
+  {
+    title: t('Agents'),
+    key: 'agents',
+    items: [
+      {
+        label: t('Agents'),
+        key: MENU.AGENTS,
+        icon: 'scan-pulse',
+        tag: {
+          label: t('New'),
+          color: '#394DFE',
+        },
+        children: [{ label: t('Tests'), key: MENU.TEST_AGENTS }],
       },
     ],
   },
@@ -248,6 +267,14 @@ export const preferences: (t: TFunction) => Category[] = (t) => [
         key: PREFERENCES_MENU.EXPORTED_VIDEOS,
         icon: 'ic-network',
         hidden: menuHidden.videoExport,
+      },
+      {
+        // moved to the main left nav ("Agents" section); route kept for
+        // old /client/test-agents links
+        label: t('Test Agents'),
+        key: PREFERENCES_MENU.TEST_AGENTS,
+        icon: 'analytics',
+        hidden: true,
       },
     ],
   },
