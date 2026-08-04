@@ -30,8 +30,8 @@ them. Merged together they reproduce `main`; see "Proof" at the bottom.
 | Branch | What it is | Owns | Commits |
 |---|---|---|---|
 | `harness/prototype-mocks` | **Never ship.** No-backend bootstrap so the prototype runs without an API. | `app/dev/`, `vercel.json`, `dev:mock` script, `DrawerGallery`, mock asset | 10 |
-| `feature/shared-ui` | Shared atoms the features need. Merge first. | `CountSuffix`, 2 icons, `SVG.tsx` regen, `MenuContent` submenu fix, `MenuItem.tag` | 9 |
-| `feature/ai-issues` | AI Issues list, detail, session replay, segments | `Issues/`, `issuesStore.ts`, `DataManagement/Segments/`, `SessionItem.tsx` | 66 |
+| `feature/shared-ui` | Shared atoms the features need. Merge first. | `CountSuffix`, 2 icons, `SVG.tsx` regen, `MenuContent` submenu fix, `MenuItem.tag` | 10 |
+| `feature/ai-issues` | AI Issues list, detail, session replay, segments | `Issues/`, `issuesStore.ts`, `DataManagement/Segments/`, `SessionItem.tsx` | 67 |
 | `feature/test-agents` | Test Agents: tests, runs, environments, drawers | `Client/KaiSettings/` | 73 |
 | `feature/ux-audit` | UX-audit agent: audit list and report | `Audits/` | 8 |
 | `feature/preferences-agents` | Preferences > Agents (settings across all agents) | `Client/AgentsPreferences/`, `Audit/AuditView.tsx` | 17 |
@@ -167,6 +167,19 @@ have silently disappeared, with a green build. Check the nav after any merge of 
 second feature.
 
 ---
+
+## Reviewing these as PRs
+
+`main` already contains every feature, so a PR from a feature branch into `main` shows
+an empty diff. The PR base is `review-base` instead, a branch pinned at `50a12ac7a`,
+and the stack is expressed as stacked PRs: `shared-ui` targets `review-base`, each
+feature targets `shared-ui`, `ux-audit` targets `ai-issues`, `preferences-agents`
+targets `test-agents`. That way each PR's diff is only that feature's own work.
+
+If you rebase a feature branch, rebase it onto its parent's *tip*. A cherry-picked
+copy of a parent commit strands the merge base, and GitHub then shows the parent's
+churn inside the child's PR: that is how ~1200 lines of icon reformatting first
+appeared in the Test Agents PR.
 
 ## Getting one feature's diff, any time
 
