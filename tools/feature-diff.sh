@@ -8,8 +8,8 @@ INTEGRATION=main
 
 # feature:parent:owned paths (space separated)
 FEATURES=(
-"harness:$BASE:frontend/.gitignore frontend/.vercelignore frontend/.env.sample frontend/vercel.json frontend/package.json frontend/CLAUDE.md frontend/app/dev frontend/app/initialize.tsx frontend/app/components/Client/DrawerGallery frontend/app/assets/img/mockEcommerce.png frontend/app/assets/img/mockEcommerce.svg"
-"shared-ui:$BASE:frontend/app/components/shared/CountSuffix.tsx frontend/app/components/ui frontend/app/svg/icons/scan-pulse.svg frontend/app/svg/icons/stars.svg frontend/app/constants/panelSizes.ts frontend/app/layout/SideMenu/MenuContent.tsx"
+"harness:$BASE:frontend/.vercelignore frontend/.env.sample frontend/vercel.json frontend/package.json frontend/CLAUDE.md frontend/app/dev frontend/app/initialize.tsx frontend/app/components/Client/DrawerGallery frontend/app/assets/img/mockEcommerce.png frontend/app/assets/img/mockEcommerce.svg"
+"shared-ui:$BASE:frontend/.gitignore frontend/app/components/shared/CountSuffix.tsx frontend/app/components/ui frontend/app/svg/icons/scan-pulse.svg frontend/app/svg/icons/stars.svg frontend/app/constants/panelSizes.ts frontend/app/layout/SideMenu/MenuContent.tsx"
 "ai-issues:feature/shared-ui:frontend/app/components/Issues frontend/app/mstore/issuesStore.ts frontend/app/components/DataManagement/Segments frontend/app/components/shared/SessionItem/SessionItem.tsx frontend/HANDOFF.md"
 "test-agents:feature/shared-ui:frontend/app/components/Client/KaiSettings"
 "ux-audit:feature/ai-issues:frontend/app/components/Audits"
@@ -71,23 +71,75 @@ list() {
 
 check() {
   fail=0
+
+  # --- per branch -----------------------------------------------------------
   for row in "${FEATURES[@]}"; do
     name="${row%%:*}"; rest="${row#*:}"; paths="${rest#*:}"
     br=$(branch_of "$name")
     if ! git rev-parse --verify -q "$br" >/dev/null; then
-      printf "%-20s BRANCH MISSING\n" "$name"; fail=1; continue
+      printf "%-22s BRANCH MISSING\n" "$name"; fail=1; continue
     fi
+    msg=""
     # 1. owned paths identical to the integration branch
     if out=$(git diff --stat "$br" "$INTEGRATION" -- $paths) && [ -z "$out" ]; then
-      owned="owned paths match $INTEGRATION"
+      msg="paths match $INTEGRATION"
     else
-      owned="OWNED PATHS DIFFER from $INTEGRATION"; fail=1
+      msg="OWNED PATHS DIFFER from $INTEGRATION"; fail=1
     fi
-    # 2. nothing outside frontend/
-    stray=$(git diff --name-only "$BASE" "$br" | grep -v '^frontend/' || true)
-    [ -n "$stray" ] && { owned="$owned; TOUCHES NON-FRONTEND: $(echo "$stray" | tr '\n' ' ')"; fail=1; }
-    printf "%-20s %s\n" "$name" "$owned"
+    # 2. nothing outside frontend/ (tools/ and FEATURES.md live on $INTEGRATION only)
+    stray=$(git diff --name-only "$BASE" "$br" -- . ':(exclude)frontend' ':(exclude)tools' ':(exclude)FEATURES.md' || true)
+    [ -n "$stray" ] && { msg="$msg; NON-FRONTEND: $(echo "$stray" | tr '\n' ' ')"; fail=1; }
+    # 3. no source file git treats as binary. a stray NUL byte in a .tsx means
+    #    no line diff, no blame and nothing to review; numstat reports "-  -".
+    binsrc=$(git diff --numstat "$BASE" "$br" -- '*.ts' '*.tsx' '*.js' '*.jsx' \
+             | awk '$1=="-" {print $3}' | tr '\n' ' ')
+    [ -n "$binsrc" ] && { msg="$msg; BINARY-CLASSIFIED SOURCE: $binsrc"; fail=1; }
+    printf "%-22s %s\n" "$name" "$msg"
   done
+
+  # --- ownership must be disjoint ------------------------------------------
+  echo
+  dupes=$(for row in "${FEATURES[@]}"; do
+            name="${row%%:*}"; rest="${row#*:}"; paths="${rest#*:}"
+            for p in $paths; do echo "$p"; done
+          done | sort | uniq -d)
+  if [ -n "$dupes" ]; then
+    echo "OWNERSHIP OVERLAP: $(echo "$dupes" | tr '\n' ' ')"; fail=1
+  else
+    echo "ownership is disjoint"
+  fi
+
+  # every changed file is owned by exactly one feature, or is wiring
+  unowned=""
+  allpaths=$(for row in "${FEATURES[@]}"; do rest="${row#*:}"; echo "${rest#*:}"; done)
+  for f in $(git diff --name-only "$BASE" "$INTEGRATION" -- frontend); do
+    hit=0
+    for p in $allpaths $WIRING; do
+      case "$f" in "$p"|"$p"/*) hit=1; break;; esac
+    done
+    [ "$hit" -eq 0 ] && unowned="$unowned $f"
+  done
+  if [ -n "$unowned" ]; then
+    echo "UNCLAIMED FILES (owned by no feature and not wiring):$unowned"; fail=1
+  else
+    echo "every changed file is claimed"
+  fi
+
+  # --- each branch must resolve its own imports ----------------------------
+  # this is the check that catches "feature A imports a file that only exists
+  # on branch B", i.e. a branch that cannot build on its own.
+  echo
+  for row in "${FEATURES[@]}"; do
+    name="${row%%:*}"; rest="${row#*:}"; paths="${rest#*:}"
+    br=$(branch_of "$name")
+    git rev-parse --verify -q "$br" >/dev/null || continue
+    if BRANCH="$br" PATHS="$paths" python3 "$(dirname "$0")/check-imports.py"; then
+      printf "%-22s imports resolve within the branch\n" "$name"
+    else
+      fail=1
+    fi
+  done
+
   echo
   if [ "$fail" -eq 0 ]; then echo "OK: every branch is consistent with $INTEGRATION."
   else echo "PROBLEMS FOUND (see above)."; fi
