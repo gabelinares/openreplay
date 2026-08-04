@@ -164,6 +164,8 @@ export const spot = (id = ':spotId', hash?: string | number): string =>
 export const highlights = (): string => '/highlights';
 
 export const kai = (): string => '/kai';
+export const audits = (): string => '/audits';
+export const auditReport = (id = ':auditId'): string => `/audits/${id}`;
 export const dataManagement = {
   activity: () => '/data-management/activity',
   userPage: (id = ':userId', hash?: string | number) =>
@@ -218,6 +220,8 @@ const REQUIRED_SITE_ID_ROUTES = [
   highlights(),
 
   kai(),
+  audits(),
+  auditReport(''),
   dataManagement.activity(),
   dataManagement.userPage(''),
   dataManagement.usersList(),
