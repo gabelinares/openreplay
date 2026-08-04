@@ -133,11 +133,11 @@ check() {
     name="${row%%:*}"; rest="${row#*:}"; paths="${rest#*:}"
     br=$(branch_of "$name")
     git rev-parse --verify -q "$br" >/dev/null || continue
-    if BRANCH="$br" PATHS="$paths" python3 "$(dirname "$0")/check-imports.py"; then
-      printf "%-22s imports resolve within the branch\n" "$name"
-    else
-      fail=1
-    fi
+    out=$(BRANCH="$br" LABEL="$name" PATHS="$paths" python3 "$(dirname "$0")/check-imports.py")
+    rc=$?
+    if [ "$rc" -ne 0 ]; then echo "$out"; fail=1
+    elif [ -n "$out" ]; then echo "$out"
+    else printf "%-22s imports resolve within the branch\n" "$name"; fi
   done
 
   echo
