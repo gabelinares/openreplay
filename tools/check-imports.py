@@ -17,13 +17,11 @@ import re
 BRANCH = os.environ["BRANCH"]
 PATHS = os.environ["PATHS"].split()
 
-# Known and tracked, so a NEW unresolved import still fails the check.
-# See FEATURES.md, "The one dependency that is wrong".
-KNOWN = {
-    ("feature/ai-issues", "App/dev/mockSessions"),
-    ("feature/ux-audit", "App/dev/mockSessions"),
-    ("feature/preferences-agents", "App/dev/mockSessions"),
-}
+# Known and tracked exceptions, so a NEW unresolved import still fails the check.
+# Empty is the goal: the one entry that used to live here, ai-issues importing
+# App/dev/mockSessions off the harness branch, was fixed by moving the fixtures
+# into Issues/mockSessions.ts.
+KNOWN = set()
 EXTS = ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js"]
 IMPORT = re.compile(r"""(?:from|import)\s+['"]((?:App|Components)/[^'"]+)['"]""")
 

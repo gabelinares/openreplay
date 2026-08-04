@@ -8,7 +8,7 @@ INTEGRATION=main
 
 # feature:parent:owned paths (space separated)
 FEATURES=(
-"harness:$BASE:frontend/.vercelignore frontend/.env.sample frontend/vercel.json frontend/package.json frontend/CLAUDE.md frontend/app/dev frontend/app/initialize.tsx frontend/app/components/Client/DrawerGallery frontend/app/assets/img/mockEcommerce.png frontend/app/assets/img/mockEcommerce.svg"
+"harness:feature/ai-issues:frontend/.vercelignore frontend/.env.sample frontend/vercel.json frontend/package.json frontend/CLAUDE.md frontend/app/dev frontend/app/initialize.tsx frontend/app/components/Client/DrawerGallery frontend/app/assets/img/mockEcommerce.png frontend/app/assets/img/mockEcommerce.svg"
 "shared-ui:$BASE:frontend/.gitignore frontend/app/components/shared/CountSuffix.tsx frontend/app/components/ui frontend/app/svg/icons/scan-pulse.svg frontend/app/svg/icons/stars.svg frontend/app/constants/panelSizes.ts frontend/app/layout/SideMenu/MenuContent.tsx"
 "ai-issues:feature/shared-ui:frontend/app/components/Issues frontend/app/mstore/issuesStore.ts frontend/app/components/DataManagement/Segments frontend/app/components/shared/SessionItem/SessionItem.tsx frontend/HANDOFF.md"
 "test-agents:feature/shared-ui:frontend/app/components/Client/KaiSettings"
@@ -66,8 +66,8 @@ list() {
     printf "%-20s %-24s %8s  %s\n" "$name" "$br" "$n" "$s"
   done
   echo
-  echo "merge order: shared-ui -> {ai-issues -> ux-audit, test-agents -> preferences-agents}"
-  echo "harness/prototype-mocks is prototype-only and must never ship."
+  echo "merge order: shared-ui -> {ai-issues -> {ux-audit, harness}, test-agents -> preferences-agents}"
+  echo "harness/prototype-mocks sits on ai-issues (it seeds Issues' fixtures) and must never ship."
 }
 
 check() {
