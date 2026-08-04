@@ -29,9 +29,9 @@ them. Merged together they reproduce `main`; see "Proof" at the bottom.
 
 | Branch | What it is | Owns | Commits |
 |---|---|---|---|
-| `harness/prototype-mocks` | **Never ship.** No-backend bootstrap so the prototype runs without an API. | `app/dev/`, `vercel.json`, `dev:mock` script, `DrawerGallery`, mock asset | 10 |
+| `harness/prototype-mocks` | **Never ship.** No-backend bootstrap so the prototype runs without an API. Sits on `ai-issues`, because seeding a session list is seeding Issues' data. | `app/dev/mockBootstrap.ts`, `vercel.json`, `dev:mock` script, `DrawerGallery`, mock asset | 8 |
 | `feature/shared-ui` | Shared atoms the features need. Merge first. | `CountSuffix`, 2 icons, `SVG.tsx` regen, `MenuContent` submenu fix, `MenuItem.tag` | 10 |
-| `feature/ai-issues` | AI Issues list, detail, session replay, segments | `Issues/`, `issuesStore.ts`, `DataManagement/Segments/`, `SessionItem.tsx` | 67 |
+| `feature/ai-issues` | AI Issues list, detail, session replay, segments | `Issues/`, `issuesStore.ts`, `DataManagement/Segments/`, `SessionItem.tsx` | 68 |
 | `feature/test-agents` | Test Agents: tests, runs, environments, drawers | `Client/KaiSettings/` | 73 |
 | `feature/ux-audit` | UX-audit agent: audit list and report | `Audits/` | 8 |
 | `feature/preferences-agents` | Preferences > Agents (settings across all agents) | `Client/AgentsPreferences/`, `Audit/AuditView.tsx` | 17 |
@@ -39,27 +39,18 @@ them. Merged together they reproduce `main`; see "Proof" at the bottom.
 Each branch's own paths are byte-identical to `main`, verified per branch with
 `./tools/feature-diff.sh --check`.
 
-### The one dependency that is wrong
+### Every branch resolves its own imports
 
-`feature/ai-issues` imports `App/dev/mockSessions`, which lives on
-`harness/prototype-mocks`, in three files:
+`./tools/feature-diff.sh --check` verifies, per branch, that every `App/...` and
+`Components/...` import resolves inside that branch. All six pass with no exceptions.
 
-```
-app/mstore/issuesStore.ts:4                      getMockSessionById, MOCK_SESSION_POOL, sessionMatchesSeeds
-app/components/Issues/segments/segmentUtils.ts:2 filterPool, MOCK_SESSION_POOL
-app/components/Issues/IssueSessionPlayer.tsx:96  getMockSessionById
-```
-
-So AI Issues does not resolve on its own, and the only way to make it resolve today
-is to merge the branch that must never ship. `feature/test-agents` has no such
-problem: it carries its own `mockData.ts` and resolves standalone.
-
-The fix is to move the session-pool fixtures into the feature that consumes them
-(`Issues/mockSessionData.ts` already exists) and split the harness bootstrap into
-generic account/project seeding, which stays in the harness, and session seeding,
-which does not. That is a real-data task, not a split task, so it is not done here.
-`./tools/feature-diff.sh --check` carries it as a named exception and will fail on
-any *new* unresolved import.
+This was not true at first. `app/dev/mockSessions.ts` held the mock session pool, and
+AI Issues read it from three files while the harness bootstrap read it from a fourth,
+so AI Issues could not resolve without the branch that must never ship. The pool now
+lives at `Issues/mockSessions.ts`: the feature owns its own fixtures, and the harness
+reads the pool from Issues, which is why the harness sits on `ai-issues` rather than
+beside it. Seeding a session list is seeding Issues' data, and the harness exists to
+run the whole prototype, so that direction is the honest one.
 
 ---
 
@@ -69,7 +60,8 @@ The order is not a preference, it is import-level fact:
 
 ```
 feature/shared-ui
-├── feature/ai-issues ──── feature/ux-audit
+├── feature/ai-issues ──┬── feature/ux-audit
+│                       └── harness/prototype-mocks   (never ship)
 └── feature/test-agents
                 └── feature/preferences-agents (needs ai-issues too)
 ```
