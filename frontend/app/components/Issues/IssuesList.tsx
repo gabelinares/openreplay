@@ -1,0 +1,603 @@
+import React from 'react';
+import {
+  Input,
+  Segmented,
+  Table,
+  Tag,
+  Tooltip,
+  Dropdown,
+  Popover,
+  Modal,
+  Button,
+} from 'antd';
+import type { TableColumnsType } from 'antd';
+import {
+  Info,
+  EllipsisVertical,
+  Pencil,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  SlidersHorizontal,
+  Album,
+  Settings as SettingsIcon,
+  ChevronDown,
+  Split,
+  Globe,
+} from 'lucide-react';
+import { observer } from 'mobx-react-lite';
+import { useStore } from 'App/mstore';
+import { useHistory } from 'App/routing';
+import { withSiteId, issue as issueRoute } from 'App/routes';
+import {
+  type Issue,
+  type CategoryName,
+  CAT_ORDER,
+  CAT_ICON,
+  HIDE_REASONS,
+  CRITICAL_REASONS,
+  impactLevel,
+  lastSeenLabel,
+  lastSeenExact,
+} from 'App/mstore/issuesStore';
+import SelectDateRange from 'Shared/SelectDateRange';
+import Period, { LAST_24_HOURS } from 'Types/app/period';
+import { Pagination } from 'UI';
+import CountSuffix from 'Shared/CountSuffix';
+import CriticalDialog from './CriticalDialog';
+import NotCriticalDialog from './NotCriticalDialog';
+import TagFilter, { CheckRow, SegmentFilter } from './TagFilter';
+import SegmentsIndicator from './segments/SegmentsIndicator';
+import { ImpactGauge, ReasonChip } from './ProblemCard';
+import './issues.css';
+
+
+export function RowTagChip({ label }: { label: string }) {
+  return (
+    <span
+      // text-sm here = ~12.25px under the 14px html root — the intended tag
+      // size; text-xs resolved to 10.5px and read too small (Gabriel 07-27)
+      className="text-sm px-2 py-0.5 rounded-md border whitespace-nowrap"
+      style={{
+        borderColor: 'var(--color-gray-light)',
+        background: 'var(--color-gray-lightest)',
+        color: 'var(--color-gray-dark)',
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function IssuesList() {
+  const { issuesStore } = useStore();
+  const { projectsStore } = useStore();
+  const siteId = projectsStore.activeSiteId;
+  const history = useHistory();
+
+  const [dispOpen, setDispOpen] = React.useState(false);
+  const [hideTarget, setHideTarget] = React.useState<Issue | null>(null);
+  const [hideReason, setHideReason] = React.useState('');
+  const [hideTags, setHideTags] = React.useState<string[]>([]);
+  const [critDialog, setCritDialog] = React.useState<Issue | null>(null);
+  const [critTarget, setCritTarget] = React.useState<Issue | null>(null);
+  const [renameTarget, setRenameTarget] = React.useState<Issue | null>(null);
+  const [renameValue, setRenameValue] = React.useState('');
+  const [page, setPage] = React.useState(1);
+  const PAGE_SIZE = 10;
+  // reset to the first page whenever the filtered set size changes
+  const totalIssues = issuesStore.list.length;
+  React.useEffect(() => {
+    setPage(1);
+  }, [totalIssues]);
+  const pagedIssues = issuesStore.list.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
+  const rangeStart = totalIssues === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = (page - 1) * PAGE_SIZE + pagedIssues.length;
+  // Presentational period (issues are mock; matches the Sessions date picker).
+  const [period, setPeriod] = React.useState<any>(
+    Period({ rangeName: LAST_24_HOURS }),
+  );
+
+  const openDetail = (id: number) =>
+    history.push(withSiteId(issueRoute(String(id)), siteId));
+
+  // Category as a Segmented tab bar (like the Sessions tabs): All + one tab per
+  // category, single-select. "All" maps to no category filter.
+  const catValue: 'All' | CategoryName =
+    issuesStore.cats.length === 1 ? issuesStore.cats[0] : 'All';
+  // one definition of the faded count, shared with the journey-tag manager
+  const faded = (n: number) => <CountSuffix n={n} />;
+  // mirror SessionTags.tsx: Segmented with the icon passed via the `icon` prop
+  const catTabOptions = [
+    { value: 'All', label: <span>All{faded(issuesStore.all.length)}</span> },
+    ...CAT_ORDER.map((c) => {
+      const Ic = CAT_ICON[c];
+      return {
+        value: c,
+        // neutral icon — no per-category color (like Sessions)
+        icon: <Ic size={14} strokeWidth={2} />,
+        label: <span>{c}{faded(issuesStore.catCount(c))}</span>,
+      };
+    }),
+  ];
+
+  const dispCount =
+    (issuesStore.critOnly ? 1 : 0) +
+    (issuesStore.showHidden ? 1 : 0) +
+    (issuesStore.relevantToMe ? 1 : 0);
+
+  const columns: TableColumnsType<Issue> = [
+    {
+      title: 'Impact',
+      dataIndex: 'impact',
+      width: 96,
+      sorter: (a, b) => a.impact - b.impact,
+      showSorterTooltip: false,
+      render: (v: number) => {
+        const level = impactLevel(v);
+        const title = `${level} impact`;
+        return (
+          <Tooltip title={title}>
+            <span
+              className="inline-flex items-center"
+              role="img"
+              aria-label={title}
+            >
+              <ImpactGauge value={v} />
+            </span>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'Issue',
+      dataIndex: 'head',
+      sorter: (a, b) => a.head.localeCompare(b.head),
+      showSorterTooltip: false,
+      render: (head: string, r: Issue) => {
+        // Criticality is DERIVED now (Mehdi 07-28): the agent flags what
+        // matches a description someone wrote, so the triangle reports state
+        // and opens the intermediary — it never sets a flag itself. Red = a
+        // description matched, tinted fill = one of MINE did. The tooltip
+        // names whose, because "why is this critical?" is the question the
+        // attribution exists to answer.
+        const critState = issuesStore.critState(r.id);
+        const matchedRules = issuesStore.matchedRules(r.id);
+        // four states, four tooltips, each as short as it can be (Gabriel 07-31)
+        const critTip =
+          issuesStore.notCritical[r.id] != null
+            ? 'Not critical for you'
+            : critState === 'mine'
+              ? 'Matches your description'
+              : critState === 'team'
+                ? `Matches ${matchedRules[0]?.createdBy}’s description`
+                : 'Describe what’s critical';
+        return (
+        <div className="flex items-center gap-2 min-w-0">
+          <Tooltip title={critTip}>
+            <Button
+              type="text"
+              size="small"
+              className={`critical-toggle flex items-center justify-center shrink-0${
+                critState !== 'none' ? ' critical-on' : ''
+              }${critState === 'mine' ? ' critical-mine' : ''}`}
+              aria-label={critTip}
+              aria-pressed={critState !== 'none'}
+              icon={
+                // "mine" is marked by the chip color (`critical-mine` in
+                // issues.css: gray chip = agent's critical, red chip = mine),
+                // not by the icon — ownership is a different axis than
+                // severity, so the triangle stays the same red outline.
+                <AlertTriangle
+                  size={15}
+                  strokeWidth={2}
+                  style={{
+                    color: critState !== 'none' ? 'var(--color-red)' : undefined,
+                    fill: 'none',
+                  }}
+                />
+              }
+              onClick={(e) => {
+                e.stopPropagation();
+                setCritDialog(r);
+              }}
+            />
+          </Tooltip>
+          <span className="truncate font-medium" style={{ color: 'var(--color-gray-darkest)' }}>
+            {head}
+          </span>
+          {issuesStore.showHidden && issuesStore.hidden.includes(r.id) && (
+            <Tooltip
+              title={
+                issuesStore.dismissReasons[r.id]
+                  ? `Dismissed: ${issuesStore.dismissReasons[r.id]}`
+                  : 'Dismissed'
+              }
+            >
+              <Tag style={{ borderRadius: 4 }}>Hidden</Tag>
+            </Tooltip>
+          )}
+        </div>
+        );
+      },
+    },
+    {
+      title: 'Tags',
+      dataIndex: 'tags',
+      width: 200,
+      render: (tags: string[], r: Issue) => {
+        const segment = issuesStore.segmentById(r.segmentId);
+        const visible = tags.slice(0, 1);
+        const hidden = tags.slice(1);
+        return (
+          <div className="flex items-center gap-1 overflow-hidden">
+            {/* origin chip — every issue carries one: a segment find shows the
+                fork icon in blue, a full-traffic find the globe in gray. The chip
+                itself stays a normal tag (gray border/bg); only the icon carries
+                meaning. Pairs with the "Found in" filters inside the Tags dropdown. */}
+            <Tooltip
+              title={segment ? `Found in segment: ${segment.name}` : 'Found in full traffic'}
+              placement="top"
+            >
+              <span
+                className="rounded-md border flex items-center justify-center shrink-0 cursor-default"
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderColor: 'var(--color-gray-light)',
+                  background: 'var(--color-gray-lightest)',
+                  color: segment ? 'var(--color-main)' : 'var(--color-gray-medium)',
+                }}
+              >
+                {segment ? <Split size={13} /> : <Globe size={13} />}
+              </span>
+            </Tooltip>
+            {visible.map((t) => <RowTagChip key={t} label={t} />)}
+            {hidden.length > 0 && (
+              <Tooltip title={hidden.join(', ')} placement="top">
+                <span className="text-xs shrink-0 cursor-default" style={{ color: 'var(--color-gray-medium)' }}>+{hidden.length}</span>
+              </Tooltip>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Last seen',
+      dataIndex: 'seenAgoMin',
+      width: 156,
+      sorter: (a, b) => a.seenAgoMin - b.seenAgoMin,
+      showSorterTooltip: false,
+      render: (m: number) => (
+        <Tooltip title={lastSeenExact(m)}>
+          <span className="text-sm tabular-nums" style={{ color: 'var(--color-gray-medium)' }}>
+            {lastSeenLabel(m)}
+          </span>
+        </Tooltip>
+      ),
+    },
+    {
+      title: '',
+      dataIndex: 'actions',
+      width: 56,
+      align: 'center',
+      render: (_: unknown, r: Issue) => {
+        const isHidden = issuesStore.hidden.includes(r.id);
+        // dropping a critical only makes sense when MY OWN description flagged
+        // it (Gabriel 07-31) — muting a teammate's signal changes nothing worth
+        // offering. Once I have dropped it, the menu offers the way back.
+        const isCritical = issuesStore.critState(r.id) === 'mine';
+        return (
+          <Dropdown
+            trigger={['click']}
+            placement="bottomRight"
+            menu={{
+              onClick: ({ key, domEvent }) => {
+                domEvent.stopPropagation();
+                if (key === 'rename') {
+                  setRenameTarget(r);
+                  setRenameValue(r.head);
+                } else if (key === 'notCritical') {
+                  setCritTarget(r);
+                } else if (key === 'restoreCritical') {
+                  issuesStore.restoreCritical(r.id);
+                } else if (key === 'hide') {
+                  setHideTarget(r);
+                  setHideReason('');
+                  setHideTags([]);
+                } else if (key === 'unhide') issuesStore.unhide(r.id);
+              },
+              items: [
+                { key: 'rename', icon: <Pencil size={14} />, label: 'Rename' },
+                // per-user now (Gabriel 07-30): my not-critical suppresses the
+                // flag for me and teaches the agent, it does not overrule the
+                // teammate whose description matched
+                ...(isCritical
+                  ? [
+                      {
+                        key: 'notCritical',
+                        icon: <AlertTriangle size={14} />,
+                        label: 'Not critical for me',
+                      },
+                    ]
+                  : issuesStore.notCritical[r.id] != null
+                    ? [
+                        {
+                          key: 'restoreCritical',
+                          icon: <AlertTriangle size={14} />,
+                          label: 'Show as critical again',
+                        },
+                      ]
+                    : []),
+                { type: 'divider' as const },
+                isHidden
+                  ? { key: 'unhide', icon: <Eye size={14} />, label: 'Unhide' }
+                  : { key: 'hide', icon: <EyeOff size={14} />, label: 'Hide' },
+              ],
+            }}
+          >
+            <Button
+              type="text"
+              aria-label="Issue actions"
+              icon={<EllipsisVertical size={16} />}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </Dropdown>
+        );
+      },
+    },
+  ];
+
+  /* Rows are the shared CheckRow, the same one the Tags and Segments popovers
+     next to this one use (Gabriel 07-31). These were bare antd Checkboxes, so
+     three sibling popovers on one toolbar had two different row treatments:
+     no hover target, no selected tint, and a click area only as wide as the
+     label. */
+  const displayContent = (
+    <div className="flex flex-col p-1" style={{ minWidth: 170 }}>
+      <CheckRow
+        on={issuesStore.critOnly}
+        onClick={() => issuesStore.setCritOnly(!issuesStore.critOnly)}
+      >
+        Critical only · {issuesStore.criticalCount}
+      </CheckRow>
+      <CheckRow
+        on={issuesStore.showHidden}
+        onClick={() => issuesStore.setShowHidden(!issuesStore.showHidden)}
+      >
+        Hidden · {issuesStore.hidden.length}
+      </CheckRow>
+      {/* one toggle for "what's mine": critical-for-me ∪ my segments' finds
+          (Mehdi 07-07 — "just show me what's relevant to me"; labeled around
+          "critical" per Gabriel 07-07 since that's the flag it's built on) */}
+      <CheckRow
+        on={issuesStore.relevantToMe}
+        onClick={() => issuesStore.setRelevantToMe(!issuesStore.relevantToMe)}
+      >
+        Critical to me · {issuesStore.relevantCount}
+      </CheckRow>
+    </div>
+  );
+
+  return (
+    <div
+      className="flex flex-col rounded-lg border bg-white mx-auto"
+      style={{ maxWidth: 1360 }}
+    >
+      {/* header — title left, OpenReplay-style search on the right */}
+      <div className="flex items-center justify-between border-b px-4 py-2">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-lg">Issues</span>
+          <Tooltip
+            placement="bottom"
+            title="Issues our agents found while reviewing session replays for this project, ranked by impact. Open one to read the journey and jump straight to the moment it happened, with no need to watch the full recording."
+          >
+            <span className="flex items-center cursor-help" style={{ color: 'var(--color-gray-medium)' }}>
+              <Info size={15} />
+            </span>
+          </Tooltip>
+          {/* capture control (Gabriel 07-13) — page-level, so it lives with
+              the title, NOT in the filter row: the switch flips segment
+              capture, the rest of the pill opens management */}
+          <SegmentsIndicator />
+        </div>
+        <div className="flex items-center gap-2">
+          {/* shortcut to Preferences > Agents (Gabriel 07-27) — same treatment
+              as the Tests page header */}
+          <Button
+            type="text"
+            icon={<SettingsIcon size={14} />}
+            onClick={() => history.push('/client/agents?agent=issues')}
+          >
+            Settings
+          </Button>
+          <a
+            href="https://docs.openreplay.com/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Button type="text" icon={<Album size={14} />}>
+              Docs
+            </Button>
+          </a>
+          <div className="min-w-50 md:w-1/4 md:min-w-75">
+            <Input.Search
+              size="small"
+              allowClear
+              maxLength={256}
+              placeholder="Filter by issue or category"
+              value={issuesStore.q}
+              onChange={(e) => issuesStore.setQ(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* category tabs (left) + remaining controls (right) — bar height matches
+          the Sessions tab bar (SessionHeader: px-4 py-3) */}
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap">
+        <Segmented
+          size="small"
+          value={catValue}
+          onChange={(v) => issuesStore.setCats(v === 'All' ? [] : [v as CategoryName])}
+          options={catTabOptions}
+        />
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* tags and segments are separate dropdowns (Gabriel 07-27): what
+              happened vs where it was captured, each scaling on its own */}
+          <TagFilter
+            allTags={issuesStore.allTags}
+            labels={issuesStore.labels}
+            match={issuesStore.match}
+            onToggle={issuesStore.toggleLabel}
+            onSetMatch={issuesStore.setMatch}
+            onClear={() => issuesStore.setLabels([])}
+            onCreateTag={issuesStore.addCustomTag}
+          />
+          <SegmentFilter
+            segments={issuesStore.originSegments.map((s) => ({ id: s.id, name: s.name, mine: s.mine }))}
+            origins={issuesStore.origins}
+            onToggleOrigin={issuesStore.toggleOrigin}
+            onClear={() => issuesStore.clearOrigins()}
+          />
+
+          <Popover
+            open={dispOpen}
+            onOpenChange={setDispOpen}
+            trigger="click"
+            placement="bottomRight"
+            content={displayContent}
+          >
+            <Button size="small" icon={<SlidersHorizontal size={14} />}>
+              Display{dispCount ? ` · ${dispCount}` : ''}
+              <ChevronDown size={13} style={{ marginLeft: 2, opacity: 0.6 }} />
+            </Button>
+          </Popover>
+
+          {/* date picker styled as an outlined dropdown to match Tags / Display,
+              with a calendar icon. Keeps the Sessions custom-range picker. */}
+          <span className="issues-date-range">
+            <SelectDateRange
+              isAnt
+              right
+              useButtonStyle
+              period={period}
+              onChange={setPeriod}
+            />
+          </span>
+        </div>
+      </div>
+
+      <Table<Issue>
+        className="issues-table"
+        rowKey="id"
+        columns={columns}
+        dataSource={pagedIssues}
+        pagination={false}
+        rowClassName={(r) =>
+          `cursor-pointer${issuesStore.hidden.includes(r.id) ? ' opacity-60' : ''}`
+        }
+        onRow={(r) => ({ onClick: () => openDetail(r.id) })}
+        locale={{
+          emptyText:
+            issuesStore.relevantToMe && totalIssues === 0
+              ? 'Nothing relevant yet — mark issues critical for you, or create a traffic segment, and they’ll show up here.'
+              : 'No issues match these filters.',
+        }}
+      />
+
+      <div className="flex items-center justify-between px-4 py-3">
+        <span className="text-xs" style={{ color: 'var(--color-gray-medium)' }}>
+          Showing {rangeStart}–{rangeEnd} of {totalIssues} issues
+        </span>
+        {totalIssues > PAGE_SIZE && (
+          <div className="w-[200px]">
+            <Pagination
+              page={page}
+              total={totalIssues}
+              limit={PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* hide-with-reason modal */}
+      <Modal
+        title="Hide this issue?"
+        open={hideTarget != null}
+        onCancel={() => setHideTarget(null)}
+        onOk={() => {
+          if (hideTarget)
+            issuesStore.hide(hideTarget.id, hideReason.trim(), hideTags);
+          setHideTarget(null);
+        }}
+        okText="Hide issue"
+      >
+        <p className="mb-3" style={{ color: 'var(--color-gray-dark)' }}>
+          “{hideTarget?.head}” will be removed from the list. Tell us why so the agent can learn.
+        </p>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {HIDE_REASONS.map((t) => (
+            <ReasonChip
+              key={t}
+              label={t}
+              checked={hideTags.includes(t)}
+              onChange={(on) =>
+                setHideTags((prev) =>
+                  on ? [...prev, t] : prev.filter((x) => x !== t),
+                )
+              }
+            />
+          ))}
+        </div>
+        <Input.TextArea
+          rows={3}
+          placeholder="Add a note (optional)…"
+          value={hideReason}
+          onChange={(e) => setHideReason(e.target.value)}
+        />
+      </Modal>
+
+      {/* rename modal */}
+      <Modal
+        title="Rename issue"
+        open={renameTarget != null}
+        onCancel={() => setRenameTarget(null)}
+        onOk={() => {
+          const v = renameValue.trim();
+          if (renameTarget && v) issuesStore.rename(renameTarget.id, v);
+          setRenameTarget(null);
+        }}
+        okText="Save"
+      >
+        <Input
+          autoFocus
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onPressEnter={() => {
+            const v = renameValue.trim();
+            if (renameTarget && v) issuesStore.rename(renameTarget.id, v);
+            setRenameTarget(null);
+          }}
+        />
+      </Modal>
+
+      {/* the intermediary: why this is critical, and where you describe it */}
+      <CriticalDialog
+        issueId={critDialog?.id ?? null}
+        issueHead={critDialog?.head ?? ''}
+        onClose={() => setCritDialog(null)}
+      />
+
+      {/* the shared not-critical dialog — the detail page opens the same one */}
+      <NotCriticalDialog issue={critTarget} onClose={() => setCritTarget(null)} />
+    </div>
+  );
+}
+
+export default observer(IssuesList);

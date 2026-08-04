@@ -42,6 +42,7 @@ export const enum PREFERENCES_MENU {
 
 export const enum MENU {
   SESSIONS = 'sessions',
+  ISSUES = 'issues',
   RECOMMENDATIONS = 'recommendations',
   VAULT = 'vault',
   BOOKMARKS = 'bookmarks',
@@ -112,7 +113,10 @@ export const categories: (t: TFunction) => Category[] = (t) => [
           label: t('New'),
           color: '#394DFE',
         },
-        children: [{ label: t('Tests'), key: MENU.TEST_AGENTS }],
+        children: [
+          { label: t('Issues'), key: MENU.ISSUES },
+          { label: t('Tests'), key: MENU.TEST_AGENTS },
+        ],
       },
     ],
   },

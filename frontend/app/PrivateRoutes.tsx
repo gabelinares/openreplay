@@ -32,6 +32,9 @@ const components: any = {
   SpotsListPure: lazy(() => import('Components/Spots/SpotsList')),
   SpotPure: lazy(() => import('Components/Spots/SpotPlayer')),
   HighlightsPure: lazy(() => import('Components/Highlights/HighlightsList')),
+  IssuesPure: lazy(() => import('Components/Issues/IssuesList')),
+  IssueDetailPure: lazy(() => import('Components/Issues/IssueDetail')),
+  IssueSessionPure: lazy(() => import('Components/Issues/IssueSessionPlayer')),
   KaiPure: lazy(() => import('Components/Kai/KaiChat')),
   TestAgentsPure: lazy(() => import('Components/Client/KaiSettings/StandalonePage')),
   ActivityPure: lazy(
@@ -66,6 +69,9 @@ const enhancedComponents: any = {
   SpotsList: withSiteIdUpdater(components.SpotsListPure),
   Spot: components.SpotPure,
   Highlights: withSiteIdUpdater(components.HighlightsPure),
+  Issues: withSiteIdUpdater(components.IssuesPure),
+  IssueDetail: withSiteIdUpdater(components.IssueDetailPure),
+  IssueSession: withSiteIdUpdater(components.IssueSessionPure),
   Kai: withSiteIdUpdater(components.KaiPure),
   TestAgents: withSiteIdUpdater(components.TestAgentsPure),
   ScopeSetup: components.ScopeSetup,
@@ -112,6 +118,9 @@ const SPOTS_LIST_PATH = routes.spotsList();
 const SPOT_PATH = routes.spot();
 
 const HIGHLIGHTS_PATH = routes.highlights();
+const ISSUES_PATH = routes.issues();
+const ISSUE_DETAIL_PATH = routes.issue();
+const ISSUE_SESSION_PATH = routes.issueSession();
 const KAI_PATH = routes.kai();
 const TEST_AGENTS_PATH = routes.testAgents();
 
@@ -343,6 +352,18 @@ function PrivateRoutes() {
           element={<enhancedComponents.Highlights />}
         />
 
+        <Route
+          path={withSiteId(ISSUE_SESSION_PATH, siteIdList)}
+          element={<enhancedComponents.IssueSession />}
+        />
+        <Route
+          path={withSiteId(ISSUE_DETAIL_PATH, siteIdList)}
+          element={<enhancedComponents.IssueDetail />}
+        />
+        <Route
+          path={withSiteId(ISSUES_PATH, siteIdList)}
+          element={<enhancedComponents.Issues />}
+        />
         <Route
           path={withSiteId(TEST_AGENTS_PATH, siteIdList)}
           element={<enhancedComponents.TestAgents />}
