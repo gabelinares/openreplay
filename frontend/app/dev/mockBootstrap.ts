@@ -14,7 +14,7 @@ import {
   buildSession,
   buildMockFilters,
   filterPool,
-} from 'App/dev/mockSessions';
+} from 'Components/Issues/mockSessions';
 
 /**
  * Local, no-backend bootstrap for the Issues design prototype.
@@ -83,7 +83,7 @@ function doSeed() {
 /**
  * Sessions surface, no backend. Serves the shared MOCK_SESSION_POOL — the same
  * entities the Issues surface references — and makes the filter/event bar fully
- * functional client-side. See app/dev/mockSessions.ts.
+ * functional client-side. See app/components/Issues/mockSessions.ts.
  */
 function seedSessions() {
   // Populate the filter catalog the search bar reads from, and stub the fetch
