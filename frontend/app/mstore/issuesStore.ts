@@ -1,7 +1,7 @@
 import React from 'react';
 import { makeAutoObservable } from 'mobx';
 import { CircleX, MousePointerClick, Gauge } from 'lucide-react';
-import { getMockSessionById, MOCK_SESSION_POOL, sessionMatchesSeeds } from 'App/dev/mockSessions';
+import { getMockSessionById, MOCK_SESSION_POOL, sessionMatchesSeeds } from 'Components/Issues/mockSessions';
 
 /* =========================================================================
    Issues — the new AI issue-detection surface. Mock, in-memory data only
@@ -212,7 +212,7 @@ export type IssueOrigin = 'full' | number;
    the Issues popover draws its traffic set from. Mix: three in the capture set
    (two on, one off), three team-visible candidates to enable, one private (of
    mine — ineligible until made team-visible), plus a teammate's spare. Filter
-   names/values match the mock omni-search catalog (dev/mockSessions). */
+   names/values match the mock omni-search catalog (Issues/mockSessions). */
 const JUL = (day: number, hour = 12) =>
   new Date(2026, 6, day, hour).getTime();
 
@@ -572,7 +572,7 @@ const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
   },
 ];
 
-/* Link each issue to real sessions in the shared pool (app/dev/mockSessions).
+/* Link each issue to real sessions in the shared pool (app/components/Issues/mockSessions).
    These are the SAME entities the Sessions page lists — the issue's example
    sessions and the sessions list now reference one source of truth. */
 const ISSUE_SESSION_IDS: Record<number, string[]> = {

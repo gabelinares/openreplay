@@ -1,5 +1,5 @@
 import { filterStore } from 'App/mstore';
-import { filterPool, MOCK_SESSION_POOL } from 'App/dev/mockSessions';
+import { filterPool, MOCK_SESSION_POOL } from '../mockSessions';
 import type { SegmentFilterSeed } from 'App/mstore/issuesStore';
 
 /* Shared segment helpers — used by the create/edit drawer (Issues + Data

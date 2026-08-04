@@ -93,7 +93,7 @@ import {
 import ControlButton from 'Components/Session_/Player/Controls/ControlButton';
 import { SKIP_INTERVALS } from 'Components/Session_/Player/Controls/Controls';
 
-import { getMockSessionById } from 'App/dev/mockSessions';
+import { getMockSessionById } from './mockSessions';
 import { CategoryLabel, ImpactGauge } from './ProblemCard';
 import {
   PerformancePanel,
