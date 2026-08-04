@@ -201,36 +201,61 @@ here, is an upstream *release* commit from 2026-06-02, and `upstream/dev` has ne
 been fetched into this clone, so the real drift is unmeasured.
 
 Practically: PRs on this fork are review artifacts, they never target upstream. When
-work lands for real it goes to `dev`. Before that, `git fetch upstream dev` and merge
-it into each branch. **Merge, never rebase**: a 6-line upstream addition to
-`SVG.tsx` produces a ~510-line 3-way conflict region, and rebasing replays it on
-every commit that touched the file, whereas merging takes the hit once per branch.
+work lands for real it goes to `dev`.
+
+**Do not merge `upstream/dev` into these branches yet.** Measured 2026-08-03 with
+`./tools/feature-diff.sh --drift`: 257 upstream commits since the base, 72 of them
+touching `frontend/`, 320 upstream files changed against our 89. The overlap is
+**12 files**, and every one of them is shell wiring or harness config:
+
+```
+.env.sample  .gitignore  package.json  initialize.tsx
+routes.ts  PrivateRoutes.tsx  layout/data.ts  layout/SideMenu/index.tsx
+utils/routeUtils.ts  components/Client/Client.tsx
+components/ui/SVG.tsx  components/ui/Icons/index.ts
+```
+
+Not one feature directory is in that list. `Issues/`, `KaiSettings/`, `Audits/`,
+`AgentsPreferences/`, `DataManagement/Segments/` and `SessionItem.tsx` are untouched
+upstream, so roughly 18,000 lines of feature code cannot rot. Merging now would mean
+resolving the same 12 wiring files six times and putting 320 files of upstream churn
+into every PR diff, which destroys the per-feature diffs this split exists to produce.
+
+Merge upstream **once, into whichever feature is actually being taken**, at the moment
+it is taken, against `dev` as it is then. **Merge, never rebase**: a 6-line upstream
+addition to `SVG.tsx` produces a ~510-line 3-way conflict region, and rebasing replays
+it on every commit that touched the file. Better still for that one file, resolve it by
+running `yarn gen:icons && npx prettier --write app/components/ui` rather than merging
+hunks, since it is generated output. Re-measure with `--drift` whenever you want the
+current number.
 
 ## Still open, and not mine to decide
 
-1. **No edition gating.** Every comparable nav group at base carries
+1. **Order, as far as it is decided.** Audits ships **last** (Gabriel, 2026-08-03).
+   Issues versus Tests is still open, and it is the one input the edition gating needs.
+2. **No edition gating.** Every comparable nav group at base carries
    `hidden: menuHidden.X` from `App/utils/split-utils` (`kai`, `vault`, `lexicon`,
    `segments`). The new `Agents` group carries none, so Issues, Tests and Audits
    appear in OSS and EE builds where the backend does not exist. Needs
    `menuHidden.agents` plus one key per child, and a decision about which edition
    each feature goes to first.
-2. **`sessionReplay.webm` is 7.6 MB and bundled**, via `import url from
+3. **`sessionReplay.webm` is 7.6 MB and bundled**, via `import url from
    'url:./sessionReplay.webm'` in `Issues/sessionVideo.ts`. Prototype content in a
    production bundle. Serve it from a URL or drop it.
-3. **The `Agents` nav group is co-owned.** It is defined identically on `ai-issues`
+4. **The `Agents` nav group is co-owned.** It is defined identically on `ai-issues`
    and `test-agents`, which is why `layout/data.ts` conflicts and why reverting a
    feature is order-dependent: whichever merged first owns the group, so reverting it
    takes the group and the other features' nav entries with it. Moving the group
    (and `MENU.AGENTS`) to `feature/shared-ui` reduces the conflict to one line and
    makes revert order-independent.
-4. **`IS_MOCK` leaks outside the harness.** `process.env.MOCK === '1'` appears in
+5. **`IS_MOCK` leaks outside the harness.** `process.env.MOCK === '1'` appears in
    `DataManagement/Segments/index.tsx` on `feature/ai-issues`, used at six sites.
    Everywhere else mock branching is confined to `app/dev/`.
-5. **No test covers any of this.** 148 commits added zero test files, and
+6. **No test covers any of this.** 148 commits added zero test files, and
    `yarn test:ci` is the only real CI gate on `frontend/**`. `issuesStore.ts` is 1266
    lines, constructed eagerly in `RootStore` for every user in every edition, with no
    unit test, while `analyticsStore`, `sessionStore` and `searchStore` all have one.
-6. **26 stale branches on `origin`** (`feat/*`, `fix/*`, `preview/*`, `polish/*`) are
+7. **26 stale branches on `origin`** (`feat/*`, `fix/*`, `preview/*`, `polish/*`) are
    all fully contained in `main` and now redundant with the six.
 
 ## Going forward

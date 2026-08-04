@@ -45,6 +45,7 @@ usage: tools/feature-diff.sh [<feature>] [--stat|--files] | --check
   <feature> --stat   file list only
   <feature> --files  bare filenames, for piping
   --check            verify each branch's owned paths still match $INTEGRATION
+  --drift            measure how far upstream/dev has moved under these branches
 
 features: $(for r in "${FEATURES[@]}"; do printf "%s " "${r%%:*}"; done)
 EOF
@@ -146,10 +147,31 @@ check() {
   return $fail
 }
 
+drift() {
+  ref=upstream/dev
+  git rev-parse --verify -q "$ref" >/dev/null || {
+    echo "$ref not fetched. run: git fetch upstream dev"; return 1; }
+  echo "base:        $(git log --format='%h %ad %s' --date=short -1 $BASE | cut -c1-90)"
+  echo "$ref: $(git log --format='%h %ad %s' --date=short -1 $ref | cut -c1-90)"
+  echo
+  echo "commits on $ref since base:            $(git rev-list --count $BASE..$ref)"
+  echo "  of those touching frontend/:         $(git rev-list --count $BASE..$ref -- frontend)"
+  echo "frontend files changed upstream:       $(git diff --name-only $BASE $ref -- frontend | wc -l | tr -d ' ')"
+  echo "frontend files changed here:           $(git diff --name-only $BASE $INTEGRATION -- frontend | wc -l | tr -d ' ')"
+  echo
+  echo "OVERLAP, i.e. the actual conflict surface:"
+  comm -12 <(git diff --name-only $BASE $ref -- frontend | sort) \
+           <(git diff --name-only $BASE $INTEGRATION -- frontend | sort) | sed 's/^/  /'
+  echo
+  echo "Feature directories are listed above only if upstream touched them. If none"
+  echo "appear, the feature code cannot rot and there is nothing to merge yet."
+}
+
 case "${1:-}" in
   ""|-l|--list) list ;;
   -h|--help)    usage ;;
   --check)      check ;;
+  --drift)      drift ;;
   *)
     row=$(lookup "$1") || { echo "unknown feature: $1"; echo; usage; exit 1; }
     name="${row%%:*}"; rest="${row#*:}"; parent="${rest%%:*}"; paths="${rest#*:}"
