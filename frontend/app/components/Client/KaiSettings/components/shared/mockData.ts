@@ -1,0 +1,1253 @@
+import { ConsoleLog, Environment, NetworkRequest, RunData, TestCase } from './types';
+
+const HOUR = 3600000;
+const NOW = Date.now();
+const ago = (hours: number) => NOW - hours * HOUR;
+// creation dates spread across ~3 months so the Created sort visibly
+// interleaves drafts, active and paused tests when the grouping flattens
+const daysAgo = (days: number) => NOW - days * 24 * HOUR;
+
+const EVERY_DAY = { days: [0, 1, 2, 3, 4, 5, 6], time: '06:00' };
+const WEEKDAYS = { days: [1, 2, 3, 4, 5], time: '09:00' };
+const MWF = { days: [1, 3, 5], time: '17:00' };
+
+// 50 steps (1 sign-in + 8 areas × 6 checks + 1 sign-out) — the worst-case long test
+// the drawers have to stay usable with.
+const REGRESSION_AREAS = [
+  'dashboard',
+  'projects',
+  'sessions',
+  'heatmaps',
+  'alerts',
+  'billing',
+  'members',
+  'integrations',
+];
+const REGRESSION_STEPS: string[] = [
+  'Sign in as the QA admin',
+  ...REGRESSION_AREAS.flatMap((area) => [
+    `Open the ${area} page`,
+    `Verify the ${area} page loads without errors`,
+    `Create a new ${area} entry`,
+    `Verify the new ${area} entry appears in the list`,
+    `Edit the ${area} entry and save`,
+    `Delete the ${area} entry and confirm`,
+  ]),
+  'Sign out and verify the redirect to login',
+];
+
+export const MOCK_ENVIRONMENTS: Environment[] = [
+  {
+    id: 'env-prod',
+    name: 'Production',
+    url: 'https://app.example.com',
+    username: 'bot@example.com',
+    password: 'prod-secret',
+  },
+  {
+    id: 'env-staging',
+    name: 'Staging',
+    url: 'https://staging.example.com',
+    username: 'qa@example.com',
+    password: 'staging-secret',
+    ignoreHttpsErrors: true,
+    headers: [{ name: 'X-Env', value: 'staging' }],
+  },
+  {
+    id: 'env-qa',
+    name: 'QA',
+    url: 'https://qa.example.com',
+  },
+];
+
+// Drafts: surfaced by the agent only once it has gathered enough sessions to be
+// confident the journey is complete. Active/paused tests are already approved.
+export const MOCK_TEST_CASES: TestCase[] = [
+  // ---- drafts ----------------------------------------------------------
+  {
+    key: 'tc-signup',
+    createdAt: daysAgo(1),
+    title: 'New sign-up flow',
+    status: 'draft',
+    isNew: true,
+    // drafts carry nothing the user hasn't set: no tags, envs, viewports, regions —
+    // the empty "Not set" cells are part of how drafts read in the table (Jul 2)
+    steps: [
+      'Open the sign-up page',
+      'Enter email and password',
+      'Accept terms',
+      'Click create account',
+      'Land on the onboarding screen',
+    ],
+    alternatives: [
+      { afterStep: 2, note: 'Skip terms · seen in 12% of sessions' },
+    ],
+  },
+  {
+    key: 'tc-byoc',
+    createdAt: daysAgo(2),
+    title: 'BYOC setup flow',
+    status: 'draft',
+    isNew: true,
+    steps: [
+      'Open the deployment settings',
+      'Choose bring-your-own-cloud',
+      'Connect the cloud account',
+      'Pick a region',
+      'Confirm and deploy',
+    ],
+  },
+  {
+    key: 'tc-reset',
+    createdAt: daysAgo(4),
+    title: 'Password reset',
+    status: 'draft',
+    steps: [
+      'Open the login page',
+      'Click forgot password',
+      'Enter the account email',
+      'Open the reset link',
+      'Set a new password',
+      'Sign in with the new password',
+    ],
+  },
+  {
+    key: 'tc-coupon',
+    createdAt: daysAgo(9),
+    title: 'Apply coupon at checkout',
+    status: 'draft',
+    isNew: true,
+    steps: [
+      'Add an item to the cart',
+      'Go to checkout',
+      'Enter a coupon code',
+      'Verify the discount is applied',
+    ],
+  },
+  {
+    key: 'tc-invite',
+    createdAt: daysAgo(13),
+    title: 'Add a team member',
+    status: 'draft',
+    steps: [
+      'Open team settings',
+      'Click invite member',
+      'Enter an email address',
+      'Pick a role',
+      'Send the invite',
+    ],
+  },
+
+  // ---- approved, not yet scheduled -------------------------------------
+  // steps approved by the user but no schedule attached yet: ready to run on
+  // demand or to be scheduled. No run history because they haven't run.
+  {
+    key: 'tc-export',
+    createdAt: daysAgo(3),
+    title: 'Export report to CSV',
+    status: 'approved',
+    tags: ['Reporting'],
+    envNames: ['Staging'],
+    resolutions: ['desktop'],
+    regions: ['paris'],
+    schedule: null,
+    steps: [
+      'Open the reports dashboard',
+      'Pick a date range',
+      'Click export',
+      'Choose CSV',
+      'Verify the file downloads',
+    ],
+  },
+  {
+    key: 'tc-2fa',
+    createdAt: daysAgo(16),
+    title: 'Enable two-factor auth',
+    status: 'approved',
+    tags: ['Auth', 'Security'],
+    envNames: ['QA'],
+    resolutions: ['desktop', 'mobile'],
+    regions: ['ny'],
+    schedule: null,
+    steps: [
+      'Open security settings',
+      'Click enable two-factor',
+      'Scan the QR code',
+      'Enter the verification code',
+      'Confirm 2FA is active',
+    ],
+  },
+
+  // ---- active / paused tests -------------------------------------------
+  {
+    // the flow changed in real sessions → a v2 is proposed and waits for review;
+    // covers all three change kinds (added / removed / updated) in one diff
+    key: 'tc-checkout',
+    createdAt: daysAgo(62),
+    title: 'Checkout flow',
+    status: 'active',
+    tags: ['Checkout'],
+    envNames: ['Production', 'Staging'],
+    resolutions: ['desktop', 'mobile'],
+    regions: ['paris', 'ny'],
+    schedule: { days: [0, 1, 2, 3, 4, 5, 6], time: '06:00' },
+    lastResult: 'passed',
+    lastRunAt: ago(2),
+    recent: ['passed', 'passed', 'failed', 'passed', 'passed'],
+    steps: [
+      'Add a sample product to the cart',
+      'Navigate to the cart',
+      'Proceed to checkout',
+      'Submit the order',
+      'Verify the order confirmation page',
+    ],
+    version: 1,
+    pendingRevision: {
+      toVersion: 2,
+      detectedAt: ago(3),
+      changes: [
+        // checkout now opens straight from the cart popover
+        { type: 'removed', index: 1 },
+        { type: 'added', afterIndex: 2, text: 'Enter a promo code' },
+        // reworded step = remove + add, git-style (no "updated" kind)
+        { type: 'removed', index: 3 },
+        {
+          type: 'added',
+          afterIndex: 3,
+          text: 'Choose a payment method and submit the order',
+        },
+      ],
+    },
+  },
+  {
+    key: 'tc-login',
+    createdAt: daysAgo(88),
+    title: 'Login flow',
+    status: 'active',
+    tags: ['Auth'],
+    envNames: ['QA'],
+    schedule: WEEKDAYS,
+    resolutions: ['mobile'],
+    regions: ['ny'],
+    lastResult: 'failed',
+    lastRunAt: ago(5),
+    recent: ['passed', 'passed', 'passed', 'failed', 'failed'],
+    steps: [
+      'Navigate to the login page',
+      'Enter the provided credentials',
+      'Click the submit button',
+      'Verify redirect to dashboard',
+    ],
+  },
+  {
+    // already revised once (v2) — shows the version label + switcher with one snapshot
+    key: 'tc-search',
+    createdAt: daysAgo(45),
+    title: 'Search & filter',
+    status: 'active',
+    tags: ['Search'],
+    envNames: ['Production'],
+    schedule: WEEKDAYS,
+    lastResult: 'passed',
+    lastRunAt: ago(9),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: [
+      'Open the main search bar',
+      'Type a product keyword',
+      'Select a suggestion',
+      'Apply a price filter',
+    ],
+    version: 2,
+    history: [
+      {
+        version: 1,
+        savedAt: ago(12 * 24),
+        steps: [
+          'Open the main search bar',
+          'Type a product keyword',
+          'Apply a price filter',
+        ],
+      },
+    ],
+  },
+  {
+    // twice-revised (v3) — exercises the full version dropdown and the per-step
+    // history popover (several steps changed wording across v1 → v2 → v3)
+    key: 'tc-billing',
+    createdAt: daysAgo(30),
+    title: 'Update billing card',
+    status: 'active',
+    tags: ['Billing'],
+    envNames: ['Staging'],
+    schedule: MWF,
+    lastResult: 'failed',
+    lastRunAt: ago(11),
+    recent: ['passed', 'failed', 'failed', 'failed', 'failed'],
+    steps: [
+      'Open billing settings',
+      'Click update card',
+      'Enter new card details',
+      'Save and verify confirmation',
+    ],
+    version: 3,
+    history: [
+      {
+        version: 1,
+        savedAt: ago(30 * 24),
+        steps: [
+          'Open account settings',
+          'Click update card',
+          'Enter card details',
+          'Save the card',
+        ],
+      },
+      {
+        version: 2,
+        savedAt: ago(10 * 24),
+        steps: [
+          'Open billing settings',
+          'Click update card',
+          'Enter new card details',
+          'Save the card',
+        ],
+      },
+    ],
+  },
+  {
+    key: 'tc-create-project',
+    createdAt: daysAgo(6),
+    title: 'Create project',
+    status: 'active',
+    tags: ['Projects'],
+    envNames: ['Production'],
+    schedule: EVERY_DAY,
+    lastResult: 'passed',
+    lastRunAt: ago(3),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: [
+      'Click new project',
+      'Enter a project name',
+      'Pick a template',
+      'Create the project',
+    ],
+  },
+  {
+    key: 'tc-invite-active',
+    createdAt: daysAgo(52),
+    title: 'Invite teammate',
+    status: 'active',
+    tags: ['Settings'],
+    envNames: ['QA'],
+    schedule: WEEKDAYS,
+    lastResult: 'passed',
+    lastRunAt: ago(14),
+    recent: ['failed', 'passed', 'passed', 'passed', 'passed'],
+    steps: [
+      'Open team settings',
+      'Send an invite',
+      'Verify the pending invite appears',
+    ],
+  },
+  {
+    // (was a duplicate of the approved tc-2fa key — antd Table needs unique rowKeys)
+    key: 'tc-2fa-active',
+    createdAt: daysAgo(24),
+    title: 'Enable two-factor auth',
+    status: 'active',
+    tags: ['Auth'],
+    envNames: ['QA'],
+    schedule: WEEKDAYS,
+    lastResult: 'passed',
+    lastRunAt: ago(20),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: [
+      'Open security settings',
+      'Start 2FA setup',
+      'Scan the QR code',
+      'Confirm with a code',
+    ],
+  },
+  {
+    key: 'tc-invoice',
+    createdAt: daysAgo(71),
+    title: 'Download invoice',
+    status: 'active',
+    tags: ['Billing'],
+    envNames: ['Production'],
+    schedule: { days: [1], time: '08:00' },
+    lastResult: 'passed',
+    lastRunAt: ago(26),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: ['Open billing history', 'Pick an invoice', 'Download the PDF'],
+  },
+  {
+    // v2 with ANOTHER revision pending (v3) — versioned tests keep evolving; this
+    // one's diff is a single added step, so reviews aren't always multi-change
+    key: 'tc-profile',
+    createdAt: daysAgo(11),
+    title: 'Upload profile photo',
+    status: 'active',
+    tags: ['Profile'],
+    envNames: ['Staging'],
+    schedule: WEEKDAYS,
+    lastResult: 'passed',
+    lastRunAt: ago(30),
+    recent: ['passed', 'failed', 'passed', 'passed', 'passed'],
+    steps: [
+      'Open profile settings',
+      'Click change photo',
+      'Upload an image',
+      'Save and verify it shows',
+    ],
+    version: 2,
+    history: [
+      {
+        version: 1,
+        savedAt: ago(20 * 24),
+        steps: ['Open profile settings', 'Upload an image', 'Save'],
+      },
+    ],
+    pendingRevision: {
+      toVersion: 3,
+      detectedAt: ago(26),
+      changes: [
+        { type: 'added', afterIndex: 2, text: 'Crop the image to fit' },
+      ],
+    },
+  },
+
+  // ---- paused ----------------------------------------------------------
+  {
+    key: 'tc-onboarding-tour',
+    createdAt: daysAgo(95),
+    title: 'Onboarding tour',
+    status: 'paused',
+    tags: ['Onboarding'],
+    envNames: ['Staging'],
+    schedule: null,
+    lastResult: 'passed',
+    lastRunAt: ago(72),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: [
+      'Start the product tour',
+      'Step through each tooltip',
+      'Finish and verify completion',
+    ],
+  },
+  {
+    key: 'tc-bulk-export',
+    createdAt: daysAgo(58),
+    title: 'Bulk data export',
+    status: 'paused',
+    tags: ['Settings'],
+    envNames: ['QA'],
+    schedule: null,
+    lastResult: 'failed',
+    lastRunAt: ago(96),
+    recent: ['failed', 'failed', 'passed', 'passed', 'passed'],
+    steps: [
+      'Open data settings',
+      'Request a full export',
+      'Wait for the export to finish',
+      'Download the archive',
+    ],
+  },
+
+  // ---- more approved/paused tests (volume, to exercise pagination) -----
+  {
+    key: 'tc-logout',
+    createdAt: daysAgo(19),
+    title: 'Logout flow',
+    status: 'active',
+    tags: ['Auth'],
+    envNames: ['QA'],
+    schedule: WEEKDAYS,
+    lastResult: 'passed',
+    lastRunAt: ago(6),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: ['Open the account menu', 'Click log out', 'Verify back on login'],
+  },
+  {
+    key: 'tc-add-payment',
+    createdAt: daysAgo(27),
+    title: 'Add a payment method',
+    status: 'active',
+    tags: ['Billing'],
+    envNames: ['Production'],
+    schedule: EVERY_DAY,
+    lastResult: 'passed',
+    lastRunAt: ago(8),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: ['Open billing', 'Add a card', 'Confirm it is saved'],
+  },
+  {
+    key: 'tc-remove-item',
+    createdAt: daysAgo(34),
+    title: 'Remove item from cart',
+    status: 'active',
+    tags: ['Checkout'],
+    envNames: ['Production'],
+    schedule: WEEKDAYS,
+    lastResult: 'passed',
+    lastRunAt: ago(10),
+    recent: ['passed', 'passed', 'failed', 'passed', 'passed'],
+    steps: ['Add two items', 'Remove one', 'Verify the total updates'],
+  },
+  {
+    key: 'tc-change-password',
+    createdAt: daysAgo(41),
+    title: 'Change password',
+    status: 'active',
+    tags: ['Auth'],
+    envNames: ['QA'],
+    schedule: MWF,
+    lastResult: 'failed',
+    lastRunAt: ago(12),
+    recent: ['passed', 'failed', 'failed', 'passed', 'failed'],
+    steps: [
+      'Open security settings',
+      'Enter a new password',
+      'Save and verify',
+    ],
+  },
+  {
+    key: 'tc-export-csv',
+    createdAt: daysAgo(76),
+    title: 'Export report as CSV',
+    status: 'paused',
+    tags: ['Settings'],
+    envNames: ['Staging'],
+    schedule: null,
+    lastResult: 'passed',
+    lastRunAt: ago(40),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: ['Open a report', 'Click export CSV', 'Verify the file downloads'],
+  },
+  {
+    key: 'tc-filter-dashboard',
+    createdAt: daysAgo(8),
+    title: 'Filter the dashboard',
+    status: 'active',
+    tags: ['Search'],
+    envNames: ['Production'],
+    schedule: WEEKDAYS,
+    lastResult: 'passed',
+    lastRunAt: ago(13),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: [
+      'Open a dashboard',
+      'Apply a date filter',
+      'Verify the cards update',
+    ],
+  },
+  {
+    key: 'tc-share-report',
+    createdAt: daysAgo(22),
+    title: 'Share a report',
+    status: 'active',
+    tags: ['Settings'],
+    envNames: ['Production'],
+    schedule: WEEKDAYS,
+    lastResult: 'passed',
+    lastRunAt: ago(15),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: ['Open a report', 'Click share', 'Copy the link'],
+  },
+  {
+    key: 'tc-delete-account',
+    createdAt: daysAgo(66),
+    title: 'Delete account',
+    status: 'paused',
+    tags: ['Settings'],
+    envNames: ['QA'],
+    schedule: null,
+    lastResult: 'passed',
+    lastRunAt: ago(120),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: ['Open account settings', 'Confirm deletion', 'Verify sign-out'],
+  },
+  {
+    key: 'tc-apply-theme',
+    createdAt: daysAgo(37),
+    title: 'Switch to dark mode',
+    status: 'active',
+    tags: ['Profile'],
+    envNames: ['Staging'],
+    schedule: WEEKDAYS,
+    lastResult: 'passed',
+    lastRunAt: ago(18),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: ['Open appearance settings', 'Pick dark mode', 'Verify it applies'],
+  },
+  {
+    key: 'tc-resend-invite',
+    createdAt: daysAgo(49),
+    title: 'Resend a team invite',
+    status: 'active',
+    tags: ['Settings'],
+    envNames: ['QA'],
+    schedule: WEEKDAYS,
+    lastResult: 'failed',
+    lastRunAt: ago(22),
+    recent: ['failed', 'passed', 'passed', 'failed', 'failed'],
+    steps: [
+      'Open team settings',
+      'Resend a pending invite',
+      'Verify the toast',
+    ],
+  },
+  {
+    key: 'tc-upgrade-plan',
+    createdAt: daysAgo(83),
+    title: 'Upgrade plan',
+    status: 'active',
+    tags: ['Billing'],
+    envNames: ['Production'],
+    schedule: EVERY_DAY,
+    lastResult: 'passed',
+    lastRunAt: ago(24),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: ['Open billing', 'Pick a higher plan', 'Confirm and verify'],
+  },
+  {
+    key: 'tc-search-empty',
+    createdAt: daysAgo(15),
+    title: 'Search with no results',
+    status: 'active',
+    tags: ['Search'],
+    envNames: ['Production'],
+    schedule: WEEKDAYS,
+    lastResult: 'passed',
+    lastRunAt: ago(27),
+    recent: ['passed', 'passed', 'passed', 'passed', 'passed'],
+    steps: ['Open search', 'Type a nonsense query', 'Verify the empty state'],
+  },
+  {
+    // a deliberately long test (50 steps) — exercises the bounded step lists
+    key: 'tc-regression',
+    createdAt: daysAgo(5),
+    title: 'Full regression sweep',
+    status: 'active',
+    tags: ['Regression'],
+    envNames: ['Staging'],
+    resolutions: ['desktop'],
+    regions: ['paris'],
+    schedule: { days: [1], time: '05:00' },
+    lastResult: 'failed',
+    lastRunAt: ago(26),
+    recent: ['passed', 'passed', 'passed', 'passed', 'failed'],
+    steps: REGRESSION_STEPS,
+  },
+];
+
+
+// Every finished run carries its network + console capture, PASSED or failed
+// (Mehdi 07-20: the data exists either way — production exposing it only on
+// failures is the backend gap tracked as OR-3634). This factory builds a
+// plausible page-load + API trace so passed runs aren't hand-written HAR
+// novels; the failed runs above keep their bespoke captures.
+const mkReq = (
+  time: number,
+  method: string,
+  url: string,
+  type: string,
+  status: number,
+  size: number,
+  duration: number,
+): NetworkRequest => {
+  const host = url.replace(/^https?:\/\//, '').split('/')[0];
+  return {
+    method,
+    url,
+    name: url.split('?')[0].split('/').filter(Boolean).pop() ?? host,
+    type,
+    status,
+    size,
+    duration,
+    time,
+    ip: '203.0.113.10',
+    protocol: 'HTTP/2.0',
+    timing: {
+      dns: 2,
+      connect: 6,
+      ssl: 11,
+      ttfb: Math.max(8, Math.round(duration * 0.6)),
+      download: Math.max(2, Math.round(duration * 0.25)),
+    },
+    requestHeaders: [
+      { name: ':authority', value: host },
+      { name: ':method', value: method },
+      {
+        name: 'accept',
+        value:
+          type === 'document' ? 'text/html,application/xhtml+xml' : 'application/json',
+      },
+      { name: 'user-agent', value: 'OpenReplay-TestAgent/1.0' },
+    ],
+    responseHeaders: [
+      {
+        name: 'content-type',
+        value:
+          type === 'document'
+            ? 'text/html; charset=utf-8'
+            : type === 'script'
+              ? 'application/javascript'
+              : type === 'stylesheet'
+                ? 'text/css'
+                : type === 'img'
+                  ? 'image/svg+xml'
+                  : 'application/json',
+      },
+      { name: 'cache-control', value: 'no-cache' },
+    ],
+  };
+};
+const runCapture = (
+  page: string,
+  xhrs: [method: string, path: string][],
+): { console: ConsoleLog[]; network: NetworkRequest[] } => ({
+  console: [
+    { level: 'info', time: 130, text: `GET ${page} 200` },
+    { level: 'info', time: 940, text: '[vitals] LCP 1.24s \u00b7 CLS 0.02' },
+    {
+      level: 'warn',
+      time: 2100,
+      text: '[Deprecation] Listener added for a synchronous XHR.',
+    },
+  ],
+  network: [
+    mkReq(60, 'GET', `https://app.example.com${page}`, 'document', 200, 18420, 142),
+    mkReq(210, 'GET', 'https://app.example.com/static/app.css', 'stylesheet', 200, 48210, 88),
+    mkReq(216, 'GET', 'https://app.example.com/static/app.js', 'script', 200, 412600, 240),
+    ...xhrs.map(([method, path], i) =>
+      mkReq(
+        600 + i * 420,
+        method,
+        `https://app.example.com${path}`,
+        'xhr',
+        method === 'POST' ? 201 : 200,
+        2400 + i * 800,
+        120 + i * 35,
+      ),
+    ),
+    mkReq(2600, 'GET', 'https://app.example.com/static/logo.svg', 'img', 304, 0, 24),
+  ],
+});
+
+// A run is one execution of a test. The same test shows up every time it runs, with
+// its own timestamp — that's what makes this a log, not a second list of tests.
+export const MOCK_RUNS: RunData[] = [
+  // ---- the 50-step regression run — long step list, failed mid-way ------
+  {
+    key: 'r-regression',
+    testName: 'Full regression sweep',
+    date: ago(26),
+    duration: 184000,
+    status: 'failed',
+    failedStep: 33,
+    envName: 'Staging',
+    resolution: 'desktop',
+    region: 'paris',
+    tags: ['Regression'],
+    error:
+      'Row not found — timed out after 10s waiting for the new billing entry.',
+    steps: REGRESSION_STEPS.map((step, i) => ({
+      step,
+      status: i < 33 ? 'passed' : i === 33 ? 'failed' : 'skipped',
+      ...(i % 8 === 0 ? { shots: 2 } : {}),
+    })) as RunData['steps'],
+    // failed runs capture the same trace — plus the failure itself
+    ...(() => {
+      const cap = runCapture('/billing', [
+        ['GET', '/api/billing'],
+        ['POST', '/api/billing/entries'],
+      ]);
+      return {
+        console: [
+          ...cap.console,
+          {
+            level: 'error' as const,
+            time: 174000,
+            text: 'Timed out after 10s waiting for selector "[data-row=billing-entry]"',
+          },
+        ],
+        network: [
+          ...cap.network,
+          mkReq(164000, 'GET', 'https://app.example.com/api/billing/entries', 'xhr', 504, 0, 10000),
+        ],
+      };
+    })(),
+  },
+  // ---- in progress (today) --------------------------------------------
+  {
+    key: 'r1',
+    testName: 'Checkout flow',
+    date: ago(0.05),
+    status: 'running',
+    envName: 'Production',
+    resolution: 'desktop',
+    region: 'paris',
+    tags: ['Checkout'],
+    steps: [
+      { step: 'Add a sample product to the cart', status: 'passed' },
+      { step: 'Navigate to the cart', status: 'passed' },
+      { step: 'Proceed to checkout', status: 'running' },
+      { step: 'Submit the order', status: 'pending' },
+      { step: 'Verify the order confirmation page', status: 'pending' },
+    ],
+  },
+  // ---- today -----------------------------------------------------------
+  {
+    key: 'r2',
+    testName: 'Login flow',
+    date: ago(2),
+    duration: 5430,
+    status: 'failed',
+    failedStep: 2,
+    envName: 'QA',
+    resolution: 'mobile',
+    region: 'ny',
+    tags: ['Auth'],
+    error:
+      'Submit button not found — timed out after 5s waiting for [type="submit"].',
+    console: [
+      { level: 'info', time: 120, text: 'GET /login 200' },
+      {
+        level: 'warn',
+        time: 1840,
+        text: '[Deprecation] Synchronous XMLHttpRequest on the main thread is deprecated.',
+      },
+      {
+        level: 'error',
+        time: 5210,
+        text: "Uncaught TypeError: Cannot read properties of null (reading 'click')\n    at submitForm (login.js:84:17)\n    at HTMLButtonElement.<anonymous> (login.js:61:5)",
+      },
+    ],
+    network: [
+      {
+        method: 'GET',
+        url: 'https://app.example.com/login',
+        name: 'login',
+        type: 'document',
+        status: 200,
+        size: 18420,
+        duration: 142,
+        time: 60,
+        ip: '203.0.113.10',
+        protocol: 'HTTP/2.0',
+        timing: { dns: 4, connect: 9, ssl: 14, ttfb: 96, download: 19 },
+        requestHeaders: [
+          { name: ':authority', value: 'app.example.com' },
+          { name: ':method', value: 'GET' },
+          { name: 'accept', value: 'text/html,application/xhtml+xml' },
+          { name: 'user-agent', value: 'OpenReplay-TestAgent/1.0' },
+        ],
+        responseHeaders: [
+          { name: 'content-type', value: 'text/html; charset=utf-8' },
+          { name: 'cache-control', value: 'no-store' },
+          { name: 'content-length', value: '18420' },
+        ],
+      },
+      {
+        method: 'GET',
+        url: 'https://app.example.com/assets/app.js',
+        name: 'app.js',
+        type: 'script',
+        status: 200,
+        size: 254300,
+        duration: 320,
+        time: 220,
+        ip: '203.0.113.10',
+        protocol: 'HTTP/2.0',
+        timing: { dns: 0, connect: 0, ssl: 0, ttfb: 70, download: 250 },
+        requestHeaders: [
+          { name: ':authority', value: 'app.example.com' },
+          { name: 'accept', value: '*/*' },
+          { name: 'referer', value: 'https://app.example.com/login' },
+        ],
+        responseHeaders: [
+          { name: 'content-type', value: 'application/javascript' },
+          { name: 'cache-control', value: 'public, max-age=31536000' },
+          { name: 'content-encoding', value: 'br' },
+        ],
+      },
+      {
+        method: 'POST',
+        url: 'https://api.example.com/v1/auth/login',
+        name: 'login',
+        type: 'fetch',
+        status: 500,
+        size: 512,
+        duration: 4980,
+        time: 900,
+        ip: '203.0.113.42',
+        protocol: 'HTTP/2.0',
+        timing: { dns: 3, connect: 11, ssl: 18, ttfb: 4910, download: 38 },
+        requestHeaders: [
+          { name: ':authority', value: 'api.example.com' },
+          { name: ':method', value: 'POST' },
+          { name: 'content-type', value: 'application/json' },
+          {
+            name: 'authorization',
+            value: 'Bearer eyJhbGciOiJIUzI1NiJ9.sample-token',
+          },
+        ],
+        responseHeaders: [
+          { name: 'content-type', value: 'application/json' },
+          { name: 'x-request-id', value: 'req_9f2c14ab' },
+        ],
+        payload: '{\n  "email": "qa+bot@example.com",\n  "password": "••••••••"\n}',
+        response:
+          '{\n  "error": "internal_error",\n  "message": "Unexpected error while creating session",\n  "requestId": "req_9f2c14ab"\n}',
+      },
+      {
+        method: 'GET',
+        url: 'https://api.example.com/v1/session',
+        name: 'session',
+        type: 'xhr',
+        status: 0,
+        duration: 0,
+        time: 5100,
+        ip: '203.0.113.42',
+        protocol: 'HTTP/2.0',
+        requestHeaders: [
+          { name: ':authority', value: 'api.example.com' },
+          { name: 'accept', value: 'application/json' },
+        ],
+      },
+    ],
+    steps: [
+      { step: 'Navigate to the login page', status: 'passed', shots: 2 },
+      { step: 'Enter the provided credentials', status: 'passed', shots: 3 },
+      { step: 'Click the submit button', status: 'failed', shots: 4 },
+      { step: 'Verify redirect to dashboard', status: 'skipped' },
+    ],
+  },
+  {
+    key: 'r3',
+    testName: 'Checkout flow',
+    date: ago(4),
+    duration: 2100,
+    status: 'passed',
+    envName: 'Production',
+    tags: ['Checkout'],
+    console: [
+      { level: 'info', time: 80, text: 'GET /cart 200' },
+      { level: 'info', time: 1600, text: 'Checkout completed — order #48213' },
+    ],
+    network: [
+      {
+        method: 'GET',
+        url: 'https://app.example.com/cart',
+        name: 'cart',
+        type: 'document',
+        status: 200,
+        size: 16800,
+        duration: 120,
+        time: 40,
+      },
+      {
+        method: 'GET',
+        url: 'https://cdn.example.com/img/product-12.jpg',
+        name: 'product-12.jpg',
+        type: 'img',
+        status: 200,
+        size: 88200,
+        duration: 90,
+        time: 300,
+      },
+      {
+        method: 'POST',
+        url: 'https://api.example.com/v1/orders',
+        name: 'orders',
+        type: 'fetch',
+        status: 201,
+        size: 640,
+        duration: 410,
+        time: 1200,
+      },
+    ],
+    steps: [
+      { step: 'Add a sample product to the cart', status: 'passed', shots: 2 },
+      { step: 'Navigate to the cart', status: 'passed', shots: 1 },
+      { step: 'Proceed to checkout', status: 'passed', shots: 3 },
+      { step: 'Submit the order', status: 'passed', shots: 2 },
+      { step: 'Verify the order confirmation page', status: 'passed', shots: 2 },
+    ],
+  },
+  {
+    key: 'r4',
+    testName: 'Search & filter',
+    version: 2,
+    date: ago(7),
+    duration: 1800,
+    status: 'passed',
+    envName: 'Production',
+    tags: ['Search'],
+    steps: [
+      { step: 'Open the main search bar', status: 'passed' },
+      { step: 'Type a product keyword', status: 'passed' },
+      { step: 'Select a suggestion', status: 'passed' },
+      { step: 'Apply a price filter', status: 'passed' },
+    ],
+    ...runCapture('/search', [
+      ['GET', '/api/suggest?q=lamp'],
+      ['GET', '/api/search?q=lamp'],
+      ['GET', '/api/search?q=lamp&price=25-50'],
+    ]),
+  },
+  // ---- yesterday -------------------------------------------------------
+  {
+    key: 'r5',
+    testName: 'Update billing card',
+    version: 3,
+    date: ago(28),
+    duration: 4200,
+    status: 'failed',
+    failedStep: 2,
+    envName: 'Staging',
+    resolution: 'tablet',
+    region: 'sao-paulo',
+    tags: ['Billing'],
+    error: 'Card field rejected input — Stripe iframe did not load in time.',
+    console: [
+      { level: 'info', time: 90, text: 'GET /settings/billing 200' },
+      {
+        level: 'warn',
+        time: 1520,
+        text: '[Stripe.js] You may test your integration over HTTP. Live Stripe.js integrations must use HTTPS.',
+      },
+      {
+        level: 'error',
+        time: 4010,
+        text: 'Error: Stripe iframe did not load in time (timeout 4000ms)\n    at mountCardField (billing.js:212:9)',
+      },
+    ],
+    network: [
+      {
+        method: 'GET',
+        url: 'https://app.example.com/settings/billing',
+        name: 'billing',
+        type: 'document',
+        status: 200,
+        size: 21000,
+        duration: 160,
+        time: 50,
+      },
+      {
+        method: 'GET',
+        url: 'https://js.stripe.com/v3/',
+        name: 'v3',
+        type: 'script',
+        status: 200,
+        size: 142000,
+        duration: 380,
+        time: 240,
+      },
+      {
+        method: 'GET',
+        url: 'https://js.stripe.com/v3/elements-inner-card.html',
+        name: 'elements-inner-card.html',
+        type: 'document',
+        status: 0,
+        duration: 0,
+        time: 700,
+      },
+      {
+        method: 'POST',
+        url: 'https://api.stripe.com/v1/payment_methods',
+        name: 'payment_methods',
+        type: 'fetch',
+        status: 0,
+        duration: 0,
+        time: 4000,
+      },
+    ],
+    steps: [
+      { step: 'Open billing settings', status: 'passed' },
+      { step: 'Click update card', status: 'passed' },
+      { step: 'Enter new card details', status: 'failed' },
+      { step: 'Save and verify confirmation', status: 'skipped' },
+    ],
+  },
+  {
+    key: 'r6',
+    testName: 'Checkout flow',
+    // beyond the Runs default period (last 7 days) — visible via "All time"
+    date: daysAgo(12),
+    duration: 2400,
+    status: 'passed',
+    envName: 'Production',
+    tags: ['Checkout'],
+    steps: [
+      { step: 'Add a sample product to the cart', status: 'passed' },
+      { step: 'Navigate to the cart', status: 'passed' },
+      { step: 'Proceed to checkout', status: 'passed' },
+      { step: 'Submit the order', status: 'passed' },
+      { step: 'Verify the order confirmation page', status: 'passed' },
+    ],
+    ...runCapture('/checkout', [
+      ['POST', '/api/cart/items'],
+      ['GET', '/api/cart'],
+      ['POST', '/api/orders'],
+      ['GET', '/api/orders/1042'],
+    ]),
+  },
+  {
+    key: 'r7',
+    testName: 'Login flow',
+    // beyond the Runs default period (last 7 days) — visible via "All time"
+    date: daysAgo(20),
+    duration: 1900,
+    status: 'passed',
+    envName: 'QA',
+    tags: ['Auth'],
+    steps: [
+      { step: 'Navigate to the login page', status: 'passed' },
+      { step: 'Enter the provided credentials', status: 'passed' },
+      { step: 'Click the submit button', status: 'passed' },
+      { step: 'Verify redirect to dashboard', status: 'passed' },
+    ],
+    ...runCapture('/login', [
+      ['POST', '/api/auth/login'],
+      ['GET', '/api/me'],
+    ]),
+  },
+  // ---- earlier ---------------------------------------------------------
+  {
+    key: 'r8',
+    testName: 'Create project',
+    date: ago(50),
+    duration: 2600,
+    status: 'passed',
+    envName: 'Production',
+    tags: ['Projects'],
+    steps: [
+      { step: 'Click new project', status: 'passed' },
+      { step: 'Enter a project name', status: 'passed' },
+      { step: 'Pick a template', status: 'passed' },
+      { step: 'Create the project', status: 'passed' },
+    ],
+    ...runCapture('/projects/new', [
+      ['GET', '/api/templates'],
+      ['POST', '/api/projects'],
+    ]),
+  },
+  {
+    key: 'r9',
+    testName: 'Checkout flow',
+    date: ago(54),
+    duration: 2200,
+    status: 'passed',
+    envName: 'Production',
+    tags: ['Checkout'],
+    steps: [
+      { step: 'Add a sample product to the cart', status: 'passed' },
+      { step: 'Navigate to the cart', status: 'passed' },
+      { step: 'Proceed to checkout', status: 'passed' },
+      { step: 'Submit the order', status: 'passed' },
+      { step: 'Verify the order confirmation page', status: 'passed' },
+    ],
+    ...runCapture('/checkout', [
+      ['POST', '/api/cart/items'],
+      ['GET', '/api/cart'],
+      ['POST', '/api/orders'],
+      ['GET', '/api/orders/987'],
+    ]),
+  },
+
+  // ---- more runs (volume, to exercise pagination + filters, and so a test's
+  // trend strip in its drawer has a real last-10 to show — not just 3-4) ------
+  ...Array.from({ length: 70 }, (_, i): RunData => {
+    const defs = [
+      {
+        testName: 'Login flow',
+        env: 'QA',
+        resolution: 'mobile',
+        region: 'ny',
+        tags: ['Auth'],
+      },
+      {
+        testName: 'Search & filter',
+        env: 'Production',
+        resolution: 'desktop',
+        region: 'paris',
+        tags: ['Search'],
+      },
+      {
+        testName: 'Create project',
+        env: 'Production',
+        resolution: 'desktop',
+        region: 'paris',
+        tags: ['Projects'],
+      },
+      {
+        testName: 'Update billing card',
+        env: 'Staging',
+        resolution: 'tablet',
+        region: 'sao-paulo',
+        tags: ['Billing'],
+      },
+      {
+        testName: 'Invite teammate',
+        env: 'QA',
+        resolution: 'desktop',
+        region: 'ny',
+        tags: ['Settings'],
+      },
+      {
+        testName: 'Logout flow',
+        env: 'QA',
+        resolution: 'mobile',
+        region: 'ny',
+        tags: ['Auth'],
+      },
+      {
+        testName: 'Checkout flow',
+        env: 'Production',
+        resolution: 'desktop',
+        region: 'paris',
+        tags: ['Checkout'],
+      },
+    ] as const;
+    const d = defs[i % defs.length];
+    const failed = i % 5 === 2; // every 5th-ish run failed
+    const date = ago(58 + i * 6);
+    // versioned tests: runs older than the version bump executed the previous steps
+    const rv = {
+      'Search & filter': { current: 2, since: ago(12 * 24) },
+      'Update billing card': { current: 3, since: ago(10 * 24) },
+    }[d.testName as string];
+    return {
+      key: `r${10 + i}`,
+      testName: d.testName,
+      ...(rv
+        ? { version: date >= rv.since ? rv.current : rv.current - 1 }
+        : {}),
+      date,
+      duration: 1500 + ((i * 370) % 4200),
+      status: failed ? 'failed' : 'passed',
+      ...(failed
+        ? {
+            failedStep: 1,
+            error: 'Assertion failed — element not found within 5s.',
+          }
+        : {}),
+      envName: d.env,
+      resolution: d.resolution as RunData['resolution'],
+      region: d.region,
+      tags: [...d.tags],
+      steps: [
+        { step: 'Open the page', status: 'passed' },
+        {
+          step: 'Perform the main action',
+          status: failed ? 'failed' : 'passed',
+        },
+        {
+          step: 'Verify the result',
+          status: failed ? 'skipped' : 'passed',
+        },
+      ],
+    };
+  }),
+];

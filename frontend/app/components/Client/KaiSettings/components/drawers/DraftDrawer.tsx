@@ -1,0 +1,336 @@
+import { Button, Tooltip } from 'antd';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarClock,
+  Check,
+  Trash2,
+  X,
+} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { useConfirms } from '../shared/confirms';
+import { kaiStore } from '../shared/store';
+import { TestCase } from '../shared/types';
+import { isScheduled } from '../shared/utils';
+import EditableSteps from './EditableSteps';
+import { EntityDrawer, Section, TagEditor } from './EntityDrawer';
+import RunSettingsFields, { RunSettings } from './RunSettingsFields';
+
+interface Props {
+  test: TestCase | null;
+  open: boolean;
+  onClose: () => void;
+  onChange: (updated: TestCase) => void;
+  onRemove: (key: string) => void;
+}
+
+// The draft review is a small workflow: approve the steps, then choose a schedule (or
+// not), then optionally tag it. Approving without a schedule leaves the test "approved"
+// (ready, not scheduled); adding a schedule makes it "active".
+type WizStep = 0 | 1 | 2;
+
+/** A draft: the agent's proposal. Walk the approve → schedule → tag workflow, or
+ *  dismiss it. Nothing is committed to the table until the user finishes (or closes
+ *  after approving — in which case it lands as "approved"). */
+function DraftDrawer({ test, open, onClose, onChange, onRemove }: Props) {
+  const { t } = useTranslation();
+  const { confirmDelete, confirmDismissSuggestion } = useConfirms();
+  const [draft, setDraft] = useState<TestCase | null>(test);
+  const [step, setStep] = useState<WizStep>(0);
+  // true once the user has clicked "Approve steps" — closing now keeps it approved
+  const [approved, setApproved] = useState(false);
+
+  useEffect(() => {
+    // a fresh draft carries nothing — pre-fill its run settings from Settings →
+    // Default run configuration (shown as "(default)" until the user changes them);
+    // only committed if the draft is finished/saved
+    if (test) {
+      const { defaults } = kaiStore.get();
+      setDraft({
+        ...test,
+        envNames: test.envNames?.length
+          ? test.envNames
+          : defaults.envName
+            ? [defaults.envName]
+            : test.envNames,
+        resolutions: test.resolutions?.length
+          ? test.resolutions
+          : defaults.resolution
+            ? [defaults.resolution]
+            : test.resolutions,
+        regions: test.regions?.length
+          ? test.regions
+          : defaults.region
+            ? [defaults.region]
+            : test.regions,
+      });
+    } else {
+      setDraft(test);
+    }
+    setStep(0);
+    setApproved(false);
+  }, [test]);
+
+  if (!draft) return null;
+
+  const scheduled = isScheduled(draft.schedule);
+  const settings: RunSettings = {
+    envNames: draft.envNames,
+    resolutions: draft.resolutions,
+    regions: draft.regions,
+    schedule: draft.schedule,
+  };
+  const patch = (p: Partial<TestCase>) =>
+    setDraft((d) => (d ? { ...d, ...p } : d));
+
+  // commit the test into the table with its resolved status
+  const finalize = () => {
+    onChange({
+      ...draft,
+      status: scheduled ? 'active' : 'approved',
+      isNew: false,
+    });
+    onClose();
+  };
+  const approveSteps = () => {
+    setApproved(true);
+    setStep(1);
+  };
+  const saveDraft = () => {
+    onChange(draft);
+    onClose();
+  };
+  // The reject grammar (Gabriel 07-21, refining Mehdi 07-20): a SUGGESTION
+  // (agent draft) gets Dismiss — red, confirmed — and dismissing removes it.
+  // YOUR draft (duplicate, manual) never shows Dismiss at all; it gets
+  // Delete. The 07-20 accident (a duplicate silently deleted by "Dismiss")
+  // is impossible because the word doesn't exist in that context anymore.
+  const mine = draft.origin === 'user';
+  const dismiss = () =>
+    confirmDismissSuggestion(draft.title, () => {
+      onRemove(draft.key);
+      onClose();
+    });
+  const deleteDraft = () =>
+    confirmDelete({
+      what: t('draft'),
+      name: draft.title,
+      onOk: () => {
+        onRemove(draft.key);
+        onClose();
+      },
+    });
+  // X / mask: if the steps were approved, persist as approved (or active if scheduled)
+  const handleClose = () => {
+    if (approved) finalize();
+    else onClose();
+  };
+
+  const stepLabels = [t('Approve'), t('Schedule'), t('Tags')];
+  // step 0 is always revisitable; the later steps unlock once the steps are approved
+  const goStep = (i: number) => {
+    if (i === 0 || approved) setStep(i as WizStep);
+  };
+
+  // footer changes per step — the workflow's forward/back controls. Only step 0 talks
+  // about approving (that's where approval happens); afterwards it's schedule → done.
+  const footer =
+    step === 0 ? (
+      <div className="flex items-center justify-between">
+        {/* X = reject a suggestion, bin = delete your work — never both.
+            Both are red (something goes away) and both confirm; Dismiss's
+            confirm carries the optional agent-learning reason. */}
+        {mine ? (
+          <Button
+            type="text"
+            danger
+            icon={<Trash2 size={15} />}
+            onClick={deleteDraft}
+          >
+            {t('Delete draft')}
+          </Button>
+        ) : (
+          <Button type="text" danger icon={<X size={15} />} onClick={dismiss}>
+            {t('Dismiss')}
+          </Button>
+        )}
+        <div className="flex items-center gap-2">
+          <Button onClick={saveDraft}>{t('Save draft')}</Button>
+          <Button
+            type="primary"
+            onClick={approveSteps}
+            icon={<ArrowRight size={15} />}
+            iconPosition="end"
+          >
+            {t('Approve steps')}
+          </Button>
+        </div>
+      </div>
+    ) : step === 1 ? (
+      <div className="flex items-center justify-between">
+        <Button
+          type="text"
+          onClick={() => setStep(0)}
+          icon={<ArrowLeft size={15} />}
+        >
+          {t('Back')}
+        </Button>
+        <div className="flex items-center gap-2">
+          {/* the no-schedule exit is a real Save with a tooltip saying exactly
+              what happens (report 1.4) — not a vague "finish" text link */}
+          {scheduled ? (
+            <Button type="text" onClick={finalize}>
+              {t('Skip tags & finish')}
+            </Button>
+          ) : (
+            <Tooltip title={t('Test will be saved without schedule')}>
+              <Button onClick={finalize}>{t('Save')}</Button>
+            </Tooltip>
+          )}
+          <Button
+            type="primary"
+            onClick={() => setStep(2)}
+            icon={<ArrowRight size={15} />}
+            iconPosition="end"
+          >
+            {t('Continue to tags')}
+          </Button>
+        </div>
+      </div>
+    ) : (
+      <div className="flex items-center justify-between">
+        <Button
+          type="text"
+          onClick={() => setStep(1)}
+          icon={<ArrowLeft size={15} />}
+        >
+          {t('Back')}
+        </Button>
+        <Button type="primary" onClick={finalize} icon={<Check size={15} />}>
+          {t('Done')}
+        </Button>
+      </div>
+    );
+
+  return (
+    <EntityDrawer
+      type="draft"
+      open={open}
+      onClose={handleClose}
+      title={draft.title}
+      onTitleChange={(title) => patch({ title })}
+      footer={footer}
+    >
+      {/* custom stepper — full control of brand colours + clickable steps (antd's theme
+          algorithm can't derive a palette from the app's CSS-var primary). */}
+      <div className="px-6 pt-5">
+        <div className="flex items-center">
+          {stepLabels.map((label, i) => {
+            const done = i < step;
+            const active = i === step;
+            const reachable = i === 0 || approved;
+            return (
+              <React.Fragment key={label}>
+                {i > 0 && (
+                  <div
+                    className="flex-1 h-px mx-2"
+                    style={{
+                      background:
+                        i <= step
+                          ? 'var(--color-main)'
+                          : 'var(--color-gray-light)',
+                    }}
+                  />
+                )}
+                <button
+                  type="button"
+                  disabled={!reachable}
+                  onClick={() => goStep(i)}
+                  className={`flex items-center gap-2 ${
+                    reachable ? 'cursor-pointer' : 'cursor-default'
+                  }`}
+                >
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+                    style={
+                      done || active
+                        ? { background: 'var(--color-main)', color: '#fff' }
+                        : {
+                            background: 'var(--color-gray-lightest)',
+                            color: 'var(--color-gray-medium)',
+                            border: '1px solid var(--color-gray-light)',
+                          }
+                    }
+                  >
+                    {done ? <Check size={14} /> : i + 1}
+                  </span>
+                  <span
+                    className={`text-sm ${
+                      active
+                        ? 'font-medium text-black'
+                        : done
+                          ? 'text-black'
+                          : 'text-disabled-text'
+                    }`}
+                  >
+                    {label}
+                  </span>
+                </button>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Step 1 — review & approve the agent's proposed steps */}
+      {step === 0 && (
+        <EditableSteps
+          steps={draft.steps}
+          alternatives={draft.alternatives}
+          onStepsChange={(steps) => patch({ steps })}
+        />
+      )}
+
+      {/* Step 2 — where & when it runs (a schedule is optional) */}
+      {step === 1 && (
+        <Section title={t('Where & when it runs')}>
+          <RunSettingsFields value={settings} onChange={patch} defaultHints />
+          <div className="mt-3 flex items-start gap-2 text-sm text-disabled-text">
+            <CalendarClock size={14} className="mt-0.5 shrink-0" />
+            <span>
+              {scheduled
+                ? t('It will run automatically on this schedule.')
+                : t(
+                    'No schedule yet — the test will be Approved and you can run it manually or schedule it later.',
+                  )}
+            </span>
+          </div>
+        </Section>
+      )}
+
+      {/* Step 3 — optional tags. "(optional)" lives in the label itself, not
+          buried in the helper text (report 1.3) */}
+      {step === 2 && (
+        <Section
+          title={
+            <span>
+              {t('Tags')}{' '}
+              <span className="font-normal text-disabled-text">
+                ({t('optional')})
+              </span>
+            </span>
+          }
+        >
+          <div className="text-sm text-disabled-text mb-3">
+            {t('Add up to 3 tags to organise this test.')}
+          </div>
+          <TagEditor value={draft.tags} onChange={(tags) => patch({ tags })} />
+        </Section>
+      )}
+    </EntityDrawer>
+  );
+}
+
+export default DraftDrawer;
