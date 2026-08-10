@@ -32,7 +32,7 @@
    while you aim at it. */
 .capture-pill {
   border-color: var(--color-gray-light);
-  background: #fff;
+  background: var(--color-white);   /* flips to near-black under .dark */
   transition: border-color 0.15s ease;
 }
 .capture-pill:hover,
