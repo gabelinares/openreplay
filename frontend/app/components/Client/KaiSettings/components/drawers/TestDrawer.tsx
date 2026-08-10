@@ -9,6 +9,7 @@ import {
   Pause,
   Play,
   Trash2,
+  TriangleAlert,
   XCircle,
 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
@@ -136,6 +137,9 @@ function TestDrawer({
 
   const revision = test.pendingRevision;
   const merge = test.pendingMerge;
+  // a merge inherits side effects from ANY source, not from the base test
+  const mergeHasSideEffects = !!merge?.sources?.some((t) => t.hasSideEffects);
+  const sideEffects = !!test.hasSideEffects || mergeHasSideEffects;
   // plain editing buffers; the special modes commit through their own actions
   const buffered = !creating && !merge && !revision && viewVersion == null;
   // what the drawer renders: pending edits when they exist, the live test otherwise
@@ -484,6 +488,26 @@ function TestDrawer({
         )
       }
     >
+      {/* Running a side-effects test changes real data, which is the only
+          destructive thing in this feature, so it is stated before the steps.
+          During a merge the flag is ORed across the sources: side effects do not
+          cancel out by being outnumbered, and the merged draft has no flag of its
+          own yet (the runner owns it). Colours are classes, never an inline
+          style, so `.dark` can reach them. */}
+      {sideEffects && (
+        <div className="flex items-start gap-2 mb-4 px-3 py-2 rounded text-sm bg-orange-lightest text-orange-dark">
+          <TriangleAlert size={16} className="shrink-0 mt-0.5" />
+          <span>
+            {mergeHasSideEffects
+              ? t(
+                  'One of the tests you are merging has side effects. Running the merged test changes real data: orders, accounts, payments. Review the steps before you trigger a run.',
+                )
+              : t(
+                  'This test has side effects. Running it changes real data: orders, accounts, payments. Review the steps before you trigger a run.',
+                )}
+          </span>
+        </div>
+      )}
       {/* the steps section wears three hats: reviewing a proposed version (the same
           fully-editable list, with the proposal's add/remove rows dressed as a
           diff), viewing an older snapshot (read-only), or plain editing */}

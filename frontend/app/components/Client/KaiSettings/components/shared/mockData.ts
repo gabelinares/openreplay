@@ -115,6 +115,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
     key: 'tc-coupon',
     createdAt: daysAgo(9),
     title: 'Apply coupon at checkout',
+    hasSideEffects: true,
     status: 'draft',
     isNew: true,
     steps: [
@@ -128,6 +129,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
     key: 'tc-invite',
     createdAt: daysAgo(13),
     title: 'Add a team member',
+    hasSideEffects: true,
     status: 'draft',
     steps: [
       'Open team settings',
