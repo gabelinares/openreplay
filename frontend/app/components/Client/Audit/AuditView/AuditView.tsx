@@ -1,15 +1,19 @@
-import React, { useEffect } from 'react';
-import { Icon } from 'UI';
+import withPageTitle from 'HOCs/withPageTitle';
 import { Button } from 'antd';
-import { useStore } from 'App/mstore';
 import { useObserver } from 'mobx-react-lite';
+import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { useStore } from 'App/mstore';
+import { numberWithCommas } from 'App/utils';
+import PreferencesPage from 'Components/Client/PreferencesPage';
+import { Icon } from 'UI';
+
 import Select from 'Shared/Select';
 import SelectDateRange from 'Shared/SelectDateRange';
-import { numberWithCommas } from 'App/utils';
-import withPageTitle from 'HOCs/withPageTitle';
-import AuditSearchField from '../AuditSearchField';
+
 import AuditList from '../AuditList';
-import { useTranslation } from 'react-i18next';
+import AuditSearchField from '../AuditSearchField';
 
 function AuditView() {
   const { t } = useTranslation();
@@ -33,15 +37,15 @@ function AuditView() {
   };
 
   return useObserver(() => (
-    /* container + header follow the shared preferences grammar (Gabriel
-       07-27, first page of the consistency pass): bordered white card, NO
-       shadow, one bordered header row with the 18px semibold title, count as
-       a gray suffix, controls right with uniform gaps */
-    <div className="flex flex-col bg-white rounded-lg border">
-      <div className="flex items-center gap-2 border-b px-4 py-2">
-        <span className="font-semibold text-lg">{t('Audit Trail')}</span>
-        <span style={{ color: 'var(--color-gray-medium)' }}>{total}</span>
-        <div className="flex items-center gap-2 ml-auto">
+    /* This page was the first one converted to the grammar by hand (Gabriel
+       07-27). It now renders through the shared shell instead, so the section has
+       exactly one header rather than one plus a faithful copy. */
+    <PreferencesPage
+      title={t('Audit Trail')}
+      meta={total}
+      flush
+      actions={
+        <>
           <SelectDateRange
             period={auditStore.period}
             onChange={onChange}
@@ -54,9 +58,7 @@ function AuditView() {
             ]}
             defaultValue={order}
             plain
-            onChange={({ value }) =>
-              auditStore.updateKey('order', value.value)
-            }
+            onChange={({ value }) => auditStore.updateKey('order', value.value)}
           />
           <AuditSearchField
             onChange={(value) => {
@@ -71,11 +73,11 @@ function AuditView() {
           >
             {t('Export to CSV')}
           </Button>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       <AuditList />
-    </div>
+    </PreferencesPage>
   ));
 }
 
