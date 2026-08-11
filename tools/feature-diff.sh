@@ -9,7 +9,7 @@ INTEGRATION=main
 # feature:parent:owned paths (space separated)
 FEATURES=(
 "harness:feature/ai-issues:frontend/.vercelignore frontend/.env.sample frontend/vercel.json frontend/package.json frontend/CLAUDE.md frontend/app/dev frontend/app/initialize.tsx frontend/app/components/Client/DrawerGallery frontend/app/assets/img/mockEcommerce.png frontend/app/assets/img/mockEcommerce.svg"
-"shared-ui:$BASE:frontend/.gitignore frontend/app/components/shared/CountSuffix.tsx frontend/app/components/ui frontend/app/svg/icons/scan-pulse.svg frontend/app/svg/icons/stars.svg frontend/app/constants/panelSizes.ts frontend/app/layout/SideMenu/MenuContent.tsx"
+"shared-ui:$BASE:frontend/.gitignore frontend/app/components/shared/CountSuffix.tsx frontend/app/components/ui frontend/app/svg/icons/scan-pulse.svg frontend/app/svg/icons/stars.svg frontend/app/constants/panelSizes.ts frontend/app/layout/SideMenu/MenuContent.tsx frontend/app/components/Session_/SessionInfoItem/SessionInfoItem.tsx"
 "ai-issues:feature/shared-ui:frontend/app/components/Issues frontend/app/mstore/issuesStore.ts frontend/app/components/DataManagement/Segments frontend/app/components/shared/SessionItem/SessionItem.tsx frontend/HANDOFF.md"
 "test-agents:feature/shared-ui:frontend/app/components/Client/KaiSettings"
 "ux-audit:feature/ai-issues:frontend/app/components/Audits"
