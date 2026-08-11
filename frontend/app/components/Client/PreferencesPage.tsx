@@ -1,4 +1,4 @@
-import { Tabs, Tooltip, Typography } from 'antd';
+import { ConfigProvider, Tabs, Tooltip, Typography } from 'antd';
 import type { TabsProps } from 'antd';
 import { Button } from 'antd';
 import { ArrowLeft, Info } from 'lucide-react';
@@ -21,10 +21,15 @@ import { useHistory } from 'App/routing';
    re-derived:
 
      card    flex flex-col bg-white rounded-lg border      (NO shadow)
-     header  flex items-center gap-2 border-b px-4 py-2
+     header  flex items-center gap-2 border-b px-4, 48px tall
      title   font-semibold text-lg
      tabs    tabBarStyle paddingLeft/Right 16, marginBottom 0
      body    p-5
+
+   The agent pages render THROUGH this too, rather than being copied from. They
+   were the reference, but a reference that keeps its own copy of the markup is
+   just the first thing to drift — and they had already drifted from each other by
+   4px, which is what exposed the header-height bug.
 
    Do not restyle a page by passing classes that fight these. If a page needs
    something the shell cannot express, change the shell so every page gets it. */
@@ -41,7 +46,12 @@ export interface PreferencesPageProps {
   /** optional antd Tabs directly under the header, as Agents and Tests have */
   tabs?: Pick<
     TabsProps,
-    'items' | 'activeKey' | 'defaultActiveKey' | 'onChange'
+    | 'items'
+    | 'activeKey'
+    | 'defaultActiveKey'
+    | 'onChange'
+    /** the Tests page rides a search field on the tab bar */
+    | 'tabBarExtraContent'
   >;
   /** show a Back button above the card, for pages reached mid-flow */
   back?: boolean;
@@ -74,7 +84,18 @@ export default function PreferencesPage({
       // definition rather than repeated per page
       style={fillHeight ? { height: 'calc(100vh - 130px)' } : undefined}
     >
-      <div className="flex items-center gap-2 border-b px-4 py-2">
+      {/* The header is a FIXED height, not padding around whatever it holds.
+          With `py-2` the row was 44px on a title-only page and 48px as soon as a
+          page passed a 32px control, so the title sat at a different height on
+          every page (Gabriel 08-11). 48px is the taller of the two the agent
+          pages already produced, and it leaves a default antd control 8px top and
+          bottom. `min-h` rather than `h` so an unexpectedly tall control grows the
+          row instead of being clipped — with the size normalising below, nothing
+          realistic reaches that.
+
+          NOTE 48px is written in pixels on purpose: the html root here is 14px,
+          so Tailwind's rem-based `h-12` would resolve to 42px, not 48. */}
+      <div className="flex items-center gap-2 border-b px-4 min-h-[48px] shrink-0">
         <span className="font-semibold text-lg">{title}</span>
         {meta != null && (
           <span style={{ color: 'var(--color-gray-medium)' }}>{meta}</span>
@@ -90,7 +111,15 @@ export default function PreferencesPage({
           </Tooltip>
         )}
         {actions && (
-          <div className="flex items-center gap-2 ml-auto">{actions}</div>
+          /* One control size for every page's header. Pages were passing a mix
+             of default, `middle` and bare Inputs, and each size is a different
+             height, which is the other half of why the row moved. Setting it here
+             rather than asking eleven pages to remember means a new page cannot
+             get it wrong. A control that sets `size` explicitly still wins, which
+             is the intended escape hatch. */
+          <ConfigProvider componentSize="middle">
+            <div className="flex items-center gap-2 ml-auto">{actions}</div>
+          </ConfigProvider>
         )}
       </div>
 
