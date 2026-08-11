@@ -169,24 +169,20 @@ function ScreenshotsView({
   // A run in flight already has screenshots for the steps it finished, so those show
   // straight away (they used to be withheld until the whole run ended). Only when
   // nothing has been captured yet does this fall back to a placeholder.
-  if (shotSteps.length === 0) {
-    if (inFlight)
-      return (
-        <div
-          className={`rounded-lg border bg-gray-lightest flex flex-col items-center justify-center gap-2 text-disabled-text ${
-            fill ? 'h-full' : ''
-          }`}
-          style={fill ? undefined : { aspectRatio: '16 / 10' }}
-        >
-          <ShotPlaceholder
-            caption={t('Screenshots appear as each step completes.')}
-          />
-        </div>
-      );
+  if (shotSteps.length === 0)
     return (
-      <DevEmpty fill={fill} text={t('No screenshots captured for this run.')} />
+      // the same white bordered line the network and console tabs use — one empty
+      // state across Activity, rather than a large gray box on this one tab
+      // (Gabriel 08-11)
+      <DevEmpty
+        fill={fill}
+        text={
+          inFlight
+            ? t('No screenshots yet — they appear as each step completes.')
+            : t('No screenshots captured for this run.')
+        }
+      />
     );
-  }
 
   const cur = shotSteps[Math.min(stepPos, shotSteps.length - 1)];
   const curStep = run.steps[cur.i];
@@ -394,19 +390,13 @@ function RunDrawer({ run, open, onClose }: Props) {
   const failed = status === 'failed';
   const total = run.steps.length;
 
-  // Progress while in flight. A run reports its steps as it goes, so "step 3 of 8"
-  // is only honest once we have them; before that we know nothing but the elapsed
-  // time, and the drawer says so rather than implying a step count of zero.
+  // ONE treatment for every run in flight (Gabriel 08-11). We do not claim per-step
+  // results while a run is going: step-level reporting is not something we can count
+  // on, so a drawer that showed ticks for one run and skeletons for another would be
+  // promising a fidelity the product may not have. What we know is the step list (it
+  // comes from the test) and the elapsed time. What we don't is any result — so no
+  // "step 3 of 8", no determinate bar, and no per-step spinner.
   const stepsKnown = total > 0;
-  const doneCount = run.steps.filter(
-    (s) =>
-      s.status === 'passed' || s.status === 'failed' || s.status === 'skipped',
-  ).length;
-  const activeIdx = run.steps.findIndex((s) => s.status === 'running');
-  // 1-based position of where the run is, for "step 3 of 8"
-  const atStep =
-    activeIdx >= 0 ? activeIdx + 1 : Math.min(doneCount + 1, total);
-  const pct = stepsKnown ? Math.round((doneCount / total) * 100) : 0;
 
   const ResIcon = RESOLUTION_ICON[run.resolution ?? 'desktop'];
   const consoleErrors = (run.console ?? []).filter(
@@ -437,23 +427,21 @@ function RunDrawer({ run, open, onClose }: Props) {
     });
 
   const renderStep = (step: TestStep, idx: number) => {
-    // While the run is in flight we show whatever the run reports per step, so the
-    // list fills in as it executes. A step the run says nothing about is 'unknown'
-    // and keeps the neutral marker (Gabriel 08-11: a running run must not look
-    // finished, but it must not look empty either).
-    const status = step.status ?? 'unknown';
+    // In flight, every step reads the same regardless of what the run happens to
+    // report: the step is known, its result is not. Forced here rather than left to
+    // the data so no fixture (or backend that reports more than another) can make one
+    // running run look further along than another.
+    const status = inFlight ? 'unknown' : step.status;
     const stepFailed = status === 'failed';
     const skipped = status === 'skipped';
     const pending = status === 'pending';
-    const active = status === 'running';
     const notRun = skipped || pending;
 
     const icon =
       status === 'unknown' ? (
-        /* The step is known, its result is not — so the marker is a skeleton of a
-           result rather than an empty ring, which would read as "did not run"
-           (Gabriel 08-11). It pulses only while the run is actually going: a held
-           run is waiting on the user, not on itself. */
+        /* A skeleton of a result, not an empty ring — the ring reads as "did not
+           run", which is a different statement (Gabriel 08-11). It pulses only while
+           the run is going: a held run waits on the user, not on itself. */
         <span
           className={`block w-[14px] h-[14px] rounded-full bg-gray-light ${
             running ? 'animate-pulse' : ''
@@ -461,8 +449,6 @@ function RunDrawer({ run, open, onClose }: Props) {
         />
       ) : pending ? (
         <span className="block w-[14px] h-[14px] rounded-full border border-gray-light" />
-      ) : active ? (
-        <Loader size={15} className="animate-spin text-indigo" />
       ) : stepFailed ? (
         <XCircle size={15} className="text-red" />
       ) : skipped ? (
@@ -475,9 +461,6 @@ function RunDrawer({ run, open, onClose }: Props) {
       <div
         key={idx}
         className="flex items-start gap-2.5 rounded px-1 -mx-1 py-1.5"
-        // the step in flight gets the faintest indigo wash, so the eye lands on
-        // "where is it now" without a second accent competing with the banner
-        style={active ? { background: 'rgba(97, 95, 255, 0.06)' } : undefined}
       >
         <span className="w-5 h-6 flex items-center justify-center shrink-0">
           {icon}
@@ -486,13 +469,10 @@ function RunDrawer({ run, open, onClose }: Props) {
           <div
             className={`text-[15px] leading-6 break-words ${
               notRun ? 'text-disabled-text' : ''
-            } ${active ? 'font-medium' : ''}`}
+            }`}
           >
             {step.step}
             {skipped && <span className="ml-2 text-xs">({t('skipped')})</span>}
-            {active && (
-              <span className="ml-2 text-xs text-indigo">{t('running…')}</span>
-            )}
           </div>
           {stepFailed && run.error && (
             <div className="mt-1.5 flex flex-col gap-1.5 items-start">
@@ -567,22 +547,7 @@ function RunDrawer({ run, open, onClose }: Props) {
           style={{ color: bannerCfg.color }}
         />
         {inFlight ? (
-          // in flight, the useful sentence is where it has got to — and when the
-          // steps aren't known yet, saying so beats "step 1 of 0"
-          <span>
-            {running ? t('Running') : t('Paused')}
-            {stepsKnown ? (
-              <>
-                {' · '}
-                {t('step')} {atStep} {t('of')} {total}
-              </>
-            ) : (
-              <span className="font-normal text-disabled-text">
-                {' · '}
-                {t('starting up')}
-              </span>
-            )}
-          </span>
+          <span>{running ? t('Running') : t('Paused')}</span>
         ) : failed ? (
           <span>
             {t('Failed at step')} {(run.failedStep ?? 0) + 1} {t('of')} {total}
@@ -593,33 +558,21 @@ function RunDrawer({ run, open, onClose }: Props) {
           </span>
         )}
       </div>
-      {/* Progress rail — 2px, no label, sitting directly under the status strip so it
-          reads as part of it. Determinate once the steps are known; while they aren't,
-          an indeterminate sweep, because a 0% bar reads as "stuck". Held runs keep the
-          bar where it stopped, in the paused tint. */}
+      {/* Activity rail — 2px, no label, sitting directly under the status strip so it
+          reads as part of it. Never a percentage: without per-step results there is no
+          honest fraction to fill, so it says "alive" and nothing more. It pulses while
+          running and holds still while paused. */}
       {inFlight && (
         <div className="h-0.5 bg-gray-light relative overflow-hidden">
-          {stepsKnown ? (
-            <div
-              className="h-full transition-all duration-500"
-              style={{
-                width: `${pct}%`,
-                background: paused
-                  ? 'var(--color-orange-dark)'
-                  : 'var(--color-indigo)',
-              }}
-            />
-          ) : (
-            <div
-              className={`h-full w-full ${running ? 'animate-pulse' : ''}`}
-              style={{
-                background: paused
-                  ? 'var(--color-orange-dark)'
-                  : 'var(--color-indigo)',
-                opacity: 0.45,
-              }}
-            />
-          )}
+          <div
+            className={`h-full w-full ${running ? 'animate-pulse' : ''}`}
+            style={{
+              background: paused
+                ? 'var(--color-orange-dark)'
+                : 'var(--color-indigo)',
+              opacity: 0.45,
+            }}
+          />
         </div>
       )}
       <div className="px-5 py-3 border-b bg-white flex items-center gap-x-4 gap-y-1 flex-wrap text-sm text-disabled-text">
@@ -776,10 +729,12 @@ function RunDrawer({ run, open, onClose }: Props) {
           // which step version this run executed — same chip as the tests table
           <span className="flex items-center gap-1.5">
             {t('Steps')}
+            {/* the count is the test's step count, which is known even in flight —
+                it is the results that aren't, so no "3/8 done" here */}
             {stepsKnown && (
               <>
                 <span className="text-gray-medium font-normal">·</span>
-                {inFlight ? `${doneCount}/${total}` : total}
+                {total}
               </>
             )}
             <VersionLabel version={run.version} always />
