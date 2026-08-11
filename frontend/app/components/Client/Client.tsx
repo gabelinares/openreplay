@@ -7,13 +7,13 @@ import { CLIENT_TABS } from 'App/utils/routeUtils';
 import Modules from 'Components/Client/Modules';
 import SessionsListingSettings from 'Components/Client/SessionsListingSettings';
 
+import AgentsPreferences from './AgentsPreferences';
 import AuditView from './Audit/AuditView';
 import Billing from './Billing/Billing';
-import CustomFields from './CustomFields';
+import CustomFieldsPage from './CustomFields/CustomFieldsPage';
 import ExportedVideosList from './ExportedVideos/ExportedVideosList';
 import Integrations from './Integrations';
 import KaiSettings from './KaiSettings';
-import AgentsPreferences from './AgentsPreferences';
 import Notifications from './Notifications';
 import ProfileSettings from './ProfileSettings';
 import Projects from './Projects';
@@ -43,7 +43,7 @@ class Client extends React.PureComponent<any> {
       case CLIENT_TABS.SITES:
         return <Projects />;
       case CLIENT_TABS.CUSTOM_FIELDS:
-        return <CustomFields />;
+        return <CustomFieldsPage />;
       case CLIENT_TABS.BILLING:
         return <Billing />;
       case CLIENT_TABS.WEBHOOKS:

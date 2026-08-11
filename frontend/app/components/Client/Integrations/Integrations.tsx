@@ -1,15 +1,18 @@
 import withPageTitle from 'HOCs/withPageTitle';
+import { TFunction } from 'i18next';
 import { observer } from 'mobx-react-lite';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useModal } from 'App/components/Modal';
 import { useStore } from 'App/mstore';
+import { mobileScreen } from 'App/utils/isMobile';
 import IntegrationFilters from 'Components/Client/Integrations/IntegrationFilters';
-import { PageTitle } from 'UI';
 
 import DocCard from 'Shared/DocCard/DocCard';
 import SiteDropdown from 'Shared/SiteDropdown';
 
+import PreferencesPage from '../PreferencesPage';
 import DatadogForm from './Backend/DatadogForm/DatadogFormModal';
 import DynatraceFormModal from './Backend/DynatraceForm/DynatraceFormModal';
 import ElasticsearchForm from './Backend/ElasticForm/ElasticFormModal';
@@ -28,9 +31,6 @@ import PiniaDoc from './Tracker/PiniaDoc';
 import ReduxDoc from './Tracker/ReduxDoc';
 import VueDoc from './Tracker/VueDoc';
 import ZustandDoc from './Tracker/ZustandDoc';
-import { TFunction } from 'i18next';
-import { useTranslation } from 'react-i18next';
-import { mobileScreen } from 'App/utils/isMobile';
 
 interface Props {
   siteId: string;
@@ -125,16 +125,17 @@ function Integrations(props: Props) {
 
   return (
     <>
-      <div className="bg-white rounded-lg border shadow-xs p-5 mb-4">
-        <div className="flex gap-2 md:gap-2 mb-2 items-center flex-row">
-          {!hideHeader && <PageTitle title={<div>{t('Integrations')}</div>} />}
-          <SiteDropdown value={siteId} onChange={onChangeSelect} />
-        </div>
-        <IntegrationFilters
-          onChange={onChange}
-          activeItem={activeFilter}
-          filters={filters}
-        />
+      <div className="mb-4">
+        <PreferencesPage
+          title={hideHeader ? null : t('Integrations')}
+          actions={<SiteDropdown value={siteId} onChange={onChangeSelect} />}
+        >
+          <IntegrationFilters
+            onChange={onChange}
+            activeItem={activeFilter}
+            filters={filters}
+          />
+        </PreferencesPage>
       </div>
 
       <div className="mb-4" />
