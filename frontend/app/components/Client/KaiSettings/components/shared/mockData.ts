@@ -1,4 +1,10 @@
-import { ConsoleLog, Environment, NetworkRequest, RunData, TestCase } from './types';
+import {
+  ConsoleLog,
+  Environment,
+  NetworkRequest,
+  RunData,
+  TestCase,
+} from './types';
 
 const HOUR = 3600000;
 const NOW = Date.now();
@@ -640,7 +646,6 @@ export const MOCK_TEST_CASES: TestCase[] = [
   },
 ];
 
-
 // Every finished run carries its network + console capture, PASSED or failed
 // (Mehdi 07-20: the data exists either way — production exposing it only on
 // failures is the backend gap tracked as OR-3634). This factory builds a
@@ -680,7 +685,9 @@ const mkReq = (
       {
         name: 'accept',
         value:
-          type === 'document' ? 'text/html,application/xhtml+xml' : 'application/json',
+          type === 'document'
+            ? 'text/html,application/xhtml+xml'
+            : 'application/json',
       },
       { name: 'user-agent', value: 'OpenReplay-TestAgent/1.0' },
     ],
@@ -716,9 +723,33 @@ const runCapture = (
     },
   ],
   network: [
-    mkReq(60, 'GET', `https://app.example.com${page}`, 'document', 200, 18420, 142),
-    mkReq(210, 'GET', 'https://app.example.com/static/app.css', 'stylesheet', 200, 48210, 88),
-    mkReq(216, 'GET', 'https://app.example.com/static/app.js', 'script', 200, 412600, 240),
+    mkReq(
+      60,
+      'GET',
+      `https://app.example.com${page}`,
+      'document',
+      200,
+      18420,
+      142,
+    ),
+    mkReq(
+      210,
+      'GET',
+      'https://app.example.com/static/app.css',
+      'stylesheet',
+      200,
+      48210,
+      88,
+    ),
+    mkReq(
+      216,
+      'GET',
+      'https://app.example.com/static/app.js',
+      'script',
+      200,
+      412600,
+      240,
+    ),
     ...xhrs.map(([method, path], i) =>
       mkReq(
         600 + i * 420,
@@ -730,7 +761,15 @@ const runCapture = (
         120 + i * 35,
       ),
     ),
-    mkReq(2600, 'GET', 'https://app.example.com/static/logo.svg', 'img', 304, 0, 24),
+    mkReq(
+      2600,
+      'GET',
+      'https://app.example.com/static/logo.svg',
+      'img',
+      304,
+      0,
+      24,
+    ),
   ],
 });
 
@@ -773,7 +812,15 @@ export const MOCK_RUNS: RunData[] = [
         ],
         network: [
           ...cap.network,
-          mkReq(164000, 'GET', 'https://app.example.com/api/billing/entries', 'xhr', 504, 0, 10000),
+          mkReq(
+            164000,
+            'GET',
+            'https://app.example.com/api/billing/entries',
+            'xhr',
+            504,
+            0,
+            10000,
+          ),
         ],
       };
     })(),
@@ -796,9 +843,10 @@ export const MOCK_RUNS: RunData[] = [
       { step: 'Verify the order confirmation page', status: 'pending' },
     ],
   },
-  // A run that has started but not yet reported a single step — the case the drawer
-  // used to render as "Steps · 0" on an otherwise blank panel (Gabriel 08-11). Kept
-  // as its own fixture so the skeleton state is reachable without waiting for one.
+  // A run that has started but reported no results yet. Its steps are still known —
+  // they come from the test, not from the run — so the drawer lists them and leaves
+  // each result unknown (Gabriel 08-11: the steps should not be hidden, it is the
+  // pass/fail circle that isn't known yet).
   {
     key: 'r1b',
     testName: 'Log in to console',
@@ -808,7 +856,12 @@ export const MOCK_RUNS: RunData[] = [
     resolution: 'desktop',
     region: 'paris',
     tags: ['Auth'],
-    steps: [],
+    steps: [
+      { step: 'Open the login page', status: 'unknown' },
+      { step: 'Enter a valid email and password', status: 'unknown' },
+      { step: 'Submit the login form', status: 'unknown' },
+      { step: 'Land on the console dashboard', status: 'unknown' },
+    ],
   },
   // ---- today -----------------------------------------------------------
   {
@@ -910,7 +963,8 @@ export const MOCK_RUNS: RunData[] = [
           { name: 'content-type', value: 'application/json' },
           { name: 'x-request-id', value: 'req_9f2c14ab' },
         ],
-        payload: '{\n  "email": "qa+bot@example.com",\n  "password": "••••••••"\n}',
+        payload:
+          '{\n  "email": "qa+bot@example.com",\n  "password": "••••••••"\n}',
         response:
           '{\n  "error": "internal_error",\n  "message": "Unexpected error while creating session",\n  "requestId": "req_9f2c14ab"\n}',
       },
@@ -986,7 +1040,11 @@ export const MOCK_RUNS: RunData[] = [
       { step: 'Navigate to the cart', status: 'passed', shots: 1 },
       { step: 'Proceed to checkout', status: 'passed', shots: 3 },
       { step: 'Submit the order', status: 'passed', shots: 2 },
-      { step: 'Verify the order confirmation page', status: 'passed', shots: 2 },
+      {
+        step: 'Verify the order confirmation page',
+        status: 'passed',
+        shots: 2,
+      },
     ],
   },
   {

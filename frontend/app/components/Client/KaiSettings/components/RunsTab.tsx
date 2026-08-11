@@ -1,6 +1,6 @@
 import { Button, Segmented, Select, Table, Tooltip, message } from 'antd';
 import type { TableColumnsType } from 'antd';
-import { RotateCw } from 'lucide-react';
+import { Pause, Play, RotateCw } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -137,6 +137,17 @@ function RunsTab() {
   const rerun = (run: RunData) =>
     message.success(`${run.testName} — ${t('rerun started, see Runs')}`);
 
+  // same overlay the drawer writes to, so holding a run from the row and holding it
+  // from its drawer are the same act
+  const pauseRun = (run: RunData) => {
+    kaiStore.setRunStatus(run.key, 'paused');
+    message.success(`${run.testName} — ${t('run paused')}`);
+  };
+  const resumeRun = (run: RunData) => {
+    kaiStore.setRunStatus(run.key, 'running');
+    message.success(`${run.testName} — ${t('run resumed')}`);
+  };
+
   const faded = (n: number) => <CountSuffix n={n} />;
   const statusOptions = [
     {
@@ -267,10 +278,44 @@ function RunsTab() {
       dataIndex: 'actions',
       width: 64,
       align: 'right',
-      // Rerun on FAILED runs only (Mehdi 07-20) — rerunning a pass has no
-      // purpose, the icon was noise on every row
-      render: (_: unknown, run) =>
-        statusOf(run) !== 'failed' ? null : (
+      /* One action per row, in one place: whatever this run's state actually
+         affords. Failed → Rerun (Mehdi 07-20: rerunning a pass has no purpose,
+         the icon was noise on every row). Running → Pause, and paused → Resume,
+         so a run held from here can be let go again from here (Gabriel 08-11);
+         without Resume the list would be a one-way door. Stop stays in the
+         drawer, where there is room for the confirm it needs. */
+      render: (_: unknown, run) => {
+        const s = statusOf(run);
+        if (s === 'running')
+          return (
+            <Tooltip title={t('Pause')}>
+              <Button
+                type="text"
+                icon={<Pause size={16} />}
+                aria-label={t('Pause')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  pauseRun(run);
+                }}
+              />
+            </Tooltip>
+          );
+        if (s === 'paused')
+          return (
+            <Tooltip title={t('Resume')}>
+              <Button
+                type="text"
+                icon={<Play size={16} />}
+                aria-label={t('Resume')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  resumeRun(run);
+                }}
+              />
+            </Tooltip>
+          );
+        if (s !== 'failed') return null;
+        return (
           <Tooltip title={t('Rerun')}>
             <Button
               type="text"
@@ -282,7 +327,8 @@ function RunsTab() {
               }}
             />
           </Tooltip>
-        ),
+        );
+      },
     },
   ];
 
