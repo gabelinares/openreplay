@@ -373,7 +373,7 @@ function NetworkPanel({
         }`}
       >
         {inFlight
-          ? t('No requests yet — network activity appears as the run goes.')
+          ? t('No requests yet. Network activity appears as the run goes.')
           : t('No network activity captured for this run.')}
       </div>
     );

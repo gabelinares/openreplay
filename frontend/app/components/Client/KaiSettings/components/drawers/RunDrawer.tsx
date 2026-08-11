@@ -106,7 +106,7 @@ function ConsoleView({
         // line is "nothing yet" (Gabriel 08-11)
         text={
           inFlight
-            ? t('Nothing logged yet — console output appears as the run goes.')
+            ? t('Nothing logged yet. Console output appears as the run goes.')
             : t('No console output captured for this run.')
         }
       />
@@ -178,7 +178,7 @@ function ScreenshotsView({
         fill={fill}
         text={
           inFlight
-            ? t('No screenshots yet — they appear as each step completes.')
+            ? t('No screenshots yet. They appear as each step completes.')
             : t('No screenshots captured for this run.')
         }
       />
@@ -630,7 +630,7 @@ function RunDrawer({ run, open, onClose }: Props) {
   const passed = status === 'passed';
   const disabledHint = (label: React.ReactNode) =>
     passed ? (
-      <Tooltip title={t('Not captured — this run passed.')}>{label}</Tooltip>
+      <Tooltip title={t('Not captured, this run passed.')}>{label}</Tooltip>
     ) : (
       label
     );
