@@ -1,27 +1,21 @@
-import {
-  Button,
-  Segmented,
-  Select,
-  Table,
-  Tooltip,
-  message,
-} from 'antd';
+import { Button, Segmented, Select, Table, Tooltip, message } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { RotateCw } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import CountSuffix from 'Shared/CountSuffix';
-
 import { formatDateTimeDefault } from 'App/date';
 import { Pagination } from 'UI';
+
+import CountSuffix from 'Shared/CountSuffix';
 
 import RunDrawer from './drawers/RunDrawer';
 import './kai-table.css';
 import { MOCK_RUNS } from './shared/mockData';
-import { kaiStore, useKaiStore } from './shared/store';
+import { kaiStore, runStatusIn, useKaiStore } from './shared/store';
 import { RunData, RunStatus } from './shared/types';
 import {
+  LiveDuration,
   REGION_OPTIONS,
   RESOLUTION_OPTIONS,
   RowTags,
@@ -34,27 +28,10 @@ import {
 type StatusTab = 'all' | RunStatus;
 const RESULT_ORDER: Record<RunStatus, number> = {
   running: 0,
-  failed: 1,
-  passed: 2,
+  paused: 1,
+  failed: 2,
+  passed: 3,
 };
-
-// Live elapsed counter for an in-flight run — ticks each second from its start time.
-function LiveDuration({ start }: { start: number }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const total = Math.max(0, Math.floor((now - start) / 1000));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  const label =
-    h > 0
-      ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-      : `${m}:${String(s).padStart(2, '0')}`;
-  return <span className="text-indigo tabular-nums">{label}</span>;
-}
 
 const ENV_NAMES = Array.from(
   new Set(MOCK_RUNS.map((r) => r.envName).filter(Boolean)),
@@ -66,7 +43,14 @@ const TAG_NAMES = Array.from(
 function RunsTab() {
   const { t } = useTranslation();
   // search input renders in the page's main tab bar (index.tsx); query is shared
-  const { runsQuery: query, runsTestFilter, runsOpenRunKey } = useKaiStore();
+  const {
+    runsQuery: query,
+    runsTestFilter,
+    runsOpenRunKey,
+    runStatus,
+  } = useKaiStore();
+  // a run paused or stopped from its drawer reads that way here too — same overlay
+  const statusOf = (run: RunData): RunStatus => runStatusIn(runStatus, run);
   const [statusTab, setStatusTab] = useState<StatusTab>('all');
   const [envFilter, setEnvFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('all');
@@ -105,9 +89,12 @@ function RunsTab() {
 
   const openRun = MOCK_RUNS.find((r) => r.key === openKey) ?? null;
 
-  const runningCount = MOCK_RUNS.filter((r) => r.status === 'running').length;
-  const failedCount = MOCK_RUNS.filter((r) => r.status === 'failed').length;
-  const passedCount = MOCK_RUNS.filter((r) => r.status === 'passed').length;
+  const countOf = (s: RunStatus) =>
+    MOCK_RUNS.filter((r) => statusOf(r) === s).length;
+  const runningCount = countOf('running');
+  const pausedCount = countOf('paused');
+  const failedCount = countOf('failed');
+  const passedCount = countOf('passed');
 
   const visible = useMemo(() => {
     let arr = MOCK_RUNS;
@@ -115,7 +102,7 @@ function RunsTab() {
       arr = arr.filter((r) =>
         r.testName.toLowerCase().includes(query.toLowerCase()),
       );
-    if (statusTab !== 'all') arr = arr.filter((r) => r.status === statusTab);
+    if (statusTab !== 'all') arr = arr.filter((r) => statusOf(r) === statusTab);
     if (envFilter !== 'all') arr = arr.filter((r) => r.envName === envFilter);
     if (tagFilter !== 'all')
       arr = arr.filter((r) => (r.tags ?? []).includes(tagFilter));
@@ -131,7 +118,17 @@ function RunsTab() {
       arr = arr.filter((r) => r.date >= cutoff);
     }
     return arr;
-  }, [query, statusTab, envFilter, tagFilter, resFilter, regionFilter, period]);
+    // runStatus included: pausing a run has to move it between the status tabs
+  }, [
+    query,
+    statusTab,
+    envFilter,
+    tagFilter,
+    resFilter,
+    regionFilter,
+    period,
+    runStatus,
+  ]);
 
   const pageItems = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const rangeStart = visible.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -160,6 +157,21 @@ function RunsTab() {
         </span>
       ),
     },
+    // only offered once something is actually held — an always-visible "Paused 0"
+    // tab would advertise a state most people never reach
+    ...(pausedCount > 0
+      ? [
+          {
+            value: 'paused',
+            label: (
+              <span>
+                {t('Paused')}
+                {faded(pausedCount)}
+              </span>
+            ),
+          },
+        ]
+      : []),
     {
       value: 'failed',
       label: (
@@ -185,9 +197,9 @@ function RunsTab() {
       title: t('Result'),
       dataIndex: 'status',
       width: 130,
-      sorter: (a, b) => RESULT_ORDER[a.status] - RESULT_ORDER[b.status],
+      sorter: (a, b) => RESULT_ORDER[statusOf(a)] - RESULT_ORDER[statusOf(b)],
       showSorterTooltip: false,
-      render: (status: RunStatus) => getRunResult(status, t),
+      render: (_: unknown, run) => getRunResult(statusOf(run), t),
     },
     {
       title: t('Test'),
@@ -227,8 +239,10 @@ function RunsTab() {
       sorter: (a, b) => (a.duration ?? Infinity) - (b.duration ?? Infinity),
       showSorterTooltip: false,
       render: (_: unknown, run) =>
-        run.status === 'running' ? (
+        statusOf(run) === 'running' ? (
           <LiveDuration start={run.date} />
+        ) : statusOf(run) === 'paused' ? (
+          <LiveDuration start={run.date} frozen />
         ) : (
           <span className="text-disabled-text">
             {run.duration ? formatDuration(run.duration) : '—'}
@@ -256,7 +270,7 @@ function RunsTab() {
       // Rerun on FAILED runs only (Mehdi 07-20) — rerunning a pass has no
       // purpose, the icon was noise on every row
       render: (_: unknown, run) =>
-        run.status !== 'failed' ? null : (
+        statusOf(run) !== 'failed' ? null : (
           <Tooltip title={t('Rerun')}>
             <Button
               type="text"
