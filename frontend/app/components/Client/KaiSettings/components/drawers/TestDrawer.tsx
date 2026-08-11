@@ -26,7 +26,7 @@ import {
   testVersion,
 } from '../shared/revisions';
 import { hasNoEnvironment, useKaiStore } from '../shared/store';
-import { RunData, TestCase } from '../shared/types';
+import { RunData, TestCase, isRunFinished } from '../shared/types';
 import {
   VersionLabel,
   formatDuration,
@@ -300,9 +300,10 @@ function TestDrawer({
       r.testName === test.title &&
       (viewVersion == null || (r.version ?? 1) === viewVersion),
   );
-  // trend: the last 10 completed runs, oldest → newest (newest on the right)
+  // trend: the last 10 completed runs, oldest → newest (newest on the right).
+  // "completed" excludes a held run as well as a running one — neither has a result
   const trend = runs
-    .filter((r) => r.status !== 'running')
+    .filter((r) => isRunFinished(r.status))
     .sort((a, b) => a.date - b.date)
     .slice(-10);
   const settings: RunSettings = {

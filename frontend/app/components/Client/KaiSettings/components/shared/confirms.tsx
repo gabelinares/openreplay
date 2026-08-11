@@ -83,5 +83,28 @@ export function useConfirms() {
       onOk,
     });
 
-  return { confirmDismissSuggestion, confirmDelete, confirmDiscard };
+  // stopping an in-flight run — same family: it throws away work in progress, so it
+  // asks, names the test, and says what survives (Gabriel 08-11)
+  const confirmStopRun = (opts: { name: string; onOk: () => void }) =>
+    modal.confirm({
+      ...LOOK,
+      title: t('Stop this run?'),
+      content: body(
+        t(
+          '“{{name}}” will stop where it is. The steps it already ran are kept, and the rest are not executed.',
+          { name: opts.name },
+        ),
+      ),
+      okText: t('Stop run'),
+      okButtonProps: { danger: true },
+      cancelText: t('Keep running'),
+      onOk: opts.onOk,
+    });
+
+  return {
+    confirmDismissSuggestion,
+    confirmDelete,
+    confirmDiscard,
+    confirmStopRun,
+  };
 }
