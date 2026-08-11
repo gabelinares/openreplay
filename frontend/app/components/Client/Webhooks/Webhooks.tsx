@@ -1,16 +1,20 @@
-import React, { useEffect } from 'react';
-import { Loader, NoContent, Icon } from 'UI';
-import AnimatedSVG, { ICONS } from 'Shared/AnimatedSVG/AnimatedSVG';
-import { toast } from 'react-toastify';
-import { useStore } from 'App/mstore';
-import { observer } from 'mobx-react-lite';
-import { IWebhook } from 'Types/webhook';
-import { App, List, Button, Typography, Space } from 'antd';
-import { PencilIcon } from 'lucide-react';
 import usePageTitle from '@/hooks/usePageTitle';
-import { useModal } from 'Components/ModalContext';
-import WebhookForm from './WebhookForm';
+import { IWebhook } from 'Types/webhook';
+import { App, Button, List, Space, Typography } from 'antd';
+import { PencilIcon } from 'lucide-react';
+import { observer } from 'mobx-react-lite';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'react-toastify';
+
+import { useStore } from 'App/mstore';
+import { useModal } from 'Components/ModalContext';
+import { Loader, NoContent } from 'UI';
+
+import AnimatedSVG, { ICONS } from 'Shared/AnimatedSVG/AnimatedSVG';
+
+import PreferencesPage from '../PreferencesPage';
+import WebhookForm from './WebhookForm';
 
 function Webhooks() {
   const { t } = useTranslation();
@@ -46,26 +50,17 @@ function Webhooks() {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-xs border p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <Typography.Title level={4} style={{ marginBottom: 0 }}>
-            {t('Webhooks')}
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            <Space>
-              <Icon name="info-circle-fill" size={16} />
-              {t(
-                'Leverage webhook notifications on alerts to trigger custom callbacks.',
-              )}
-            </Space>
-          </Typography.Text>
-        </div>
+    <PreferencesPage
+      title={t('Webhooks')}
+      info={t(
+        'Leverage webhook notifications on alerts to trigger custom callbacks.',
+      )}
+      actions={
         <Button type="primary" onClick={() => init()}>
           {t('Add Webhook')}
         </Button>
-      </div>
-
+      }
+    >
       <Loader loading={loading}>
         <NoContent
           title={
@@ -85,7 +80,10 @@ function Webhooks() {
                 onClick={() => init(w)}
                 className="p-2! group flex justify-between items-center cursor-pointer hover:bg-active-blue transition"
               >
-                <Space direction="vertical" className="overflow-hidden! w-full!">
+                <Space
+                  direction="vertical"
+                  className="overflow-hidden! w-full!"
+                >
                   <Typography.Text style={{ textTransform: 'capitalize' }}>
                     {w.name}
                   </Typography.Text>
@@ -112,7 +110,7 @@ function Webhooks() {
           />
         </NoContent>
       </Loader>
-    </div>
+    </PreferencesPage>
   );
 }
 
