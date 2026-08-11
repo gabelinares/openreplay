@@ -78,7 +78,9 @@ export function ImpactGauge({ value }: { value: number }) {
         borderRadius: 2,
         overflow: 'hidden',
         gap: 1,
-        background: '#fff',
+        // the gaps between segments show this through, so it is the page's own
+        // white token, which the theme flips to near-black in dark mode
+        background: 'var(--color-white)',
       }}
     >
       {[0, 1, 2].map((i) => (

@@ -11,6 +11,7 @@ import {
   User,
   Search,
   Play,
+  Tags,
 } from 'lucide-react';
 import {
   MoreOutlined,
@@ -47,6 +48,7 @@ import { useStore } from 'App/mstore';
 import { useHistory, useParams } from 'App/routing';
 
 import CriticalDialog from './CriticalDialog';
+import MoreCount from './MoreCount';
 import {
   withSiteId,
   issues as issuesRoute,
@@ -57,7 +59,7 @@ import { CountryFlag, EscapeButton, Icon } from 'UI';
 import { countries } from 'App/constants';
 import { browserIcon, osIcon, deviceTypeIcon } from 'App/iconNames';
 import SessionInfoItem from 'Components/Session_/SessionInfoItem';
-import MetaItem from 'Shared/SessionItem/MetaItem';
+import TagsRow from './TagsRow';
 import {
   CAT_ICON,
   impactLevel,
@@ -741,8 +743,8 @@ function IssueSessionPlayer() {
   // conditions over the shared pool
   const sessionSegs = issuesStore.sessionSegments(sessionId ?? '');
 
-  // user metadata — customer-defined, can be many; shown as wrapping pills in
-  // the header "More" popover (hidden by default), compact enough for dozens.
+  // user metadata — customer-defined, can be many; shown as one folding row of
+  // key/value pills in the header "More" popover (hidden by default).
   const metaList = sess?.metadata
     ? Object.entries(sess.metadata).map(([label, value]) => ({ label, value }))
     : card?.plan
@@ -889,23 +891,34 @@ function IssueSessionPlayer() {
         value="1440 × 900"
         isLast={metaList.length === 0}
       />
-      {/* User metadata — customer-defined, can be many (Mehdi: up to 10/15+).
-          Hidden behind "More", rendered as wrapping pills so dozens stay
-          compact instead of a tall one-row-per-field list. */}
+      {/* User metadata — customer-defined, can be many (Mehdi: up to 10/15+), so
+          it is ONE more row in this list rather than a block with its own grammar
+          below it. The split two-tone MetaItem pill was the only tag on the page
+          that read as two chips glued together; these are single-tone, the key
+          quiet and the value dark, and the row folds its overflow behind "+N"
+          instead of wrapping into a ragged block (Gabriel 08-11, OR-3665). */}
       {metaList.length > 0 && (
-        <div className="pt-3" style={{ maxWidth: 320 }}>
-          <div
-            className="px-2 pb-2 text-xs font-semibold uppercase color-gray-medium"
-            style={{ letterSpacing: '0.05em' }}
-          >
-            Metadata
-          </div>
-          <div className="px-2 flex flex-wrap gap-1">
-            {metaList.map((m) => (
-              <MetaItem key={m.label} label={m.label} value={m.value} />
-            ))}
-          </div>
-        </div>
+        <SessionInfoItem
+          comp={
+            <Tags size={16} strokeWidth={2} style={{ color: 'var(--color-gray-medium)' }} />
+          }
+          label="Metadata"
+          isLast
+          value={
+            // A fixed cell so the row can measure and fold — left to grow, six
+            // pills would drag the popover off the screen. 280 rather than 200 so
+            // two average pairs usually fit before the "+N" (Gabriel 08-11).
+            //
+            // color-gray-darkest resets what this cell would otherwise impose:
+            // SessionInfoItem's value column is gray-medium (#888) and MetaItem's
+            // key takes its colour by inheritance, so the identical component came
+            // out washed here and dark (#333) in the sessions list. Reusing a
+            // component means not restyling it through its container either.
+            <div className="color-gray-darkest" style={{ width: 280 }}>
+              <TagsRow tags={metaList} />
+            </div>
+          }
+        />
       )}
     </div>
   );
@@ -1280,19 +1293,10 @@ function IssueSessionPlayer() {
                         Segments:
                       </span>
                       <SegmentChip name={sessionSegs[0].name} />
-                      {sessionSegs.length > 1 && (
-                        <Tooltip
-                          title={sessionSegs.slice(1).map((s) => s.name).join(', ')}
-                          placement="top"
-                        >
-                          <span
-                            className="text-xs shrink-0 cursor-default"
-                            style={{ color: 'var(--color-gray-medium)' }}
-                          >
-                            +{sessionSegs.length - 1}
-                          </span>
-                        </Tooltip>
-                      )}
+                      <MoreCount
+                        n={sessionSegs.length - 1}
+                        titles={sessionSegs.slice(1).map((s) => s.name)}
+                      />
                     </div>
                   )}
                 </div>
