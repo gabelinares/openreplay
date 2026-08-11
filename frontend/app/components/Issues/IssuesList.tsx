@@ -45,6 +45,7 @@ import Period, { LAST_24_HOURS } from 'Types/app/period';
 import { Pagination } from 'UI';
 import CountSuffix from 'Shared/CountSuffix';
 import CriticalDialog from './CriticalDialog';
+import MoreCount from './MoreCount';
 import NotCriticalDialog from './NotCriticalDialog';
 import TagFilter, { CheckRow, SegmentFilter } from './TagFilter';
 import SegmentsIndicator from './segments/SegmentsIndicator';
@@ -256,11 +257,7 @@ function IssuesList() {
               </span>
             </Tooltip>
             {visible.map((t) => <RowTagChip key={t} label={t} />)}
-            {hidden.length > 0 && (
-              <Tooltip title={hidden.join(', ')} placement="top">
-                <span className="text-xs shrink-0 cursor-default" style={{ color: 'var(--color-gray-medium)' }}>+{hidden.length}</span>
-              </Tooltip>
-            )}
+            <MoreCount n={hidden.length} titles={hidden} />
           </div>
         );
       },
