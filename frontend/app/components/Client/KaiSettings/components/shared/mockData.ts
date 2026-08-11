@@ -798,6 +798,20 @@ export const MOCK_RUNS: RunData[] = [
       { step: 'Verify the order confirmation page', status: 'pending' },
     ],
   },
+  // A run that has started but not yet reported a single step — the case the drawer
+  // used to render as "Steps · 0" on an otherwise blank panel (Gabriel 08-11). Kept
+  // as its own fixture so the skeleton state is reachable without waiting for one.
+  {
+    key: 'r1b',
+    testName: 'Log in to console',
+    date: ago(0.01),
+    status: 'running',
+    envName: 'Production',
+    resolution: 'desktop',
+    region: 'paris',
+    tags: ['Auth'],
+    steps: [],
+  },
   // ---- today -----------------------------------------------------------
   {
     key: 'r2',

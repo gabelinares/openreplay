@@ -4,14 +4,23 @@
 // steps — `approved` is the state in between.
 export type TestLifecycle = 'draft' | 'approved' | 'active' | 'paused';
 export type RunResult = 'passed' | 'failed';
-// A run can still be in flight, hence `running`.
-export type RunStatus = 'running' | 'passed' | 'failed';
+// A run can still be in flight, hence `running` — and an in-flight run can be held
+// mid-execution, hence `paused` (Gabriel 08-11: production offers no way to stop a
+// run once it has started). `paused` is a run state, distinct from a test's `paused`
+// lifecycle: the test stays scheduled, this one execution is holding.
+export type RunStatus = 'running' | 'paused' | 'passed' | 'failed';
+/** Neither running nor held — the run is over and its results are final. */
+export const isRunFinished = (s: RunStatus) => s === 'passed' || s === 'failed';
 export type StepStatus =
   | 'passed'
   | 'failed'
   | 'skipped'
   | 'running'
-  | 'pending';
+  | 'pending'
+  // the run has not said anything about this step yet — a running run reports as it
+  // goes, so the drawer has to render "not known" as its own thing rather than
+  // guessing at pending
+  | 'unknown';
 
 export interface HttpHeader {
   name: string;
