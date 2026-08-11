@@ -17,6 +17,9 @@ module.exports = {
   'tealx-light-border': '#C6DCDA',
   'tealx-lightest': 'rgba(62, 170, 175, 0.1)',
   orange: '#E28940',
+  /* warning surface. translucent on purpose, like tealx-lightest: it sits
+     correctly on a light or a dark page with no dark-mode override. */
+  'orange-lightest': 'rgba(226, 137, 64, 0.1)',
   yellow: '#FFFBE5',
   yellow2: '#F5A623',
   'orange-dark': '#C26822',
@@ -77,6 +80,8 @@ module.exports = {
     white: 'rgb(23, 23, 23)',
     black: '#fff',
     teal: 'rgb(81, 162, 255)',
+    /* orange-dark (#C26822) is unreadable on a dark surface */
+    'orange-dark': '#EFA765',
     main: 'rgb(81, 162, 255)',
     'text-primary': 'rgb(245, 245, 245)',
     'text-disabled': 'rgba(255, 255, 255, 0.38)',

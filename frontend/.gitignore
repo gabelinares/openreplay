@@ -24,3 +24,8 @@ cypress/videos/
 coverage
 dist
 .parcel-cache/
+.vercel
+.claude
+
+# design-hook caches
+**/.impeccable/
