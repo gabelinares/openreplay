@@ -1,12 +1,4 @@
-import {
-  Button,
-  Modal,
-  Segmented,
-  Select,
-  Skeleton,
-  Tooltip,
-  message,
-} from 'antd';
+import { Button, Modal, Segmented, Select, Tooltip, message } from 'antd';
 import {
   CheckCircle2,
   ChevronLeft,
@@ -64,6 +56,23 @@ interface Props {
 const hasShot = (s: TestStep) => s.status === 'passed' || s.status === 'failed';
 
 const isNetError = (r: NetworkRequest) => r.status === 0 || r.status >= 400;
+
+/** The quiet mark for "an image belongs here": a muted outline glyph and a caption,
+ *  the same grammar as the Environments empty state (production review 07-15 ruled
+ *  the ghost illustration off-brand). Small and gray-medium on purpose — it stands in
+ *  for a screenshot, so it must not compete with one (Gabriel 08-11). */
+function ShotPlaceholder({ caption }: { caption: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <Images
+        size={22}
+        strokeWidth={1.5}
+        style={{ color: 'var(--color-gray-medium)', opacity: 0.7 }}
+      />
+      <span className="text-xs text-disabled-text">{caption}</span>
+    </div>
+  );
+}
 
 function DevEmpty({ text, fill }: { text: string; fill?: boolean }) {
   return (
@@ -169,10 +178,9 @@ function ScreenshotsView({
           }`}
           style={fill ? undefined : { aspectRatio: '16 / 10' }}
         >
-          <Skeleton.Image active style={{ width: 88, height: 60 }} />
-          <span className="text-sm">
-            {t('Screenshots appear as each step completes.')}
-          </span>
+          <ShotPlaceholder
+            caption={t('Screenshots appear as each step completes.')}
+          />
         </div>
       );
     return (
@@ -243,14 +251,13 @@ function ScreenshotsView({
             <XCircle size={12} /> {t('Failed')}
           </span>
         )}
-        <div className="flex flex-col items-center gap-1 text-disabled-text">
-          <ImageIcon size={36} />
-          <span className="text-xs">
-            {failed
+        <ShotPlaceholder
+          caption={
+            failed
               ? t('Screenshot at failure')
-              : `${t('Step')} ${cur.i + 1} · ${t('screenshot')} ${safeShot + 1}`}
-          </span>
-        </div>
+              : `${t('Step')} ${cur.i + 1} · ${t('screenshot')} ${safeShot + 1}`
+          }
+        />
         {/* explicit image counter, bottom-right — clearly about screenshots, not steps */}
         <span
           className="absolute bottom-2 right-2 text-xs font-medium rounded px-1.5 py-0.5 bg-white/90 border text-gray-dark"
@@ -442,7 +449,17 @@ function RunDrawer({ run, open, onClose }: Props) {
     const notRun = skipped || pending;
 
     const icon =
-      status === 'unknown' || pending ? (
+      status === 'unknown' ? (
+        /* The step is known, its result is not — so the marker is a skeleton of a
+           result rather than an empty ring, which would read as "did not run"
+           (Gabriel 08-11). It pulses only while the run is actually going: a held
+           run is waiting on the user, not on itself. */
+        <span
+          className={`block w-[14px] h-[14px] rounded-full bg-gray-light ${
+            running ? 'animate-pulse' : ''
+          }`}
+        />
+      ) : pending ? (
         <span className="block w-[14px] h-[14px] rounded-full border border-gray-light" />
       ) : active ? (
         <Loader size={15} className="animate-spin text-indigo" />
@@ -773,31 +790,10 @@ function RunDrawer({ run, open, onClose }: Props) {
         <div className="flex flex-col max-h-[50vh] overflow-y-auto overscroll-contain pr-1">
           {stepsKnown ? (
             run.steps.map((step, idx) => renderStep(step, idx))
-          ) : inFlight ? (
-            /* The run has started but has not reported its steps yet. Skeletons in
-               the shape of step rows say "these are coming", where "Steps · 0" said
-               the run had none (Gabriel 08-11). */
-            <div className="flex flex-col gap-1 py-1">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="flex items-start gap-2.5 py-1.5">
-                  <span className="w-5 h-6 flex items-center justify-center shrink-0">
-                    <span className="block w-[14px] h-[14px] rounded-full border border-gray-light" />
-                  </span>
-                  <Skeleton
-                    active={running}
-                    paragraph={false}
-                    title={{ width: ['70%', '55%', '62%'][i] }}
-                    className="flex-1"
-                  />
-                </div>
-              ))}
-              <span className="text-sm text-disabled-text pl-[30px] pt-1">
-                {running
-                  ? t('Waiting for the first step to report…')
-                  : t('Paused before the first step reported.')}
-              </span>
-            </div>
           ) : (
+            /* Only reached when the run truly carries no steps. A run in flight does
+               not land here: its steps come from the test, so they are listed with
+               skeleton result markers instead (Gabriel 08-11). */
             <DevEmpty text={t('This run recorded no steps.')} />
           )}
         </div>
