@@ -5,6 +5,8 @@ import React from 'react';
 import { useStore } from 'App/mstore';
 import type { Issue } from 'App/mstore/issuesStore';
 
+import MoreCount from '../MoreCount';
+
 /* Issue-page segment scope (Mehdi 07-20, design approved by Gabriel 07-21).
 
    · FoundInChips — the header meta line: which segments this issue lives in
@@ -114,16 +116,7 @@ export const FoundInChips = observer(function FoundInChips({
           onClick={() => toggle(segment.id)}
         />
       ))}
-      {hiddenCount > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowAll(true)}
-          className="text-xs cursor-pointer"
-          style={{ color: 'var(--color-gray-medium)' }}
-        >
-          +{hiddenCount}
-        </button>
-      )}
+      <MoreCount n={hiddenCount} onClick={() => setShowAll(true)} />
     </div>
   );
 });
