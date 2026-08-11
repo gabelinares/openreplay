@@ -147,6 +147,9 @@ export interface TestCase {
   // step versioning — steps carry a version (default 1); saved snapshots of older
   // versions live in `history`, and a detected flow change sits in `pendingRevision`
   // until the user reviews it (accept/discard/edit per change → save as vN).
+  /** runner-owned, read-only: running this test changes real data (orders,
+   *  accounts, payments). Drives the ⚠ in the table and the drawer banner. */
+  hasSideEffects?: boolean;
   version?: number;
   history?: TestVersion[];
   pendingRevision?: PendingRevision;

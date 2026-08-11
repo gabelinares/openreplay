@@ -121,6 +121,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
     key: 'tc-coupon',
     createdAt: daysAgo(9),
     title: 'Apply coupon at checkout',
+    hasSideEffects: true,
     status: 'draft',
     isNew: true,
     steps: [
@@ -134,6 +135,7 @@ export const MOCK_TEST_CASES: TestCase[] = [
     key: 'tc-invite',
     createdAt: daysAgo(13),
     title: 'Add a team member',
+    hasSideEffects: true,
     status: 'draft',
     steps: [
       'Open team settings',
@@ -835,12 +837,14 @@ export const MOCK_RUNS: RunData[] = [
     resolution: 'desktop',
     region: 'paris',
     tags: ['Checkout'],
+    // in flight, so no step carries a result yet — the drawer renders every running
+    // run the same way and does not claim per-step progress (Gabriel 08-11)
     steps: [
-      { step: 'Add a sample product to the cart', status: 'passed' },
-      { step: 'Navigate to the cart', status: 'passed' },
-      { step: 'Proceed to checkout', status: 'running' },
-      { step: 'Submit the order', status: 'pending' },
-      { step: 'Verify the order confirmation page', status: 'pending' },
+      { step: 'Add a sample product to the cart', status: 'unknown' },
+      { step: 'Navigate to the cart', status: 'unknown' },
+      { step: 'Proceed to checkout', status: 'unknown' },
+      { step: 'Submit the order', status: 'unknown' },
+      { step: 'Verify the order confirmation page', status: 'unknown' },
     ],
   },
   // A run that has started but reported no results yet. Its steps are still known —
