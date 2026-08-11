@@ -1,12 +1,15 @@
-import React from 'react';
-import { Icon } from 'UI';
 import cn from 'classnames';
+import React from 'react';
+
+import { Icon } from 'UI';
 
 interface Props {
   label: string;
   icon?: string;
   comp?: React.ReactNode;
-  value: string;
+  /** a node, not just text, so a row can hold chips — the session panel's Metadata
+   *  row is one of these rows rather than a block of its own (OR-3665) */
+  value: React.ReactNode;
   isLast?: boolean;
 }
 export default function SessionInfoItem(props: Props) {
