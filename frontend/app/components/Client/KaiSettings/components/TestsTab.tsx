@@ -11,6 +11,7 @@ import {
   message,
 } from 'antd';
 import type { TableColumnsType } from 'antd';
+import SideEffectsIcon from './shared/SideEffectsIcon';
 import {
   Calendar,
   EllipsisVertical,
@@ -18,7 +19,6 @@ import {
   Play,
   Plus,
   Radar,
-  TriangleAlert,
 } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -563,7 +563,7 @@ function TestsTab() {
           {tc.hasSideEffects && (
             <Tooltip title="Has side effects. Running this test changes real data: orders, accounts, payments.">
               <span className="shrink-0 flex items-center text-orange-dark">
-                <TriangleAlert size={14} />
+                <SideEffectsIcon size={14} />
               </span>
             </Tooltip>
           )}

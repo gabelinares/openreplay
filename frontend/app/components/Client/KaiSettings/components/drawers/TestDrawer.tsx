@@ -9,9 +9,9 @@ import {
   Pause,
   Play,
   Trash2,
-  TriangleAlert,
   XCircle,
 } from 'lucide-react';
+import SideEffectsIcon from '../shared/SideEffectsIcon';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -496,7 +496,9 @@ function TestDrawer({
           style, so `.dark` can reach them. */}
       {sideEffects && (
         <div className="flex items-start gap-2 mb-4 px-3 py-2 rounded text-sm bg-orange-lightest text-orange-dark">
-          <TriangleAlert size={16} className="shrink-0 mt-0.5" />
+          <span className="shrink-0 mt-0.5">
+            <SideEffectsIcon size={16} />
+          </span>
           <span>
             {mergeHasSideEffects
               ? t(
