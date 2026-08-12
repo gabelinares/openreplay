@@ -41,6 +41,7 @@ export const enum PREFERENCES_MENU {
 
 export const enum MENU {
   SESSIONS = 'sessions',
+  ISSUES = 'issues',
   RECOMMENDATIONS = 'recommendations',
   VAULT = 'vault',
   BOOKMARKS = 'bookmarks',
@@ -56,6 +57,7 @@ export const enum MENU {
   EXIT = 'exit',
   SPOTS = 'spots',
   KAI = 'kai',
+  AGENTS = 'agents',
   ACTIVITY = 'activity',
   USER = 'user-page',
   USERS = 'data-users',
@@ -94,6 +96,22 @@ export const categories: (t: TFunction) => Category[] = (t) => [
         label: t('Highlights'),
         key: MENU.HIGHLIGHTS,
         icon: 'chat-square-quote',
+      },
+    ],
+  },
+  {
+    title: t('Agents'),
+    key: 'agents',
+    items: [
+      {
+        label: t('Agents'),
+        key: MENU.AGENTS,
+        icon: 'scan-pulse',
+        tag: {
+          label: t('New'),
+          color: '#394DFE',
+        },
+        children: [{ label: t('Issues'), key: MENU.ISSUES }],
       },
     ],
   },
