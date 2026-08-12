@@ -7,7 +7,6 @@ import {
   type Issue,
   type CategoryName,
   CAT_ICON,
-  CRITICAL_REASONS,
   impactLevel,
   IMPACT_FILLED,
   IMPACT_COLOR,

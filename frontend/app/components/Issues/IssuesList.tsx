@@ -35,7 +35,6 @@ import {
   CAT_ORDER,
   CAT_ICON,
   HIDE_REASONS,
-  CRITICAL_REASONS,
   impactLevel,
   lastSeenLabel,
   lastSeenExact,
@@ -46,7 +45,6 @@ import { Pagination } from 'UI';
 import CountSuffix from 'Shared/CountSuffix';
 import CriticalDialog from './CriticalDialog';
 import MoreCount from './MoreCount';
-import NotCriticalDialog from './NotCriticalDialog';
 import TagFilter, { CheckRow, SegmentFilter } from './TagFilter';
 import SegmentsIndicator from './segments/SegmentsIndicator';
 import { ImpactGauge, ReasonChip } from './ProblemCard';
@@ -81,7 +79,6 @@ function IssuesList() {
   const [hideReason, setHideReason] = React.useState('');
   const [hideTags, setHideTags] = React.useState<string[]>([]);
   const [critDialog, setCritDialog] = React.useState<Issue | null>(null);
-  const [critTarget, setCritTarget] = React.useState<Issue | null>(null);
   const [renameTarget, setRenameTarget] = React.useState<Issue | null>(null);
   const [renameValue, setRenameValue] = React.useState('');
   const [page, setPage] = React.useState(1);
@@ -298,7 +295,10 @@ function IssuesList() {
                   setRenameTarget(r);
                   setRenameValue(r.head);
                 } else if (key === 'notCritical') {
-                  setCritTarget(r);
+                  // immediate, like the critical dialog's own footer action —
+                  // no reason asked, it isn't fed to the LLM today (Mehdi
+                  // 08-12, OR-3679), and the menu offers the way back
+                  issuesStore.setNotCriticalForMe(r.id);
                 } else if (key === 'restoreCritical') {
                   issuesStore.restoreCritical(r.id);
                 } else if (key === 'hide') {
@@ -309,9 +309,9 @@ function IssuesList() {
               },
               items: [
                 { key: 'rename', icon: <Pencil size={14} />, label: 'Rename' },
-                // per-user now (Gabriel 07-30): my not-critical suppresses the
-                // flag for me and teaches the agent, it does not overrule the
-                // teammate whose description matched
+                // per-user (Gabriel 07-30): my not-critical suppresses the
+                // flag for me, it does not overrule the teammate whose
+                // description matched
                 ...(isCritical
                   ? [
                       {
@@ -590,9 +590,6 @@ function IssuesList() {
         issueHead={critDialog?.head ?? ''}
         onClose={() => setCritDialog(null)}
       />
-
-      {/* the shared not-critical dialog — the detail page opens the same one */}
-      <NotCriticalDialog issue={critTarget} onClose={() => setCritTarget(null)} />
     </div>
   );
 }

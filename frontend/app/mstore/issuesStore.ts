@@ -101,15 +101,6 @@ export type CriticalRule = {
   mine: boolean;
 };
 
-/* Reason chips offered when saying an issue is not critical for me (shared by
-   the list + detail pages). */
-export const CRITICAL_REASONS = [
-  'Not actually critical',
-  'Already resolved',
-  'Acceptable risk',
-  'Low user impact',
-];
-
 /* Canned journey descriptions offered as autocomplete suggestions in the NL
    journey search on the issue detail page. Phrased from the same vocabulary as
    the mock session journeys below so they read like real, findable journeys. */
@@ -645,9 +636,11 @@ export default class IssuesStore {
          `criticalBy: [{ definitionId, userId }]`. The UI needs the attribution
          to say WHY a row is critical and to filter "critical to me" by whose
          description matched — it cannot be recomputed on the client.
-       · `POST /issues/:id/not-critical { reason }` — PER-USER suppression plus
-         the reason as agent feedback (Gabriel 07-30: my not-critical never
-         changes a teammate's view; the old copy said "for anyone").
+       · `POST /issues/:id/not-critical` — PER-USER suppression, no reason
+         attached (Mehdi 08-12, OR-3679: the feedback is not fed to the LLM
+         today, so asking for one was ceremony). It never changes a teammate's
+         view, and it survives a teammate marking the same issue critical —
+         the backend keeps both (Mehdi's answer on OR-3679, point 5).
        · NOT needed: any per-issue "pin this one for me" table. The triangle
          authors a description instead (Gabriel 07-30), which is the tradeoff
          Mehdi took to avoid delaying the release.
@@ -690,8 +683,8 @@ export default class IssuesStore {
     3: [1], // expiry rejected → my payment description
     4: [3], // 8s checkout → Mehdi's slow-page description
   };
-  /** my own "not critical", with the reason that teaches the agent */
-  notCritical: Record<number, string> = {};
+  /** my own "not critical" — a per-user suppression flag, nothing more */
+  notCritical: Record<number, true> = {};
   /** Display filter: issues my own descriptions flagged ∪ issues surfaced by
       segments I own */
   relevantToMe = false;
@@ -1029,14 +1022,14 @@ export default class IssuesStore {
     }).length;
   }
 
-  /** MY not-critical: suppresses the flag for me only, and the reason is
-      feedback for the agent (Gabriel 07-30). */
-  setNotCriticalForMe = (id: number, reason: string) => {
+  /** MY not-critical: suppresses the flag for me only. No reason is asked —
+      it isn't fed to the LLM today (Mehdi 08-12, OR-3679). */
+  setNotCriticalForMe = (id: number) => {
     // replace, never mutate a key: MobX does not track keys ADDED to a plain
     // observable object, so `notCritical[id] = x` updated the data without
     // waking the rows that read it (Gabriel 07-31 caught the row menu not
     // offering the way back). Same pattern as customTags/criticalRules above.
-    this.notCritical = { ...this.notCritical, [id]: reason };
+    this.notCritical = { ...this.notCritical, [id]: true };
   };
 
   restoreCritical = (id: number) => {
