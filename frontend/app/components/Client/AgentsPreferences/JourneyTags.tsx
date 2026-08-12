@@ -11,6 +11,7 @@ import TagDialog from 'Components/Issues/TagDialog';
 import CountSuffix from 'Shared/CountSuffix';
 
 import { useConfirms } from '../KaiSettings/components/shared/confirms';
+import './manager-card.css';
 
 /* The journey-tag manager.
 
@@ -140,13 +141,15 @@ function JourneyTags() {
     },
   ];
 
-  // the Issues list's category-switcher grammar: Segmented + a faded count
+  // the Issues list's category-switcher grammar: Segmented + a faded count.
+  // Named the way Data Management > Properties names the same split —
+  // "OpenReplay Properties" / "Your Properties" (Gabriel 08-12).
   const sourceOptions = [
     {
       value: 'openreplay',
       label: (
         <span>
-          {t('By OpenReplay')}
+          {t('OpenReplay Tags')}
           <CountSuffix n={issuesStore.predefinedTags.length} />
         </span>
       ),
@@ -155,7 +158,7 @@ function JourneyTags() {
       value: 'yours',
       label: (
         <span>
-          {t('Mine')}
+          {t('Your Tags')}
           <CountSuffix n={issuesStore.customTags.length} />
         </span>
       ),
@@ -181,7 +184,7 @@ function JourneyTags() {
   );
 
   return (
-    <div className="flex flex-col rounded-lg border bg-white">
+    <div className="agents-manager-card flex flex-col rounded-lg border bg-white">
       {/* source switcher + controls on one bar — the Issues list's controls row
           (px-4 py-3, Segmented left, controls right) */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap">

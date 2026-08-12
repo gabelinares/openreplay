@@ -11,6 +11,7 @@ import { CriticalRuleFields } from 'Components/Issues/CriticalDialog';
 import CountSuffix from 'Shared/CountSuffix';
 
 import { useConfirms } from '../KaiSettings/components/shared/confirms';
+import './manager-card.css';
 
 /* "What's critical" — the centralized list Mehdi asked for on 07-28: one
    description per line, each showing who wrote it, because the engine passes
@@ -157,7 +158,7 @@ function CriticalRules() {
   ];
 
   return (
-    <div className="flex flex-col rounded-lg border bg-white">
+    <div className="agents-manager-card flex flex-col rounded-lg border bg-white">
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap">
         <Segmented
           size="small"
@@ -166,12 +167,14 @@ function CriticalRules() {
             setScope(v as Scope);
             setQ('');
           }}
+          // named after the Dashboards list's own mine-vs-everyone's split,
+          // its Team/Private toggle (Gabriel 08-12)
           options={[
             {
               value: 'all',
               label: (
                 <span>
-                  {t('Everyone')}
+                  {t('Team')}
                   <CountSuffix n={all.length} />
                 </span>
               ),
@@ -180,7 +183,7 @@ function CriticalRules() {
               value: 'mine',
               label: (
                 <span>
-                  {t('Mine')}
+                  {t('Private')}
                   <CountSuffix n={all.filter((r) => r.mine).length} />
                 </span>
               ),
