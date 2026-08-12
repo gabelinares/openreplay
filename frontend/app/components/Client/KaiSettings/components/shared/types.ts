@@ -4,12 +4,12 @@
 // steps — `approved` is the state in between.
 export type TestLifecycle = 'draft' | 'approved' | 'active' | 'paused';
 export type RunResult = 'passed' | 'failed';
-// A run can still be in flight, hence `running` — and an in-flight run can be held
-// mid-execution, hence `paused` (Gabriel 08-11: production offers no way to stop a
-// run once it has started). `paused` is a run state, distinct from a test's `paused`
-// lifecycle: the test stays scheduled, this one execution is holding.
-export type RunStatus = 'running' | 'paused' | 'passed' | 'failed';
-/** Neither running nor held — the run is over and its results are final. */
+// A run can still be in flight, hence `running` — and that is all: a run cannot be
+// paused or stopped once started, only a TEST pauses from further executions
+// (Mehdi 08-12; this replaces the 08-11 run-level `paused`, which promised a
+// control the product does not have).
+export type RunStatus = 'running' | 'passed' | 'failed';
+/** Not running — the run is over and its results are final. */
 export const isRunFinished = (s: RunStatus) => s === 'passed' || s === 'failed';
 export type StepStatus =
   | 'passed'

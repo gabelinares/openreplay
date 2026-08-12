@@ -11,12 +11,8 @@ import {
   Maximize2,
   Minus,
   Network,
-  Pause,
-  PauseCircle,
-  Play,
   RotateCw,
   Server,
-  Square,
   Tag as TagIcon,
   Terminal,
   Timer,
@@ -30,8 +26,6 @@ import { formatDateTimeDefault } from 'App/date';
 
 import CountryFlagIcon from 'Shared/CountryFlagIcon';
 
-import { useConfirms } from '../shared/confirms';
-import { kaiStore, runStatusIn, useKaiStore } from '../shared/store';
 import { ConsoleLog, NetworkRequest, RunData, TestStep } from '../shared/types';
 import {
   LiveDuration,
@@ -349,17 +343,14 @@ type DevTab = 'screenshots' | 'network' | 'console';
 /** One execution of a test: outcome, a compact meta line, the step list (failed step
  *  shows its error inline), and a tabbed DevTools block — screenshots, network and
  *  console — mirroring what a session shows. Read-only once the run is over; while it
- *  is still in flight the drawer also reports progress and can hold or stop it. */
+ *  is still in flight the drawer reports progress and nothing more: a run cannot be
+ *  paused or stopped once started (Mehdi 08-12). */
 function RunDrawer({ run, open, onClose }: Props) {
   const { t } = useTranslation();
   const [devTab, setDevTab] = useState<DevTab>('screenshots');
   const [expanded, setExpanded] = useState(false);
   const [modalTab, setModalTab] = useState<DevTab>('screenshots');
   const activityRef = useRef<HTMLDivElement>(null);
-  // subscribes to the run-status overlay, so pausing re-renders this drawer (and the
-  // Runs table behind it) instead of leaving a stale "Running" band on screen
-  const { runStatus: runStatusMap } = useKaiStore();
-  const { confirmStopRun } = useConfirms();
 
   // a per-step "View …" link selects the tab and scrolls the Activity panel into view
   const jumpToActivity = (tab: DevTab) => {
@@ -381,12 +372,8 @@ function RunDrawer({ run, open, onClose }: Props) {
     setExpanded(true);
   };
 
-  // the run's status as it stands now — the fixture's, unless this run has been
-  // paused or stopped since (the Runs table reads the same overlay)
-  const status = runStatusIn(runStatusMap, run);
+  const { status } = run;
   const running = status === 'running';
-  const paused = status === 'paused';
-  const inFlight = running || paused;
   const failed = status === 'failed';
   const total = run.steps.length;
 
@@ -407,31 +394,12 @@ function RunDrawer({ run, open, onClose }: Props) {
   const rerun = () =>
     message.success(`${run.testName} — ${t('rerun started, see Runs')}`);
 
-  const pauseRun = () => {
-    kaiStore.setRunStatus(run.key, 'paused');
-    message.success(t('Run paused'));
-  };
-  const resumeRun = () => {
-    kaiStore.setRunStatus(run.key, 'running');
-    message.success(t('Run resumed'));
-  };
-  // Stopping throws away an execution in progress, so it asks first — through the
-  // shared confirm, not a one-off dialog.
-  const confirmStop = () =>
-    confirmStopRun({
-      name: run.testName,
-      onOk: () => {
-        kaiStore.setRunStatus(run.key, 'failed');
-        message.success(t('Run stopped'));
-      },
-    });
-
   const renderStep = (step: TestStep, idx: number) => {
-    // In flight, every step reads the same regardless of what the run happens to
+    // While running, every step reads the same regardless of what the run happens to
     // report: the step is known, its result is not. Forced here rather than left to
     // the data so no fixture (or backend that reports more than another) can make one
     // running run look further along than another.
-    const status = inFlight ? 'unknown' : step.status;
+    const status = running ? 'unknown' : step.status;
     const stepFailed = status === 'failed';
     const skipped = status === 'skipped';
     const pending = status === 'pending';
@@ -440,13 +408,9 @@ function RunDrawer({ run, open, onClose }: Props) {
     const icon =
       status === 'unknown' ? (
         /* A skeleton of a result, not an empty ring — the ring reads as "did not
-           run", which is a different statement (Gabriel 08-11). It pulses only while
-           the run is going: a held run waits on the user, not on itself. */
-        <span
-          className={`block w-[14px] h-[14px] rounded-full bg-gray-light ${
-            running ? 'animate-pulse' : ''
-          }`}
-        />
+           run", which is a different statement (Gabriel 08-11). It pulses because
+           the run is going. */
+        <span className="block w-[14px] h-[14px] rounded-full bg-gray-light animate-pulse" />
       ) : pending ? (
         <span className="block w-[14px] h-[14px] rounded-full border border-gray-light" />
       ) : stepFailed ? (
@@ -515,23 +479,17 @@ function RunDrawer({ run, open, onClose }: Props) {
         Icon: Loader,
         spin: true,
       }
-    : paused
+    : failed
       ? {
-          bg: 'rgba(255, 152, 0, 0.1)',
-          color: 'var(--color-orange-dark)',
-          Icon: PauseCircle,
+          bg: 'rgba(204, 0, 0, 0.08)',
+          color: 'var(--color-red)',
+          Icon: XCircle,
         }
-      : failed
-        ? {
-            bg: 'rgba(204, 0, 0, 0.08)',
-            color: 'var(--color-red)',
-            Icon: XCircle,
-          }
-        : {
-            bg: 'rgba(66, 174, 94, 0.1)',
-            color: 'var(--color-green-dark)',
-            Icon: CheckCircle2,
-          };
+      : {
+          bg: 'rgba(66, 174, 94, 0.1)',
+          color: 'var(--color-green-dark)',
+          Icon: CheckCircle2,
+        };
   const BannerIcon = bannerCfg.Icon;
   // Status strip + meta line, both always visible (Jul 1 review: run info shows
   // directly — nothing tucked behind a "More" toggle).
@@ -546,8 +504,8 @@ function RunDrawer({ run, open, onClose }: Props) {
           className={`shrink-0 ${bannerCfg.spin ? 'animate-spin' : ''}`}
           style={{ color: bannerCfg.color }}
         />
-        {inFlight ? (
-          <span>{running ? t('Running') : t('Paused')}</span>
+        {running ? (
+          <span>{t('Running')}</span>
         ) : failed ? (
           <span>
             {t('Failed at step')} {(run.failedStep ?? 0) + 1} {t('of')} {total}
@@ -560,18 +518,12 @@ function RunDrawer({ run, open, onClose }: Props) {
       </div>
       {/* Activity rail — 2px, no label, sitting directly under the status strip so it
           reads as part of it. Never a percentage: without per-step results there is no
-          honest fraction to fill, so it says "alive" and nothing more. It pulses while
-          running and holds still while paused. */}
-      {inFlight && (
+          honest fraction to fill, so it says "alive" and nothing more. */}
+      {running && (
         <div className="h-0.5 bg-gray-light relative overflow-hidden">
           <div
-            className={`h-full w-full ${running ? 'animate-pulse' : ''}`}
-            style={{
-              background: paused
-                ? 'var(--color-orange-dark)'
-                : 'var(--color-indigo)',
-              opacity: 0.45,
-            }}
+            className="h-full w-full animate-pulse"
+            style={{ background: 'var(--color-indigo)', opacity: 0.45 }}
           />
         </div>
       )}
@@ -582,12 +534,12 @@ function RunDrawer({ run, open, onClose }: Props) {
           </span>
         </Tooltip>
         {/* elapsed, ticking, for a run still going — the one number you actually
-              want while waiting. Held runs freeze it instead of climbing. */}
-        <Tooltip title={inFlight ? t('Elapsed') : undefined}>
+              want while waiting */}
+        <Tooltip title={running ? t('Elapsed') : undefined}>
           <span className="flex items-center gap-1.5">
             <Timer size={14} />{' '}
-            {inFlight ? (
-              <LiveDuration start={run.date} frozen={paused} />
+            {running ? (
+              <LiveDuration start={run.date} />
             ) : run.duration ? (
               formatDuration(run.duration)
             ) : (
@@ -675,42 +627,10 @@ function RunDrawer({ run, open, onClose }: Props) {
       title={run.testName}
       eyebrow="Run"
       headerActions={
-        /* An in-flight run gets the controls it was missing entirely: hold it, or
-           give up on it. Finished runs keep Rerun. Only one filled button either
-           way, so the header never carries two accents. */
-        inFlight ? (
-          <div className="flex items-center gap-2">
-            {running ? (
-              <Button
-                size="small"
-                icon={<Pause size={13} />}
-                onClick={pauseRun}
-              >
-                {t('Pause')}
-              </Button>
-            ) : (
-              <Button
-                type="primary"
-                size="small"
-                icon={<Play size={13} />}
-                onClick={resumeRun}
-              >
-                {t('Resume')}
-              </Button>
-            )}
-            <Tooltip title={t('Stop this run for good')}>
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<Square size={13} />}
-                onClick={confirmStop}
-              >
-                {t('Stop')}
-              </Button>
-            </Tooltip>
-          </div>
-        ) : (
+        /* A running run offers no controls — it cannot be paused or stopped once
+           started (Mehdi 08-12; the 08-11 Pause/Stop pair promised controls the
+           product does not have). Finished runs keep Rerun. */
+        running ? null : (
           <Button
             type="primary"
             size="small"
@@ -782,7 +702,7 @@ function RunDrawer({ run, open, onClose }: Props) {
           {devTab === 'screenshots' && (
             <ScreenshotsView
               run={run}
-              inFlight={inFlight}
+              inFlight={running}
               onExpand={() => openExpanded('screenshots')}
             />
           )}
@@ -790,11 +710,11 @@ function RunDrawer({ run, open, onClose }: Props) {
             <NetworkPanel
               reqs={run.network}
               startedAt={run.date}
-              inFlight={inFlight}
+              inFlight={running}
             />
           )}
           {devTab === 'console' && (
-            <ConsoleView logs={run.console} inFlight={inFlight} />
+            <ConsoleView logs={run.console} inFlight={running} />
           )}
         </div>
       </Section>
@@ -829,19 +749,19 @@ function RunDrawer({ run, open, onClose }: Props) {
               tabs (or an empty console) never resizes the modal (Jul 1 review) */}
           <div className="h-[60vh] min-h-[420px]">
             {modalTab === 'screenshots' && (
-              <ScreenshotsView run={run} fill inFlight={inFlight} />
+              <ScreenshotsView run={run} fill inFlight={running} />
             )}
             {modalTab === 'network' && (
               <NetworkPanel
                 reqs={run.network}
                 startedAt={run.date}
                 fillHeight
-                inFlight={inFlight}
+                inFlight={running}
               />
             )}
             {modalTab === 'console' && (
               <div className="h-full overflow-y-auto">
-                <ConsoleView logs={run.console} fill inFlight={inFlight} />
+                <ConsoleView logs={run.console} fill inFlight={running} />
               </div>
             )}
           </div>
