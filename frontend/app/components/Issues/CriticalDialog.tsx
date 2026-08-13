@@ -74,8 +74,8 @@ export function CriticalRuleFields({
    would have explained lives in the button's tooltip instead: the issue leaves
    YOUR critical list, the description itself is untouched. The row menu offers
    the way back. The path to the full list is the header's Settings button.
-   The same action with a reason attached still lives in the row menu and the
-   detail page's action bar (NotCriticalDialog), where there is room to ask. */
+   The row menu's "Not critical for me" acts the same immediate way — no reason
+   is asked anywhere, it isn't fed to the LLM today (Mehdi 08-12, OR-3679). */
 export default observer(function CriticalDialog({
   issueId,
   issueHead,
@@ -116,7 +116,7 @@ export default observer(function CriticalDialog({
       matches, and the row menu offers "Show as critical again". */
   const removeFromCritical = () => {
     if (issueId == null) return;
-    issuesStore.setNotCriticalForMe(issueId, '');
+    issuesStore.setNotCriticalForMe(issueId);
     onClose();
   };
 

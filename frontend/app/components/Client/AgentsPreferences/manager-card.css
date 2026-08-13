@@ -1,0 +1,7 @@
+/* The manager card draws its own 1px bottom border, and antd gives the last
+   row's cells one too — two gray lines a pixel apart at the card's bottom edge,
+   which read as a shadow under the table (Mehdi 08-12). The card closes the
+   table, so the last row keeps no border of its own. */
+.agents-manager-card .ant-table-tbody > tr:last-child > td {
+  border-bottom: 0;
+}

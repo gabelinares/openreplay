@@ -1,6 +1,6 @@
 import { Button, Segmented, Select, Table, Tooltip, message } from 'antd';
 import type { TableColumnsType } from 'antd';
-import { Pause, Play, RotateCw } from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,7 +12,7 @@ import CountSuffix from 'Shared/CountSuffix';
 import RunDrawer from './drawers/RunDrawer';
 import './kai-table.css';
 import { MOCK_RUNS } from './shared/mockData';
-import { kaiStore, runStatusIn, useKaiStore } from './shared/store';
+import { kaiStore, useKaiStore } from './shared/store';
 import { RunData, RunStatus } from './shared/types';
 import {
   LiveDuration,
@@ -28,9 +28,8 @@ import {
 type StatusTab = 'all' | RunStatus;
 const RESULT_ORDER: Record<RunStatus, number> = {
   running: 0,
-  paused: 1,
-  failed: 2,
-  passed: 3,
+  failed: 1,
+  passed: 2,
 };
 
 const ENV_NAMES = Array.from(
@@ -43,14 +42,10 @@ const TAG_NAMES = Array.from(
 function RunsTab() {
   const { t } = useTranslation();
   // search input renders in the page's main tab bar (index.tsx); query is shared
-  const {
-    runsQuery: query,
-    runsTestFilter,
-    runsOpenRunKey,
-    runStatus,
-  } = useKaiStore();
-  // a run paused or stopped from its drawer reads that way here too — same overlay
-  const statusOf = (run: RunData): RunStatus => runStatusIn(runStatus, run);
+  const { runsQuery: query, runsTestFilter, runsOpenRunKey } = useKaiStore();
+  // the fixture's status IS the run's status — a run cannot be paused or
+  // stopped once started (Mehdi 08-12), so there is no overlay to consult
+  const statusOf = (run: RunData): RunStatus => run.status;
   const [statusTab, setStatusTab] = useState<StatusTab>('all');
   const [envFilter, setEnvFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('all');
@@ -92,7 +87,6 @@ function RunsTab() {
   const countOf = (s: RunStatus) =>
     MOCK_RUNS.filter((r) => statusOf(r) === s).length;
   const runningCount = countOf('running');
-  const pausedCount = countOf('paused');
   const failedCount = countOf('failed');
   const passedCount = countOf('passed');
 
@@ -118,17 +112,7 @@ function RunsTab() {
       arr = arr.filter((r) => r.date >= cutoff);
     }
     return arr;
-    // runStatus included: pausing a run has to move it between the status tabs
-  }, [
-    query,
-    statusTab,
-    envFilter,
-    tagFilter,
-    resFilter,
-    regionFilter,
-    period,
-    runStatus,
-  ]);
+  }, [query, statusTab, envFilter, tagFilter, resFilter, regionFilter, period]);
 
   const pageItems = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const rangeStart = visible.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -136,17 +120,6 @@ function RunsTab() {
 
   const rerun = (run: RunData) =>
     message.success(`${run.testName} — ${t('rerun started, see Runs')}`);
-
-  // same overlay the drawer writes to, so holding a run from the row and holding it
-  // from its drawer are the same act
-  const pauseRun = (run: RunData) => {
-    kaiStore.setRunStatus(run.key, 'paused');
-    message.success(`${run.testName} — ${t('run paused')}`);
-  };
-  const resumeRun = (run: RunData) => {
-    kaiStore.setRunStatus(run.key, 'running');
-    message.success(`${run.testName} — ${t('run resumed')}`);
-  };
 
   const faded = (n: number) => <CountSuffix n={n} />;
   const statusOptions = [
@@ -168,21 +141,6 @@ function RunsTab() {
         </span>
       ),
     },
-    // only offered once something is actually held — an always-visible "Paused 0"
-    // tab would advertise a state most people never reach
-    ...(pausedCount > 0
-      ? [
-          {
-            value: 'paused',
-            label: (
-              <span>
-                {t('Paused')}
-                {faded(pausedCount)}
-              </span>
-            ),
-          },
-        ]
-      : []),
     {
       value: 'failed',
       label: (
@@ -252,8 +210,6 @@ function RunsTab() {
       render: (_: unknown, run) =>
         statusOf(run) === 'running' ? (
           <LiveDuration start={run.date} />
-        ) : statusOf(run) === 'paused' ? (
-          <LiveDuration start={run.date} frozen />
         ) : (
           <span className="text-disabled-text">
             {run.duration ? formatDuration(run.duration) : '—'}
@@ -278,44 +234,13 @@ function RunsTab() {
       dataIndex: 'actions',
       width: 64,
       align: 'right',
-      /* One action per row, in one place: whatever this run's state actually
-         affords. Failed → Rerun (Mehdi 07-20: rerunning a pass has no purpose,
-         the icon was noise on every row). Running → Pause, and paused → Resume,
-         so a run held from here can be let go again from here (Gabriel 08-11);
-         without Resume the list would be a one-way door. Stop stays in the
-         drawer, where there is room for the confirm it needs. */
-      render: (_: unknown, run) => {
-        const s = statusOf(run);
-        if (s === 'running')
-          return (
-            <Tooltip title={t('Pause')}>
-              <Button
-                type="text"
-                icon={<Pause size={16} />}
-                aria-label={t('Pause')}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  pauseRun(run);
-                }}
-              />
-            </Tooltip>
-          );
-        if (s === 'paused')
-          return (
-            <Tooltip title={t('Resume')}>
-              <Button
-                type="text"
-                icon={<Play size={16} />}
-                aria-label={t('Resume')}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  resumeRun(run);
-                }}
-              />
-            </Tooltip>
-          );
-        if (s !== 'failed') return null;
-        return (
+      /* Rerun on FAILED runs only (Mehdi 07-20: rerunning a pass has no
+         purpose, the icon was noise on every row). A RUNNING run offers
+         nothing: a run cannot be paused or stopped once started (Mehdi 08-12
+         — the 08-11 Pause/Resume here promised a control that doesn't exist;
+         pausing lives on the TEST, which stops further executions). */
+      render: (_: unknown, run) =>
+        statusOf(run) !== 'failed' ? null : (
           <Tooltip title={t('Rerun')}>
             <Button
               type="text"
@@ -327,8 +252,7 @@ function RunsTab() {
               }}
             />
           </Tooltip>
-        );
-      },
+        ),
     },
   ];
 

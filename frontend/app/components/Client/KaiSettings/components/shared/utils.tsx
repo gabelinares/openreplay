@@ -5,7 +5,6 @@ import {
   Loader,
   LucideIcon,
   Monitor,
-  PauseCircle,
   Smartphone,
   Tablet,
   XCircle,
@@ -122,21 +121,13 @@ export const getStatusTag = (
 
 /** Live elapsed counter for an in-flight run — ticks each second from its start time.
  *  Shared by the Runs table's Duration column and the run drawer's meta line, so an
- *  in-flight run reads the same elapsed time in both places. `frozen` stops the tick
- *  for a held run: a paused run's elapsed time must not keep climbing. */
-export function LiveDuration({
-  start,
-  frozen,
-}: {
-  start: number;
-  frozen?: boolean;
-}) {
+ *  in-flight run reads the same elapsed time in both places. */
+export function LiveDuration({ start }: { start: number }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (frozen) return undefined;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [frozen]);
+  }, []);
   const total = Math.max(0, Math.floor((now - start) / 1000));
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
@@ -145,11 +136,7 @@ export function LiveDuration({
     h > 0
       ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
       : `${m}:${String(s).padStart(2, '0')}`;
-  return (
-    <span className={frozen ? 'tabular-nums' : 'text-indigo tabular-nums'}>
-      {label}
-    </span>
-  );
+  return <span className="text-indigo tabular-nums">{label}</span>;
 }
 
 // Run result chip — a filled <Tag> in the same brand-tint style as getStatusTag (the
@@ -169,15 +156,8 @@ export const getRunResult = (
           Icon: Loader,
           spin: true,
         }
-      : status === 'paused'
+      : status === 'failed'
         ? {
-            label: t('Paused'),
-            background: 'rgba(255, 152, 0, 0.12)', // brand orange tint
-            color: 'var(--color-orange-dark)',
-            Icon: PauseCircle,
-          }
-        : status === 'failed'
-          ? {
               label: t('Failed'),
               background: 'rgba(204, 0, 0, 0.1)', // brand red tint
               color: 'var(--color-red)',

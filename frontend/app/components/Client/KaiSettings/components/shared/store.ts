@@ -5,7 +5,6 @@ import {
   Environment,
   RunData,
   RunDefaults,
-  RunStatus,
   TestCase,
 } from './types';
 
@@ -32,11 +31,6 @@ interface KaiState {
   // the page's main tab bar (index.tsx) and targets whichever tab is active
   testsQuery: string;
   runsQuery: string;
-  // Pausing / stopping an in-flight run, keyed by run key. MOCK_RUNS is a frozen
-  // fixture, so the new status lives here as an overlay — and it has to be shared
-  // rather than local to the drawer, or the Runs table would still say "Running"
-  // for a run you just paused in front of it.
-  runStatus: Record<string, RunStatus>;
 }
 
 let state: KaiState = {
@@ -53,7 +47,6 @@ let state: KaiState = {
   runsOpenRunKey: null,
   testsQuery: '',
   runsQuery: '',
-  runStatus: {},
 };
 
 const listeners = new Set<() => void>();
@@ -95,12 +88,6 @@ export const kaiStore = {
     }),
   clearRunsOpenRunKey: () => set({ runsOpenRunKey: null }),
 
-  /** Hold, resume or abandon one in-flight run. Stopping is terminal: the run keeps
-   *  whatever it managed to execute and reads as failed, because a run that never
-   *  reached its last step did not pass. */
-  setRunStatus: (key: string, status: RunStatus) =>
-    set({ runStatus: { ...state.runStatus, [key]: status } }),
-
   /** Deleting an environment detaches it from every test. A test left with no
    *  environment at all reads "Not set" — and if it was active, it pauses (there is
    *  nothing to run against) until an environment is set again. Tests that still have
@@ -125,18 +112,6 @@ export const kaiStore = {
     });
   },
 };
-
-/** A run's status as it stands now: the fixture's status unless the user has paused,
- *  resumed or stopped this run since. Read this instead of `run.status` anywhere the
- *  run's state is shown, so the table, the drawer and the test's run history agree.
- *
- *  Takes the map rather than reading module state, so every caller gets it from
- *  `useKaiStore()` and re-renders when a run is paused — a helper that read `state`
- *  directly would go stale on screen. */
-export const runStatusIn = (
-  map: Record<string, RunStatus>,
-  run: RunData,
-): RunStatus => map[run.key] ?? run.status;
 
 /** A test with no environment can't run — gates Resume until one is set. */
 export const hasNoEnvironment = (tc: TestCase): boolean =>
