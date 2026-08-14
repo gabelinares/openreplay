@@ -1,9 +1,9 @@
 import withPageTitle from '@/components/hocs/withPageTitle';
 import { PlusOutlined } from '@ant-design/icons';
 import withPermissions from 'HOCs/withPermissions';
-import { Button, Empty, Table, type TableProps, Tag, Tooltip } from 'antd';
+import { Button, Empty, Switch, Table, type TableProps, Tag, Tooltip, message } from 'antd';
 import type { SorterResult } from 'antd/es/table/interface';
-import { Lock, Star, Users } from 'lucide-react';
+import { Lock, Users } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from 'App/mstore';
 import { sessions } from 'App/routes';
 import SimpleEmptyImage from 'Components/DataManagement/SimpleEmptyImage';
+import { estimateFromSeeds } from 'Components/Issues/segments/segmentUtils';
 import { CopyButton, TextEllipsis } from 'UI';
 
 import FullPagination from 'Shared/FullPagination';
@@ -24,7 +25,6 @@ type SortOrder = 'asc' | 'desc';
 
 const columnKeyToSortBy: Record<string, SortBy> = {
   name: 'name',
-  updatedAt: 'updatedAt',
 };
 
 function SegmentsList({
@@ -51,11 +51,17 @@ function SegmentsList({
   toCreate: () => void;
 }) {
   const { t } = useTranslation();
-  const { projectsStore, userStore } = useStore();
+  const { projectsStore, issuesStore } = useStore();
   const siteId = projectsStore.activeSiteId;
-  const currentUserId = userStore.account.id;
   const buildShareUrl = (id: string) =>
     `https://${ENV.ORIGIN}/${siteId}${sessions()}?sid=${id}`;
+  // same compact notation as the Events page (Mehdi 07-13: tables read in K,
+  // exact numbers live in the detail view)
+  const numberFormatter = Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    compactDisplay: 'short',
+  });
+
   const columns: TableProps<Segment>['columns'] = [
     {
       title: t('Name'),
@@ -64,80 +70,117 @@ function SegmentsList({
       sorter: true,
       showSorterTooltip: false,
       className: 'cursor-pointer!',
+      // plain name — the creator + update-time meta line moved into the
+      // drawer's creator block (Mehdi 07-15: "inside the modal, bigger")
       render: (text: string) => (
         <TextEllipsis maxWidth={'320px'} text={text} className="link" />
       ),
     },
     {
+      // Team/Private only — no Owner tag (Mehdi 07-13: "owner" is reserved
+      // jargon for the account owner; the name meta line already says whose
+      // segment it is)
       title: t('Visibility'),
       key: 'visibility',
-      render: (_: unknown, record: Segment) => {
-        const isOwner =
-          record.userId !== undefined &&
-          String(record.userId) === String(currentUserId);
-        return (
-          <div className="flex items-center gap-1">
-            {/* @ts-ignore */}
-            <Tooltip
-              title={
-                record.isPublic
-                  ? t('Visible to everyone on your team')
-                  : t('Only visible to the segment owner')
-              }
+      render: (_: unknown, record: Segment) => (
+        <div className="flex items-center gap-1">
+          {/* @ts-ignore */}
+          <Tooltip
+            title={
+              record.isPublic
+                ? t('Visible to everyone on your team')
+                : t('Only visible to its creator')
+            }
+          >
+            <Tag
+              icon={record.isPublic ? <Users size={12} /> : <Lock size={12} />}
+              color="default"
+              className="text-xs! px-2! py-0.5! m-0! whitespace-nowrap inline-flex! items-center! gap-1! cursor-help"
             >
-              <Tag
-                icon={
-                  record.isPublic ? <Users size={12} /> : <Lock size={12} />
-                }
-                color="default"
-                className="text-xs! px-2! py-0.5! m-0! whitespace-nowrap inline-flex! items-center! gap-1! cursor-help"
-              >
-                {record.isPublic ? t('Team') : t('Private')}
-              </Tag>
-            </Tooltip>
-            {isOwner && (
-              // @ts-ignore
-              <Tooltip title={t("You're this segment's owner")}>
-                <Tag
-                  icon={<Star size={12} />}
-                  color="gold"
-                  className="text-xs! px-2! py-0.5! m-0! whitespace-nowrap inline-flex! items-center! gap-1! cursor-help"
-                >
-                  {t('Owner')}
-                </Tag>
-              </Tooltip>
-            )}
-          </div>
-        );
-      },
+              {record.isPublic ? t('Team') : t('Private')}
+            </Tag>
+          </Tooltip>
+        </div>
+      ),
     },
     {
-      title: t('Conditions'),
-      dataIndex: 'filters',
-      key: 'complexity',
-      render: (filters: any[]) => (filters ? filters.length : 0),
-    },
-    {
-      title: t('# Sessions'),
+      // Sessions + Traffic merged, one column one line (Mehdi + Gabriel
+      // 07-15): compact count first, the segment's traffic share after it in
+      // gray — SAME font size, so it reads as one value pair ("6.8K · ~34%")
+      // under a header that names both. The share is an estimate from the
+      // segment's conditions (not a capture artifact), so every store-known
+      // row shows it and the column stays uniform. Tooltip spells the share
+      // out; no per-day figure (Gabriel 07-15). Rows the issuesStore doesn't
+      // know (non-mock API data) show the count alone.
+      title: `${t('# Sessions')} · ${t('Traffic')}`,
       dataIndex: 'sessionsCount',
       key: 'sessionsCount',
-      render: (count: number) => (count ?? 0).toLocaleString(),
+      render: (count: number, record: Segment) => {
+        const s = issuesStore.segmentById(Number(record.id));
+        return (
+          <span className="tabular-nums whitespace-nowrap">
+            {numberFormatter.format(count ?? 0)}
+            {s && (
+              <Tooltip title={`Matches ~${s.trafficPct}% of your traffic`}>
+                <span
+                  className="cursor-help"
+                  style={{ color: 'var(--color-gray-medium)' }}
+                >
+                  {' '}
+                  · ~{s.trafficPct}%
+                </span>
+              </Tooltip>
+            )}
+          </span>
+        );
+      },
     },
     {
       title: t('# Users'),
       dataIndex: 'usersCount',
       key: 'usersCount',
-      render: (count: number) => (count ?? 0).toLocaleString(),
+      render: (count: number) => numberFormatter.format(count ?? 0),
     },
+    /* capture column (Mehdi 07-13: one merged list, no Traffic tab) — the
+       same shared flag the Issues popover toggles. Sourced from issuesStore
+       by id; rows the store doesn't know (non-mock API data) show a dash. */
     {
-      title: t('Updated At'),
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
-      sorter: true,
-      showSorterTooltip: false,
-      className: 'cursor-pointer!',
-      render: (text: number) =>
-        text ? new Date(text).toLocaleDateString() : '—',
+      title: t('Capture'),
+      key: 'capture',
+      width: 90,
+      render: (_: unknown, record: Segment) => {
+        const s = issuesStore.segmentById(Number(record.id));
+        if (!s) return <span style={{ color: 'var(--color-gray-medium)' }}>—</span>;
+        const control = (
+          <div onClick={(e) => e.stopPropagation()} className="inline-flex">
+            <Switch
+              size="small"
+              checked={s.active}
+              disabled={!s.isPublic}
+              aria-label={`${s.name} — capture ${s.active ? 'on' : 'off'}`}
+              onChange={(on) => {
+                // switching on recomputes the estimate from the live pool
+                if (on) issuesStore.enableCapture(s.id, estimateFromSeeds(s.seeds));
+                else if (issuesStore.toggleSegment(s.id, false))
+                  message.info(
+                    t('No active segments left — capture switched to full traffic.'),
+                  );
+              }}
+            />
+          </div>
+        );
+        return s.isPublic ? (
+          control
+        ) : (
+          <Tooltip
+            title={t(
+              'Private segments can’t capture traffic — only team-visible ones are eligible (everyone must be able to stop a capture).',
+            )}
+          >
+            {control}
+          </Tooltip>
+        );
+      },
     },
     {
       title: '',

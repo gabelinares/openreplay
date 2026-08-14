@@ -99,6 +99,7 @@ function SideMenu(props: Props) {
   const menuRoutes: any = {
     [MENU.EXIT]: () => withSiteId(routes.sessions(), siteId),
     [MENU.SESSIONS]: () => withSiteId(routes.sessions(), siteId),
+    [MENU.ISSUES]: () => withSiteId(routes.issues(), siteId),
     [MENU.BOOKMARKS]: () => withSiteId(routes.bookmarks(), siteId),
     [MENU.VAULT]: () => withSiteId(routes.bookmarks(), siteId),
     [MENU.LIVE_SESSIONS]: () => withSiteId(routes.assist(), siteId),
@@ -115,6 +116,7 @@ function SideMenu(props: Props) {
     [PREFERENCES_MENU.PROJECTS]: () => client(CLIENT_TABS.SITES),
     [PREFERENCES_MENU.ROLES_ACCESS]: () => client(CLIENT_TABS.MANAGE_ROLES),
     [PREFERENCES_MENU.AUDIT]: () => client(CLIENT_TABS.AUDIT),
+    [PREFERENCES_MENU.AGENTS]: () => client(CLIENT_TABS.AGENTS),
     [PREFERENCES_MENU.TEAM]: () => client(CLIENT_TABS.MANAGE_USERS),
     [PREFERENCES_MENU.NOTIFICATIONS]: () => client(CLIENT_TABS.NOTIFICATIONS),
     [PREFERENCES_MENU.BILLING]: () => client(CLIENT_TABS.BILLING),

@@ -38,10 +38,12 @@ export const enum PREFERENCES_MENU {
   BILLING = 'billing',
   EXPORTED_VIDEOS = 'exported-videos',
   TEST_AGENTS = 'test-agents',
+  AGENTS = 'agents',
 }
 
 export const enum MENU {
   SESSIONS = 'sessions',
+  ISSUES = 'issues',
   RECOMMENDATIONS = 'recommendations',
   VAULT = 'vault',
   BOOKMARKS = 'bookmarks',
@@ -112,7 +114,10 @@ export const categories: (t: TFunction) => Category[] = (t) => [
           label: t('New'),
           color: '#394DFE',
         },
-        children: [{ label: t('Tests'), key: MENU.TEST_AGENTS }],
+        children: [
+          { label: t('Issues'), key: MENU.ISSUES },
+          { label: t('Tests'), key: MENU.TEST_AGENTS },
+        ],
       },
     ],
   },
@@ -267,6 +272,15 @@ export const preferences: (t: TFunction) => Category[] = (t) => [
         key: PREFERENCES_MENU.EXPORTED_VIDEOS,
         icon: 'ic-network',
         hidden: menuHidden.videoExport,
+      },
+      {
+        // shared preferences for the agents (Mehdi 07-27): notifications by
+        // category, journey tags, behavior toggles. Core config (environments,
+        // run defaults) stays with each agent's page.
+        label: t('Agents'),
+        key: PREFERENCES_MENU.AGENTS,
+        // same icon as the main nav's Agents group
+        icon: 'scan-pulse',
       },
       {
         // moved to the main left nav ("Agents" section); route kept for

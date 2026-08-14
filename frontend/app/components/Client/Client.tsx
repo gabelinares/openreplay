@@ -13,6 +13,7 @@ import CustomFields from './CustomFields';
 import ExportedVideosList from './ExportedVideos/ExportedVideosList';
 import Integrations from './Integrations';
 import KaiSettings from './KaiSettings';
+import AgentsPreferences from './AgentsPreferences';
 import Notifications from './Notifications';
 import ProfileSettings from './ProfileSettings';
 import Projects from './Projects';
@@ -59,6 +60,8 @@ class Client extends React.PureComponent<any> {
         return <ExportedVideosList />;
       case CLIENT_TABS.TEST_AGENTS:
         return <KaiSettings />;
+      case CLIENT_TABS.AGENTS:
+        return <AgentsPreferences />;
       default:
         return <Navigate to={clientRoute(CLIENT_TABS.PROFILE)} replace />;
     }

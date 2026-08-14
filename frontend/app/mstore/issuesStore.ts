@@ -1,0 +1,1266 @@
+import React from 'react';
+import { makeAutoObservable } from 'mobx';
+import { CircleX, MousePointerClick, Gauge } from 'lucide-react';
+import { getMockSessionById, MOCK_SESSION_POOL, sessionMatchesSeeds } from 'Components/Issues/mockSessions';
+
+/* =========================================================================
+   Issues — the new AI issue-detection surface. Mock, in-memory data only
+   (no API). An ISSUE is the primary object: one binary flag (Critical), one
+   of three categories (Errors / UI/UX / Slowness), and a set of tags.
+   ========================================================================= */
+
+export type CategoryName = 'Errors' | 'UI/UX' | 'Slowness';
+export type MatchMode = 'all' | 'any';
+export type SortMode = 'impact' | 'newest';
+
+export interface IssueSession {
+  email: string;
+  plan: 'paid' | 'trial' | 'free';
+  browser: string;
+  os: string;
+  loc: string;
+  dur: string;
+  tags: string[];
+  journey: string;
+  /** short headline for how this session experienced the issue — a "variation" */
+  variation: string;
+}
+
+export interface Issue {
+  id: number;
+  head: string;
+  /** project-wide critical flag (decorated: agent/teammates OR my own mark) */
+  critical: boolean;
+  /** which segment surfaced this issue — absent = found in full traffic */
+  segmentId?: number;
+  cat: CategoryName;
+  real: string;
+  /** suggested fix / resolution — paired with `real` in the detail diagnosis */
+  fix: string;
+  journey: string;
+  impact: number;
+  /** minutes since this issue was last seen (drives "Last seen" + newest sort) */
+  seenAgoMin: number;
+  tags: string[];
+  sessions: IssueSession[];
+  /** ids into the shared MOCK_SESSION_POOL — the SAME entities the Sessions
+      page lists. Drives the example-session cards on the issue detail page. */
+  sessionIds?: string[];
+}
+
+/** A resolved example-session card for the issue detail page. Factual fields are
+    sourced from the shared session pool (same entity as the Sessions page); the
+    behavioral tags + plain-language journey are issue-authored (zipped by index). */
+export interface IssueSessionCard {
+  sessionId: string;
+  email: string;
+  browser: string;
+  os: string;
+  city: string;
+  country: string;
+  loc: string;
+  durMs: number;
+  dur: string;
+  date: string;
+  device: string;
+  events: number;
+  plan: string;
+  tags: string[];
+  journey: string;
+  /** short headline of this session's variation of the issue */
+  variation: string;
+}
+
+function fmtDuration(ms: number): string {
+  const totalSec = Math.max(1, Math.round(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return m ? `${m}m${s}s` : `${s}s`;
+}
+
+export const CAT_ORDER: CategoryName[] = ['Errors', 'UI/UX', 'Slowness'];
+
+/* Reason chips offered when hiding an issue (shared by the list + detail pages),
+   so the agent learns why something was dismissed. */
+export const HIDE_REASONS = [
+  'Not a real issue',
+  'Already fixed',
+  'Expected behavior',
+  'Duplicate',
+  'Low priority',
+];
+
+/** One line of "what critical means to me" (Mehdi 07-28): a plain-words
+ *  description plus its author. No name field — the description IS the rule,
+ *  and the author is what makes "critical to me" filterable. `mine` stands in
+ *  for `createdBy.id === currentUser.id` on the API. */
+export type CriticalRule = {
+  id: number;
+  description: string;
+  createdBy: string;
+  mine: boolean;
+};
+
+/* Reason chips offered when saying an issue is not critical for me (shared by
+   the list + detail pages). */
+export const CRITICAL_REASONS = [
+  'Not actually critical',
+  'Already resolved',
+  'Acceptable risk',
+  'Low user impact',
+];
+
+/* Canned journey descriptions offered as autocomplete suggestions in the NL
+   journey search on the issue detail page. Phrased from the same vocabulary as
+   the mock session journeys below so they read like real, findable journeys. */
+export const JOURNEY_SEARCH_SUGGESTIONS = [
+  'users who add to cart then abandon at checkout',
+  'users who hit "Place order" and watch the spinner end with nothing',
+  'users who tap the order button repeatedly with no response',
+  'users whose valid card expiry gets rejected as invalid',
+  'users who leave before the payment fields render',
+  'users who abandon the long onboarding form at step 4',
+  'users who scroll past empty image placeholders',
+  'users who retry a search after the spinner hangs',
+  'users who lose their filters when moving to page 2',
+  'users who hit the dead Help Center link in the footer',
+  'users who wait on blank dashboard charts',
+  'users who bounce from pricing in under ten seconds',
+];
+
+/* Single source for the per-category icon so the list and the detail header
+   stay consistent. */
+export const CAT_ICON: Record<
+  CategoryName,
+  React.ComponentType<{ size?: number; style?: React.CSSProperties; className?: string }>
+> = {
+  Errors: CircleX,
+  'UI/UX': MousePointerClick,
+  Slowness: Gauge,
+};
+
+export const CAT_COLOR: Record<CategoryName, string> = {
+  Errors: '#CC0000',
+  'UI/UX': '#615FFF',
+  Slowness: '#E28940',
+};
+
+/* =========================================================================
+   TRAFFIC SEGMENTS — choose WHAT the agent captures (Mehdi 07-07).
+   Two capture modes, mutually exclusive:
+     · full traffic — the agent samples across everything;
+     · segments     — the agent captures ONLY sessions matching active
+                      segments (they REPLACE full traffic, not add on top).
+   A segment = an omni-search query (the same filters as Sessions) + optional
+   free-text instructions. Anyone can toggle a segment or switch the mode —
+   it's the project's shared capture setting. Issues carry the segment that
+   surfaced them (segmentId) — absent means found in full traffic.
+   ========================================================================= */
+
+/** One serialized omni-search filter — enough to re-hydrate the real filter
+    object from the catalog (filterStore.findEvent) when editing a segment. */
+export interface SegmentFilterSeed {
+  name: string;
+  isEvent: boolean;
+  autoCaptured?: boolean;
+  operator?: string;
+  value: string[];
+}
+
+/* ONE entity across the whole app (Mehdi 07-07 Data Management integration,
+   07-13 category merge): a saved segment (the classic "saved search" in Data
+   Management) with ONE capture flag — `active`: its capture switch is on, so
+   the agent captures it while the project is in segments mode. There is no
+   separate "capture set" anymore (the old isTrafficSegment): a segment either
+   captures or it doesn't, and every surface (the DM list, the Issues popover)
+   is a view over the same flag.
+   Only team-visible (isPublic) segments are eligible for capture — everyone
+   must be able to stop them. Segments created from Issues are forced
+   team-visible; instructions only exist when created from Issues. */
+export interface SavedSegment {
+  id: number;
+  name: string;
+  /** display name of the creator; `mine` gates edit/delete (anyone toggles) */
+  createdBy: string;
+  mine: boolean;
+  /** team-visible vs private-to-owner; capture eligibility requires team */
+  isPublic: boolean;
+  /** the capture switch — capturing while the project is in segments mode */
+  active: boolean;
+  /** serialized omni-search query (rebuilt into real filters on edit) */
+  seeds: SegmentFilterSeed[];
+  /** human-readable one-liner of the query, shown in the popover */
+  summary: string;
+  /** share of daily traffic this query matches (computed at save/enable time) */
+  trafficPct: number;
+  /** ~sessions analysed per day for this segment */
+  sessionsPerDay: number;
+  instructions?: string;
+  /** DM-table stats (mock values, the real ones come from the backend) */
+  sessionsCount: number;
+  usersCount: number;
+  updatedAt: number;
+}
+
+
+/** One origin an issue can come from: the full-traffic baseline, or a specific
+    segment (by id). Filtering is multi-select, like tag labels — an empty
+    selection means "everywhere". */
+export type IssueOrigin = 'full' | number;
+
+/* Seeded segments — the SAME list Data Management shows (session segments) and
+   the Issues popover draws its traffic set from. Mix: three in the capture set
+   (two on, one off), three team-visible candidates to enable, one private (of
+   mine — ineligible until made team-visible), plus a teammate's spare. Filter
+   names/values match the mock omni-search catalog (Issues/mockSessions). */
+const JUL = (day: number, hour = 12) =>
+  new Date(2026, 6, day, hour).getTime();
+
+export const MOCK_SEGMENTS: SavedSegment[] = [
+  {
+    id: 1,
+    name: 'Billing & checkout',
+    createdBy: 'You',
+    mine: true,
+    isPublic: true,
+    active: true,
+    seeds: [
+      { name: 'LOCATION', isEvent: true, autoCaptured: true, operator: 'contains', value: ['/checkout'] },
+      { name: 'CLICK', isEvent: true, autoCaptured: true, value: ['Place order'] },
+    ],
+    summary: 'Path contains /checkout · Click "Place order"',
+    trafficPct: 2,
+    sessionsPerDay: 40,
+    instructions:
+      'Watch for silent payment failures and anything around coupons or card validation.',
+    sessionsCount: 1240,
+    usersCount: 830,
+    updatedAt: JUL(6),
+  },
+  {
+    id: 2,
+    name: 'Pricing · France',
+    createdBy: 'Mehdi O.',
+    mine: false,
+    isPublic: true,
+    active: true,
+    seeds: [
+      { name: 'LOCATION', isEvent: true, autoCaptured: true, operator: 'contains', value: ['/pricing'] },
+      { name: 'userCountry', isEvent: false, operator: 'is', value: ['FR'] },
+    ],
+    summary: 'Path contains /pricing · Country = FR',
+    trafficPct: 6,
+    sessionsPerDay: 120,
+    sessionsCount: 3480,
+    usersCount: 2100,
+    updatedAt: JUL(5),
+  },
+  {
+    id: 3,
+    name: 'Mobile visitors',
+    createdBy: 'Nikita M.',
+    mine: false,
+    isPublic: true,
+    active: false,
+    seeds: [
+      { name: 'userDevice', isEvent: false, operator: 'is', value: ['mobile'] },
+    ],
+    summary: 'Device = mobile',
+    trafficPct: 38,
+    sessionsPerDay: 760,
+    sessionsCount: 21600,
+    usersCount: 9400,
+    updatedAt: JUL(2),
+  },
+  {
+    id: 4,
+    name: 'Checkout drop-off',
+    createdBy: 'Sarah K.',
+    mine: false,
+    isPublic: true,
+    active: false,
+    seeds: [
+      { name: 'LOCATION', isEvent: true, autoCaptured: true, operator: 'contains', value: ['/cart'] },
+    ],
+    summary: 'Path contains /cart',
+    trafficPct: 4,
+    sessionsPerDay: 80,
+    sessionsCount: 2350,
+    usersCount: 1400,
+    updatedAt: JUL(4),
+  },
+  {
+    id: 5,
+    name: 'Power users',
+    createdBy: 'You',
+    mine: true,
+    isPublic: true,
+    active: false,
+    seeds: [
+      { name: 'CLICK', isEvent: true, autoCaptured: true, value: [''] },
+      { name: 'INPUT', isEvent: true, autoCaptured: true, value: [''] },
+    ],
+    summary: 'Click · Input',
+    trafficPct: 12,
+    sessionsPerDay: 240,
+    sessionsCount: 6800,
+    usersCount: 1900,
+    updatedAt: JUL(7),
+  },
+  {
+    id: 6,
+    name: 'Signup funnel',
+    createdBy: 'You',
+    mine: true,
+    isPublic: false,
+    active: false,
+    seeds: [
+      { name: 'LOCATION', isEvent: true, autoCaptured: true, operator: 'contains', value: ['/signup'] },
+    ],
+    summary: 'Path contains /signup',
+    trafficPct: 3,
+    sessionsPerDay: 60,
+    sessionsCount: 940,
+    usersCount: 880,
+    updatedAt: JUL(1),
+  },
+  {
+    id: 7,
+    name: 'German traffic',
+    createdBy: 'Mehdi O.',
+    mine: false,
+    isPublic: true,
+    active: false,
+    seeds: [
+      { name: 'userCountry', isEvent: false, operator: 'is', value: ['DE'] },
+    ],
+    summary: 'Country = DE',
+    trafficPct: 9,
+    sessionsPerDay: 180,
+    sessionsCount: 5200,
+    usersCount: 3100,
+    updatedAt: JUL(3),
+  },
+  {
+    id: 8,
+    name: 'Safari sessions',
+    createdBy: 'Nikita M.',
+    mine: false,
+    isPublic: true,
+    active: false,
+    seeds: [
+      { name: 'userBrowser', isEvent: false, operator: 'is', value: ['Safari'] },
+    ],
+    summary: 'Browser = Safari',
+    trafficPct: 17,
+    sessionsPerDay: 340,
+    sessionsCount: 9700,
+    usersCount: 4300,
+    updatedAt: JUL(6, 9),
+  },
+];
+
+/* Impact as three levels (no number). Thresholds match the sort order. */
+export type ImpactLevel = 'High' | 'Medium' | 'Low';
+
+export function impactLevel(v: number): ImpactLevel {
+  if (v >= 45) return 'High';
+  if (v >= 25) return 'Medium';
+  return 'Low';
+}
+
+/** filled-segment count per level (out of 3) */
+export const IMPACT_FILLED: Record<ImpactLevel, number> = {
+  High: 3,
+  Medium: 2,
+  Low: 1,
+};
+
+/** the three impact colors */
+export const IMPACT_COLOR: Record<ImpactLevel, string> = {
+  High: 'var(--color-red)',
+  Medium: 'var(--color-orange)',
+  Low: 'var(--color-gray-medium)',
+};
+
+const MIN_PER_DAY = 1440;
+
+/** Compact "last seen" label: relative for up to 7 days, an absolute date beyond. */
+export function lastSeenLabel(minAgo: number): string {
+  if (minAgo < 1) return 'just now';
+  if (minAgo < 60) return `${Math.round(minAgo)}m ago`;
+  if (minAgo < MIN_PER_DAY) return `${Math.round(minAgo / 60)}h ago`;
+  if (minAgo < 7 * MIN_PER_DAY) return `${Math.round(minAgo / MIN_PER_DAY)}d ago`;
+  return new Date(Date.now() - minAgo * 60000).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+export function lastSeenExact(minAgo: number): string {
+  return new Date(Date.now() - minAgo * 60000).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+const RAW: Omit<Issue, 'tags' | 'fix'>[] = [
+  {
+    id: 1,
+    head: 'Card declined with no error message at checkout',
+    critical: true,
+    segmentId: 1, // surfaced by the "Billing & checkout" segment
+    cat: 'Errors',
+    impact: 71,
+    seenAgoMin: 3,
+    real: 'When the payment processor returns a declined status, the checkout UI swallows the error entirely — no message, no toast, no inline validation. The "Place order" button simply resets to its default state, so the user has no idea whether the charge failed, succeeded, or is still pending. Most retry the exact same card two or three times before giving up, and a meaningful share of them never complete the purchase at all.',
+    journey: 'User filled in card details, hit "Place order", saw the spinner end with nothing, retried the same card twice, then abandoned the cart.',
+    sessions: [
+      // demo pair for the shared title slot (07-28): the first variation runs
+      // PAST three lines (truncated + tooltip), the second sits at ~three
+      // lines untruncated — together they exercise both ends of the clamp
+      { email: 'daniel@black-bird.io', plan: 'paid', browser: 'Chrome', os: 'Mac OS X', loc: 'Frankfurt am Main', dur: '12m1s', variation: 'The order failed silently after the processor declined the card: the spinner ran for a few seconds, the button reset with no message anywhere on the page, and nothing acknowledged the failure — he retried the exact same card twice, checked his bank app for a pending charge, and finally left the cart without completing the purchase.', tags: ['Payment', 'Checkout', 'Error encountered'], journey: 'Filled in card details, hit "Place order", watched the spinner end with nothing, re-entered the same card twice, then left the cart.' },
+      { email: 'lucas@finhub.io', plan: 'paid', browser: 'Chrome', os: 'Windows', loc: 'Toronto', dur: '9m12s', variation: 'Submitted payment and was silently bounced back to the checkout form with every field still filled and no error or toast in sight, grew visibly frustrated and abandoned the order after two attempts.', tags: ['Checkout', 'Error encountered'], journey: 'Reached checkout, submitted payment, got silently bounced back to the form, grew visibly frustrated and abandoned.' },
+      { email: 'amara@shopwave.co', plan: 'trial', browser: 'Safari', os: 'iOS', loc: 'Lagos', dur: '6m03s', variation: 'Pay button reset on mobile', tags: ['Payment', 'Checkout'], journey: 'Tried to pay on her phone, saw the button reset with no message, and gave up after a single attempt.' },
+    ],
+  },
+  {
+    id: 2,
+    head: '"Place order" button unresponsive on mobile',
+    critical: true,
+    cat: 'UI/UX',
+    impact: 66,
+    seenAgoMin: 24,
+    real: 'On mobile viewports the primary "Place order" button receives the tap event but never fires its click handler, so the order is never submitted. An overlay element appears to be intercepting the touch, which is why the button looks active but does nothing. Users tap it repeatedly — classic rage-click behaviour — scroll around hunting for an error that never appears, and then abandon the session.',
+    journey: 'User reached the checkout step on a phone, tapped "Place order" seven times in a row, scrolled up and back down looking for an error, then left.',
+    sessions: [
+      // ~two lines: this issue's grid slots titles at 2 (no three-line gap)
+      { email: 'main@badmanners.gg', plan: 'trial', browser: 'Safari', os: 'iOS', loc: 'Islamabad', dur: '8m7s', variation: 'Tapped "Place order" seven times on a phone, nothing fired and no error appeared anywhere, then quit the checkout for good.', tags: ['Checkout', 'Frustration'], journey: 'Tapped "Place order" seven times in a row on a phone, nothing fired, scrolled up and down hunting for an error, then quit.' },
+      { email: 'priya@meshcart.in', plan: 'free', browser: 'Chrome', os: 'Android', loc: 'Mumbai', dur: '5m44s', variation: 'Looped between cart and checkout', tags: ['Checkout', 'Back and forth'], journey: 'Tapped the order button, looped back to the cart and forward again twice, and never got a response.' },
+    ],
+  },
+  {
+    id: 3,
+    head: 'Card form rejects a valid expiry date',
+    critical: true,
+    segmentId: 1, // surfaced by the "Billing & checkout" segment
+    cat: 'Errors',
+    impact: 58,
+    seenAgoMin: 52,
+    real: 'The expiry-date field rejects correctly formatted future dates (MM/YY) with an "invalid date" validation error, blocking payment submission. The check appears to run on every keystroke rather than on blur, so the field flags itself as invalid mid-entry and never clears. Users re-type the same valid date several different ways, grow frustrated, and abandon the payment step.',
+    journey: 'User entered a valid expiry three different ways, each rejected with "invalid date", re-typed slowly, then gave up on the payment step.',
+    sessions: [
+      { email: 'dev@dosetech.co', plan: 'paid', browser: 'Firefox', os: 'Linux', loc: 'Lahore (Sher Kot)', dur: '9m1s', variation: 'Valid expiry rejected three times', tags: ['Payment', 'Form submission', 'Error encountered'], journey: 'Entered a valid expiry three different ways, each rejected as "invalid date", re-typed it slowly, then abandoned payment.' },
+      { email: 'sofia@oakmont.eu', plan: 'paid', browser: 'Chrome', os: 'Windows', loc: 'Madrid', dur: '7m20s', variation: 'Fought a false validation error', tags: ['Form submission', 'Error encountered'], journey: 'Corrected the expiry field over and over against a false validation error before giving up on the order.' },
+    ],
+  },
+  {
+    id: 4,
+    head: 'Checkout page takes 8s to load',
+    critical: true,
+    cat: 'Slowness',
+    impact: 52,
+    seenAgoMin: 180,
+    real: 'The checkout page takes around eight seconds to become interactive. The order summary and payment fields render well after the rest of the page, so users stare at a half-loaded screen with no clear signal that anything is still loading. Many tab away while they wait, and a portion never return to finish the order — directly bleeding revenue at the most critical step of the funnel.',
+    journey: 'User clicked through to checkout, stared at a half-loaded page for several seconds, switched tabs, came back, and a portion of users left before it finished.',
+    sessions: [
+      { email: 'rajesh+support@acme.com', plan: 'paid', browser: 'Chrome', os: 'Windows', loc: 'Newark', dur: '15m20s', variation: 'Tab-switched while it loaded', tags: ['Checkout', 'Frustration'], journey: 'Clicked through to checkout, stared at a half-loaded page, switched tabs while it loaded, and came back several seconds later.' },
+      { email: 'elena@brightbox.io', plan: 'trial', browser: 'Chrome', os: 'Mac OS X', loc: 'Berlin', dur: '11m02s', variation: 'Left before fields rendered', tags: ['Checkout', 'Drop off'], journey: 'Waited on the slow checkout, lost patience before the payment fields rendered, and left without ordering.' },
+    ],
+  },
+  {
+    id: 5,
+    head: 'Users abandon onboarding at the long step-4 form',
+    critical: false,
+    cat: 'UI/UX',
+    impact: 47,
+    seenAgoMin: 480,
+    real: 'Step 4 of onboarding is a single overwhelming form with 14 required fields presented all at once. Completion drops sharply at this point — users who breezed through the first three steps stall here, hesitate over several inputs, and a large share close the tab without finishing. The sheer length of the form, with no progress indication or grouping, is the clearest driver of the drop-off.',
+    journey: 'User progressed smoothly through steps 1–3, hit the long form at step 4, scrolled the whole thing, hesitated on several fields, then closed the tab.',
+    sessions: [
+      { email: 'muhammad.hadayat@swipbox.com', plan: 'trial', browser: 'Chrome', os: 'Mac OS X', loc: 'Saidpur', dur: '11m31s', variation: 'Stalled on the 14-field form', tags: ['Onboarding', 'Form submission', 'Drop off'], journey: 'Breezed through steps 1–3, hit the 14-field form at step 4, hesitated on several inputs, then closed the tab.' },
+      { email: 'tom@layerlabs.dev', plan: 'trial', browser: 'Firefox', os: 'Windows', loc: 'Austin', dur: '8m49s', variation: 'Never started the long form', tags: ['Onboarding', 'Drop off'], journey: 'Scrolled the long step-4 form top to bottom, never started filling it, and abandoned onboarding.' },
+    ],
+  },
+  {
+    id: 6,
+    head: 'Product images slow to load on the listing grid',
+    critical: false,
+    cat: 'Slowness',
+    impact: 39,
+    seenAgoMin: 1320,
+    real: 'Product thumbnails on the category listing take several seconds to appear, loading one at a time as the user scrolls instead of being reserved and lazy-loaded. On first paint the grid is a wall of empty placeholders, so it reads as broken rather than loading. Users pause, scroll past the gaps, and often scroll back up once the images finally trickle in — a janky first impression on a page meant to drive browsing.',
+    journey: 'User opened a category, scrolled a grid of empty image placeholders, paused waiting for thumbnails, and scrolled back up once they finally loaded.',
+    sessions: [
+      { email: 'apps@vfairs.com', plan: 'free', browser: 'Chrome', os: 'Windows', loc: 'Poznan', dur: '7m55s', variation: 'Scrolled past empty placeholders', tags: ['Navigation', 'Frustration'], journey: 'Opened a category, scrolled a grid of empty placeholders, waited, then scrolled back up once the thumbnails finally loaded.' },
+      { email: 'kenji@miraisoft.jp', plan: 'paid', browser: 'Safari', os: 'Mac OS X', loc: 'Osaka', dur: '6m10s', variation: 'Images trickled in one by one', tags: ['Navigation'], journey: 'Searched the listing, watched images trickle in one by one, and paused before interacting with the grid.' },
+    ],
+  },
+  {
+    id: 7,
+    head: 'Search spinner never resolves',
+    critical: false,
+    cat: 'Errors',
+    impact: 35,
+    seenAgoMin: 2880,
+    real: 'The search request fails silently at the network layer — there is no timeout and no error state, so the results spinner keeps spinning indefinitely. Users wait, clear the query and retry a couple of times, and eventually give up and try to navigate to the category by hand. Because nothing ever surfaces the failure, it looks to the user like the product simply does not work.',
+    journey: 'User typed a query, waited on the spinner, cleared and retried twice, then tried navigating to the category manually instead.',
+    sessions: [
+      { email: 'mehdi+new@openreplay.cloud', plan: 'paid', browser: 'Firefox', os: 'Mac OS X', loc: 'Schieren', dur: '10m26s', variation: 'Spinner hung, browsed manually', tags: ['Navigation', 'Error encountered'], journey: 'Typed a query, watched the spinner hang, cleared and retried twice, then tried browsing to the category by hand instead.' },
+      { email: 'hana@coralpay.io', plan: 'trial', browser: 'Chrome', os: 'Windows', loc: 'Seoul', dur: '6m38s', variation: 'Filter spinner never resolved', tags: ['Navigation', 'Frustration'], journey: 'Applied a filter, hit a spinner that never resolved, retried it a few times and grew frustrated before leaving.' },
+    ],
+  },
+  {
+    id: 8,
+    head: 'Filters reset when moving to the next page',
+    critical: false,
+    cat: 'UI/UX',
+    impact: 30,
+    seenAgoMin: 5760,
+    real: 'Active filter chips are silently dropped the moment the user paginates, so page 2 onward shows unfiltered results while the controls still imply the filters are applied. The filter state lives only in component memory and is not persisted to the URL or query, so any navigation resets it. Users re-apply the same filters repeatedly, page back and forth, and lose trust that the listing reflects what they asked for.',
+    journey: 'User applied two filters, reviewed page 1, clicked to page 2, saw the filters gone and results changed, went back and re-applied them repeatedly.',
+    sessions: [
+      { email: 'apps@vfairs.com', plan: 'free', browser: 'Chrome', os: 'Windows', loc: 'Nong Sung', dur: '9m20s', variation: 'Filters cleared on page 2', tags: ['Navigation', 'Error encountered'], journey: 'Set two filters, reviewed page 1, clicked to page 2 and found them silently cleared, then re-applied them repeatedly.' },
+      { email: 'omar@gridly.io', plan: 'paid', browser: 'Chrome', os: 'Linux', loc: 'Cairo', dur: '7m02s', variation: 'Lost filters paging back and forth', tags: ['Navigation', 'Back and forth'], journey: 'Filtered the results, paged forward and back, lost the filters each time, and eventually gave up.' },
+    ],
+  },
+  {
+    id: 9,
+    head: 'Footer "Help Center" link 404s',
+    critical: false,
+    cat: 'UI/UX',
+    impact: 22,
+    seenAgoMin: 8640,
+    real: 'The "Help Center" link in the footer points to a dead URL and returns a 404. Users who are already stuck and actively seeking help hit a wall at the exact moment they need support most. There is no redirect or monitoring in place, so the broken link has likely been failing silently for a while, quietly pushing frustrated users toward churn instead of resolution.',
+    journey: 'User scrolled to the footer, clicked "Help Center", landed on a 404 page, hit back, and tried the contact link instead.',
+    sessions: [
+      { email: 'daniel@black-bird.io', plan: 'paid', browser: 'Chrome', os: 'Mac OS X', loc: 'Thung Khru', dur: '5m44s', variation: 'Help Center link 404’d', tags: ['Navigation', 'Error encountered'], journey: 'Scrolled to the footer, clicked "Help Center", landed on a 404, hit back, and tried the contact link instead.' },
+      { email: 'greta@nordkit.se', plan: 'free', browser: 'Firefox', os: 'Windows', loc: 'Stockholm', dur: '4m12s', variation: 'Hit a dead support page', tags: ['Navigation', 'Error encountered', 'Drop off'], journey: 'Went looking for support, clicked the footer Help Center link, hit the dead 404 page, and abandoned the attempt.' },
+    ],
+  },
+  {
+    id: 10,
+    head: 'Dashboard charts take 5s to render',
+    critical: false,
+    cat: 'Slowness',
+    impact: 18,
+    seenAgoMin: 12960,
+    real: 'The account dashboard charts take around five seconds to fetch and draw after the page shell loads, leaving every panel blank in the meantime. With no skeletons or loading states, returning users land on what looks like an empty, broken dashboard. The data eventually appears, but the dead first impression makes the product feel slow and unreliable on the page users see most often.',
+    journey: 'User opened the dashboard, waited on blank chart panels, moved the cursor around expecting data, and continued once the charts appeared.',
+    sessions: [
+      { email: 'rajesh+support@acme.com', plan: 'trial', browser: 'Chrome', os: 'Linux', loc: 'Lahore (Sher Kot)', dur: '6m32s', variation: 'Waited on blank chart panels', tags: ['Navigation'], journey: 'Opened the dashboard, waited on blank chart panels, moved the cursor around expecting data, and carried on once it drew.' },
+      { email: 'bea@finchly.com', plan: 'paid', browser: 'Chrome', os: 'Mac OS X', loc: 'Lisbon', dur: '5m18s', variation: 'Sat through an empty dashboard', tags: ['Navigation'], journey: 'Landed on the dashboard and sat through several seconds of empty panels before the charts finally appeared.' },
+    ],
+  },
+  {
+    id: 11,
+    head: 'Quick bounce off the pricing page',
+    critical: false,
+    segmentId: 2, // surfaced by the "Pricing · France" segment
+    cat: 'UI/UX',
+    impact: 12,
+    seenAgoMin: 20160,
+    real: 'A noticeable share of sessions land on the pricing page from ads and leave within a few seconds with no scroll and no click. The instant bounce suggests the above-the-fold content is not matching the intent the ad set up — the value proposition or the plan they expected is not immediately visible. These are paid arrivals leaving before they engage at all, so the wasted acquisition spend compounds the lost conversions.',
+    journey: 'User landed on pricing from an ad, stayed under ten seconds without scrolling or interacting, and closed the tab.',
+    sessions: [
+      { email: 'visitor@gmail.com', plan: 'free', browser: 'Chrome', os: 'Windows', loc: 'Manila', dur: '8s', variation: 'Bounced in under ten seconds', tags: ['Navigation', 'Drop off'], journey: 'Landed on pricing from an ad, stayed under ten seconds without scrolling or clicking, and closed the tab.' },
+      { email: 'guest@yahoo.com', plan: 'free', browser: 'Safari', os: 'iOS', loc: 'Jakarta', dur: '6s', variation: 'Left pricing without scrolling', tags: ['Navigation', 'Drop off'], journey: 'Arrived on the pricing page from a link, did not scroll or interact at all, and bounced within seconds.' },
+    ],
+  },
+];
+
+/* Link each issue to real sessions in the shared pool (app/components/Issues/mockSessions).
+   These are the SAME entities the Sessions page lists — the issue's example
+   sessions and the sessions list now reference one source of truth. */
+const ISSUE_SESSION_IDS: Record<number, string[]> = {
+  1: ['sess_1001', 'sess_1002', 'sess_1003'],
+  2: ['sess_1004', 'sess_1005'],
+  3: ['sess_1009', 'sess_1020'],
+  4: ['sess_1002', 'sess_1015'],
+  5: ['sess_1013', 'sess_1014'],
+  6: ['sess_1016', 'sess_1011'],
+  7: ['sess_1006', 'sess_1018'],
+  8: ['sess_1012', 'sess_1019'],
+  9: ['sess_1021', 'sess_1010'],
+  10: ['sess_1012', 'sess_1019'],
+  11: ['sess_1010', 'sess_1021'],
+};
+
+/* Suggested fix / resolution per issue — paired with `real` in the detail-page
+   diagnosis (The problem / Suggested fix). */
+const ISSUE_FIX: Record<number, string> = {
+  1: 'Surface the decline reason inline and keep the user on the payment step, instead of silently resetting the “Place order” button.',
+  2: 'Bind the tap handler to the button on mobile (check the overlay/z-index intercepting taps) and show a pressed state so the action registers.',
+  3: 'Fix the expiry validation to accept correctly formatted future MM/YY dates, and validate on blur rather than per keystroke.',
+  4: 'Defer non-critical work and prioritize the order summary + payment fields so checkout is interactive in under ~2s.',
+  5: 'Split step 4 into smaller grouped steps (or progressively disclose fields) and trim the required set to reduce drop-off.',
+  6: 'Reserve image space and lazy-load thumbnails with low-res placeholders so the grid never looks broken on first paint.',
+  7: 'Add a timeout + error state to the search request and let the user retry, instead of an indefinite spinner.',
+  8: 'Persist active filters in the URL/query so they survive pagination instead of resetting on page change.',
+  9: 'Point the footer “Help Center” link to the live support URL and add a redirect/monitor to catch future 404s.',
+  10: 'Render the dashboard shell immediately with skeleton panels and stream chart data, or cache the last result.',
+  11: 'Match the pricing page to ad intent above the fold and test a clearer value prop to reduce instant bounces.',
+};
+
+const ISSUES: Issue[] = RAW.map((r) => ({
+  ...r,
+  tags: [...new Set(r.sessions.flatMap((s) => s.tags))],
+  sessionIds: ISSUE_SESSION_IDS[r.id] ?? [],
+  fix: ISSUE_FIX[r.id] ?? '',
+}));
+
+export default class IssuesStore {
+  all: Issue[] = ISSUES;
+
+  q = '';
+  cats: CategoryName[] = [];
+  labels: string[] = [];
+  match: MatchMode = 'all';
+  sort: SortMode = 'impact';
+  critOnly = false;
+  showHidden = false;
+  hidden: number[] = [];
+  names: Record<number, string> = {};
+  dismissReasons: Record<number, string> = {};
+  dismissTags: Record<number, string[]> = {};
+  /* ---- critical DEFINITIONS (Mehdi 07-28/29 — replaces the 07-07 per-issue
+     flag) ----
+     Criticality is no longer something the UI puts on an issue. The customer
+     describes what critical means to them, one description per line, each
+     carrying its author; the engine (shipped 07-29) passes those descriptions
+     to the LLM with per-user attribution, and the LLM decides which issues are
+     critical and for whom. So in the UI criticality is always DERIVED:
+     `matchedRules(id)` is the whole truth, and every control is either an
+     explanation or a way to author a description.
+
+     BACKEND CONTRACT (for Nikita):
+       · `GET/POST/PATCH/DELETE /critical-definitions` →
+         `{ id, description, createdBy: { id, name }, createdAt }`.
+         No name field — Mehdi 07-29: "you just need to give maybe a
+         description", and the user is the important part.
+       · every issue carries what matched it, server-side:
+         `criticalBy: [{ definitionId, userId }]`. The UI needs the attribution
+         to say WHY a row is critical and to filter "critical to me" by whose
+         description matched — it cannot be recomputed on the client.
+       · `POST /issues/:id/not-critical { reason }` — PER-USER suppression plus
+         the reason as agent feedback (Gabriel 07-30: my not-critical never
+         changes a teammate's view; the old copy said "for anyone").
+       · NOT needed: any per-issue "pin this one for me" table. The triangle
+         authors a description instead (Gabriel 07-30), which is the tradeoff
+         Mehdi took to avoid delaying the release.
+     `criticalBy` and `notCritical` below are the mock stand-ins for the first
+     two of those; both are keyed by issue id exactly as the API will be. */
+  criticalRules: CriticalRule[] = [
+    {
+      id: 1,
+      description:
+        'Anything that stops someone paying: declined cards, failed charges, or a payment form that rejects valid details.',
+      createdBy: 'Gabriel L.',
+      mine: true,
+    },
+    {
+      id: 2,
+      description:
+        'Checkout and cart steps that break, hang, or lose what the user already entered.',
+      createdBy: 'Gabriel L.',
+      mine: true,
+    },
+    {
+      id: 3,
+      description:
+        'Pages that take more than five seconds to become usable on mobile.',
+      createdBy: 'Mehdi O.',
+      mine: false,
+    },
+    {
+      id: 4,
+      description: 'Anything that blocks signup or login.',
+      createdBy: 'Nikita M.',
+      mine: false,
+    },
+  ];
+  /** what the engine matched, per issue — server-derived (see the contract
+      above). Seeded to explain the four criticals the mock ships with. */
+  criticalBy: Record<number, number[]> = {
+    1: [1], // card declined → my payment description
+    2: [2], // "Place order" unresponsive → my checkout description
+    3: [1], // expiry rejected → my payment description
+    4: [3], // 8s checkout → Mehdi's slow-page description
+  };
+  /** my own "not critical", with the reason that teaches the agent */
+  notCritical: Record<number, string> = {};
+  /** Display filter: issues my own descriptions flagged ∪ issues surfaced by
+      segments I own */
+  relevantToMe = false;
+
+  // ---- saved segments (shared with Data Management) ----
+  segments: SavedSegment[] = MOCK_SEGMENTS;
+  /** capture mode: active segments REPLACE full traffic when on (Mehdi 07-07) */
+  captureMode: 'full' | 'segments' = 'segments';
+  /** "found in" filter — lives in the Tags dropdown next to the labels, because
+      origin is an ATTRIBUTE of an issue (Display only shapes visibility).
+      Multi-select; empty = everywhere. */
+  origins: IssueOrigin[] = [];
+  /** ISSUE-PAGE segment scope (Mehdi 07-20): sessions shown on the detail page
+      are filtered to these segments. Seeded from the list's origins filter on
+      arrival (propagation), then user-controlled via the Segments dropdown;
+      headline stats stay GLOBAL (Gabriel 07-21: sessions-only scoping). */
+  detailScope: number[] = [];
+  /** ISSUE-PAGE tag filter (Mehdi 07-28): example sessions filtered by their
+      journey tags, the exact grammar of the list's Tags dropdown (AND/OR,
+      search, New tag). Seeded from the list's labels on arrival, like the
+      segment scope. Sessions-only, headline stats stay global. */
+  detailLabels: string[] = [];
+  detailMatch: MatchMode = 'all';
+  /** customer-defined journey tags (Mehdi 07-27): name + a natural-language
+      description the LLM matches against each session's journey. Attribution
+      is automatic; the description is authored once. Kept even with zero
+      matches so the tag stays discoverable in filters and (later) settings. */
+  customTags: JourneyTag[] = [];
+  /** The predefined set is EDITABLE STATE, not a constant (Mehdi 07-28: he
+      checked with the team — predefined tags can be renamed and removed like
+      any other). Seeded from PREDEFINED_JOURNEY_TAGS; `source` in the settings
+      table is provenance, not permission. */
+  predefinedTags: JourneyTag[] = PREDEFINED_JOURNEY_TAGS.map((t) => ({ ...t }));
+
+  constructor() {
+    makeAutoObservable(this);
+  }
+
+  /** a tag the user authors is always theirs, so only this one is "custom";
+      editing and removing work on either list (see updateTag/removeTag).
+      Returns false when the name is already taken, so the caller can say so
+      instead of reporting a success that did not happen. */
+  addCustomTag = (name: string, description: string): boolean => {
+    const taken = [...this.predefinedTags, ...this.customTags].some(
+      (t) => t.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (taken) return false;
+    this.customTags.push({ name, description });
+    return true;
+  };
+
+  updateTag = (oldName: string, name: string, description: string) => {
+    const rename = (t: JourneyTag) =>
+      t.name === oldName ? { name, description } : t;
+    this.predefinedTags = this.predefinedTags.map(rename);
+    this.customTags = this.customTags.map(rename);
+    // an active filter follows the rename instead of going stale
+    this.labels = this.labels.map((l) => (l === oldName ? name : l));
+  };
+
+  removeTag = (name: string) => {
+    const keep = (t: JourneyTag) => t.name !== name;
+    this.predefinedTags = this.predefinedTags.filter(keep);
+    this.customTags = this.customTags.filter(keep);
+    this.labels = this.labels.filter((l) => l !== name);
+  };
+
+  // ---- derived ----
+  get allTags(): string[] {
+    return [
+      ...new Set([
+        ...this.all.flatMap((i) => i.tags),
+        ...this.customTags.map((t) => t.name),
+      ]),
+    ].sort();
+  }
+
+  catCount(c: CategoryName): number {
+    return this.all.filter((i) => i.cat === c).length;
+  }
+
+  /** The descriptions that made this issue critical — the whole truth about
+      criticality, and the answer to "why is this flagged?". Empty once I have
+      said it is not critical for me. */
+  matchedRules(id: number): CriticalRule[] {
+    if (this.notCritical[id] != null) return [];
+    return this.rulesFor(id);
+  }
+
+  /** the same descriptions IGNORING my suppression — what flagged this issue,
+      or what would flag it again if I restored it. One mapping, two views: the
+      muted dialog shows these so it can name what it is muting. */
+  rulesFor(id: number): CriticalRule[] {
+    return (this.criticalBy[id] ?? [])
+      .map((ruleId) => this.criticalRules.find((r) => r.id === ruleId))
+      .filter(Boolean) as CriticalRule[];
+  }
+
+  /** Three states, now about WHOSE description matched: none, a teammate's
+      only, or one of mine (which is what "Critical to me" filters on). */
+  critState(id: number): 'none' | 'team' | 'mine' {
+    const matched = this.matchedRules(id);
+    if (!matched.length) return 'none';
+    return matched.some((r) => r.mine) ? 'mine' : 'team';
+  }
+
+  /** Apply per-issue user overrides (rename) and derive `critical` from the
+      descriptions that matched — this is MY view of the list, since my own
+      "not critical" suppresses the flag for me alone. */
+  decorate = (i: Issue): Issue => {
+    const head = this.names[i.id] ?? i.head;
+    const critical = this.matchedRules(i.id).length > 0;
+    return head === i.head && critical === i.critical
+      ? i
+      : { ...i, head, critical };
+  };
+
+  get list(): Issue[] {
+    let l = this.all.map(this.decorate);
+    if (!this.showHidden) l = l.filter((i) => !this.hidden.includes(i.id));
+    if (this.cats.length) l = l.filter((i) => this.cats.includes(i.cat));
+    if (this.labels.length)
+      l = l.filter((i) =>
+        this.match === 'any'
+          ? this.labels.some((t) => i.tags.includes(t))
+          : this.labels.every((t) => i.tags.includes(t)),
+      );
+    if (this.critOnly) l = l.filter((i) => i.critical);
+    if (this.relevantToMe) l = l.filter(this.isRelevant);
+    if (this.origins.length)
+      l = l.filter((i) =>
+        i.segmentId != null
+          ? this.origins.includes(i.segmentId)
+          : this.origins.includes('full'),
+      );
+    const q = this.q.toLowerCase().trim();
+    if (q)
+      l = l.filter((i) =>
+        (i.head + i.real + i.journey + i.tags.join() + i.cat)
+          .toLowerCase()
+          .includes(q),
+      );
+    const cmp =
+      this.sort === 'newest'
+        ? (a: Issue, b: Issue) => a.seenAgoMin - b.seenAgoMin
+        : (a: Issue, b: Issue) =>
+            +b.critical - +a.critical || b.impact - a.impact;
+    return [...l].sort(cmp);
+  }
+
+  byId(id: number): Issue | undefined {
+    const i = this.all.find((x) => x.id === id);
+    if (!i) return undefined;
+    return this.decorate(i);
+  }
+
+  /** Mock total of sessions matching a journey search on this issue — the
+      example cards are a small sample of this larger set. Deterministic and
+      scaled off impact so bigger issues report bigger matched populations. */
+  journeyMatchTotal(issue: Issue): number {
+    return issue.impact * 7 + ((issue.id * 13) % 29);
+  }
+
+  /** Example-session cards for the issue detail page, resolved from the shared
+      session pool (same entities as the Sessions page). Falls back to the
+      issue-authored summaries if no pool ids are mapped. */
+  exampleSessions(issue: Issue, opts?: { ignoreFilters?: boolean }): IssueSessionCard[] {
+    // The curated ids come first; we then top up from the shared pool so the detail
+    // page can "load more" / "refresh" through a bigger sample (the only count shown
+    // is the quiet matched-sessions total, see journeyMatchTotal).
+    const curated = issue.sessionIds ?? [];
+    const extra = MOCK_SESSION_POOL.map((s) => s.sessionId).filter(
+      (id) => !curated.includes(id),
+    );
+    // segment scope (detail page): only sessions matching ANY scoped segment.
+    // Applied BEFORE the sample slice so "load more" keeps honoring the scope.
+    const scopeSeeds = (opts?.ignoreFilters ? [] : this.detailScope)
+      .map((id) => this.segmentById(id)?.seeds)
+      .filter((x): x is SavedSegment['seeds'] => Boolean(x));
+    const inScope = (id: string) =>
+      scopeSeeds.length === 0 ||
+      scopeSeeds.some((seeds) => sessionMatchesSeeds(id, seeds));
+    // tag filter (detail page): tags ride the mapped card, so this one applies
+    // AFTER mapping — and the sample slice moves after it, same reason as scope
+    const detailLabels = opts?.ignoreFilters ? [] : this.detailLabels;
+    const matchesTags = (tags: string[]) =>
+      detailLabels.length === 0 ||
+      (this.detailMatch === 'any'
+        ? detailLabels.some((t) => tags.includes(t))
+        : detailLabels.every((t) => tags.includes(t)));
+    const orderedIds = [...curated, ...extra].filter(inScope);
+    const fromPool = orderedIds
+      .map((id, i) => {
+        const s = getMockSessionById(id);
+        if (!s) return null;
+        // narrative (tags + journey) is issue-authored, cycled so every card has one
+        const authored = issue.sessions.length
+          ? issue.sessions[i % issue.sessions.length]
+          : undefined;
+        return {
+          sessionId: s.sessionId,
+          email: s.userId,
+          browser: s.userBrowser,
+          os: s.userOs,
+          city: s.userCity,
+          country: s.userCountry,
+          loc: s.userCity || s.userCountry,
+          durMs: s.duration,
+          dur: fmtDuration(s.duration),
+          date: new Date(s.startTs).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+          device: s.userDeviceType,
+          events: s.eventsCount ?? 0,
+          plan: s.metadata?.plan ?? '',
+          tags: authored?.tags ?? [],
+          journey: authored?.journey ?? '',
+          variation: authored?.variation ?? '',
+        };
+      })
+      .filter((s): s is IssueSessionCard => Boolean(s));
+    // the authored fallback is for issues with no pool mapping at all — a tag
+    // filter that excludes every pool card returns empty (the page's empty state)
+    if (fromPool.length)
+      return fromPool.filter((s) => matchesTags(s.tags)).slice(0, 12);
+    return issue.sessions
+      .map((s, i) => ({
+        sessionId: `${issue.id}-${i}`,
+        email: s.email,
+        browser: s.browser,
+        os: s.os,
+        city: s.loc,
+        country: '',
+        loc: s.loc,
+        durMs: 0,
+        dur: s.dur,
+        date: '',
+        device: 'desktop',
+        events: 0,
+        plan: s.plan,
+        tags: s.tags,
+        journey: s.journey,
+        variation: s.variation,
+      }))
+      .filter((s) => matchesTags(s.tags));
+  }
+
+  // ---- actions ----
+  setQ = (q: string) => { this.q = q; };
+  setSort = (s: SortMode) => { this.sort = s; };
+  setMatch = (m: MatchMode) => { this.match = m; };
+  setCats = (c: CategoryName[]) => { this.cats = c; };
+  setLabels = (l: string[]) => { this.labels = l; };
+  toggleLabel = (t: string) => {
+    this.labels = this.labels.includes(t)
+      ? this.labels.filter((x) => x !== t)
+      : [...this.labels, t];
+  };
+  setCritOnly = (v: boolean) => { this.critOnly = v; };
+  setShowHidden = (v: boolean) => { this.showHidden = v; };
+
+  /** count shown next to "Critical only" (ignores other filters, same shape
+      as relevantCount/hidden.length below — Display checkboxes always show
+      their count in parens) */
+  get criticalCount(): number {
+    return this.all.map(this.decorate).filter(
+      (i) => !this.hidden.includes(i.id) && i.critical,
+    ).length;
+  }
+
+  // ---- "Critical to me" ----
+  /** relevant = one of MY descriptions flagged it, or a segment I own surfaced
+      it. The first half is exactly the per-user attribution the engine sends. */
+  isRelevant = (i: Issue): boolean =>
+    this.critState(i.id) === 'mine' ||
+    (i.segmentId != null && Boolean(this.segmentById(i.segmentId)?.mine));
+
+  /** count shown next to the Display checkbox (ignores other filters) */
+  get relevantCount(): number {
+    return this.all.filter(
+      (i) => !this.hidden.includes(i.id) && this.isRelevant(i),
+    ).length;
+  }
+
+  setRelevantToMe = (v: boolean) => { this.relevantToMe = v; };
+
+  // ---- critical definitions ----
+  /** Author a description. When it comes from an issue (the triangle's
+      intermediary), that issue is flagged straight away so the click has a
+      visible effect; everything else it matches arrives with the next pass,
+      which is what the dialog's caption promises. */
+  addCriticalRule = (description: string, forIssueId?: number): CriticalRule => {
+    const rule: CriticalRule = {
+      id: Math.max(0, ...this.criticalRules.map((r) => r.id)) + 1,
+      description,
+      createdBy: 'Gabriel L.',
+      mine: true,
+    };
+    this.criticalRules.push(rule);
+    if (forIssueId != null) {
+      delete this.notCritical[forIssueId];
+      this.criticalBy[forIssueId] = [
+        ...(this.criticalBy[forIssueId] ?? []),
+        rule.id,
+      ];
+    }
+    return rule;
+  };
+
+  updateCriticalRule = (id: number, description: string) => {
+    this.criticalRules = this.criticalRules.map((r) =>
+      r.id === id ? { ...r, description } : r,
+    );
+  };
+
+  /** Removing a description un-flags everything it was the only match for —
+      the reason the delete confirm has to say how many issues that is. */
+  removeCriticalRule = (id: number) => {
+    this.criticalRules = this.criticalRules.filter((r) => r.id !== id);
+    Object.keys(this.criticalBy).forEach((key) => {
+      const issueId = Number(key);
+      this.criticalBy[issueId] = this.criticalBy[issueId].filter(
+        (r) => r !== id,
+      );
+    });
+  };
+
+  /** how many issues would stop being critical if this description went away */
+  rulesOnlyMatch(id: number): number {
+    return Object.keys(this.criticalBy).filter((key) => {
+      const ids = this.criticalBy[Number(key)];
+      return ids.includes(id) && ids.length === 1;
+    }).length;
+  }
+
+  /** MY not-critical: suppresses the flag for me only, and the reason is
+      feedback for the agent (Gabriel 07-30). */
+  setNotCriticalForMe = (id: number, reason: string) => {
+    // replace, never mutate a key: MobX does not track keys ADDED to a plain
+    // observable object, so `notCritical[id] = x` updated the data without
+    // waking the rows that read it (Gabriel 07-31 caught the row menu not
+    // offering the way back). Same pattern as customTags/criticalRules above.
+    this.notCritical = { ...this.notCritical, [id]: reason };
+  };
+
+  restoreCritical = (id: number) => {
+    const { [id]: _dropped, ...rest } = this.notCritical;
+    this.notCritical = rest;
+  };
+
+  // ---- issue-page segment scope ----
+  setDetailScope = (ids: number[]) => {
+    this.detailScope = ids.filter((id) => this.segmentById(id));
+  };
+  toggleDetailScope = (id: number) => {
+    this.detailScope = this.detailScope.includes(id)
+      ? this.detailScope.filter((x) => x !== id)
+      : [...this.detailScope, id];
+  };
+  clearDetailScope = () => {
+    this.detailScope = [];
+  };
+  // ---- issue-page tag filter (same shape as the list's labels/match) ----
+  setDetailLabels = (l: string[]) => { this.detailLabels = l; };
+  toggleDetailLabel = (t: string) => {
+    this.detailLabels = this.detailLabels.includes(t)
+      ? this.detailLabels.filter((x) => x !== t)
+      : [...this.detailLabels, t];
+  };
+  setDetailMatch = (m: MatchMode) => { this.detailMatch = m; };
+  clearDetailLabels = () => { this.detailLabels = []; };
+  /** every saved segment whose conditions match this pool session */
+  sessionSegments = (sessionId: string): SavedSegment[] =>
+    this.segments.filter(
+      (seg) => seg.seeds.length > 0 && sessionMatchesSeeds(sessionId, seg.seeds),
+    );
+  /** segments this issue is "found in": the surfacing origin first, then every
+      segment matching ≥1 of its sampled sessions, with the matched share */
+  issueSegments = (
+    issue: Issue,
+  ): { segment: SavedSegment; matched: number; total: number }[] => {
+    const ids = (issue.sessionIds ?? []).length
+      ? issue.sessionIds!
+      : MOCK_SESSION_POOL.slice(0, 12).map((s) => s.sessionId);
+    const rows = this.segments
+      .map((segment) => ({
+        segment,
+        matched:
+          segment.seeds.length > 0
+            ? ids.filter((id) => sessionMatchesSeeds(id, segment.seeds)).length
+            : 0,
+        total: ids.length,
+      }))
+      .filter((r) => r.matched > 0 || r.segment.id === issue.segmentId);
+    // origin first, then by share
+    return rows.sort((a, b) =>
+      a.segment.id === issue.segmentId
+        ? -1
+        : b.segment.id === issue.segmentId
+          ? 1
+          : b.matched - a.matched,
+    );
+  };
+
+  // ---- saved segments (capture = the `active` flag) ----
+  /** segments currently capturing — what the Issues popover lists */
+  get capturingSegments(): SavedSegment[] {
+    return this.segments.filter((s) => s.active);
+  }
+
+  /** what I can see in Data Management: everything team-visible + my private */
+  get visibleSegments(): SavedSegment[] {
+    return this.segments.filter((s) => s.isPublic || s.mine);
+  }
+
+  /** the Tags "found in" options: capturing segments plus anything an issue
+      on the list is attributed to (so origin filtering keeps working after a
+      segment's capture is switched off) */
+  get originSegments(): SavedSegment[] {
+    const referenced = new Set(
+      this.all.map((i) => i.segmentId).filter((x): x is number => x != null),
+    );
+    return this.segments.filter((s) => s.active || referenced.has(s.id));
+  }
+
+  get activeSegmentCount(): number {
+    return this.segments.filter((s) => s.active).length;
+  }
+
+  /** guarded in the UI too: segments mode needs at least one active segment */
+  setCaptureMode = (mode: 'full' | 'segments') => {
+    if (mode === 'segments' && this.activeSegmentCount === 0) return;
+    this.captureMode = mode;
+  };
+
+  /** deactivating/deleting the last active segment while capturing segments
+      falls back to full traffic — the zero-capture state is unreachable.
+      Returns true when the fallback happened (the UI toasts it). */
+  private fallBackIfEmpty(): boolean {
+    if (this.captureMode === 'segments' && this.activeSegmentCount === 0) {
+      this.captureMode = 'full';
+      return true;
+    }
+    return false;
+  }
+
+  segmentById(id?: number): SavedSegment | undefined {
+    return id == null ? undefined : this.segments.find((f) => f.id === id);
+  }
+
+  toggleOrigin = (o: IssueOrigin) => {
+    this.origins = this.origins.includes(o)
+      ? this.origins.filter((x) => x !== o)
+      : [...this.origins, o];
+  };
+
+  clearOrigins = () => { this.origins = []; };
+
+  /** anyone can toggle any segment — it's the project's shared capture
+      setting. Returns true when switching the last one off fell the project
+      back to full traffic (the UI toasts it). */
+  toggleSegment = (id: number, active: boolean): boolean => {
+    this.segments = this.segments.map((f) =>
+      f.id === id ? { ...f, active } : f,
+    );
+    return this.fallBackIfEmpty();
+  };
+
+  /** switch capture on with a freshly computed estimate — the "Add segment"
+      picker and the DM capture switch both land here */
+  enableCapture = (id: number, est?: { pct: number; perDay: number }) => {
+    this.segments = this.segments.map((f) =>
+      f.id === id
+        ? {
+            ...f,
+            active: true,
+            trafficPct: est?.pct ?? f.trafficPct,
+            sessionsPerDay: est?.perDay ?? f.sessionsPerDay,
+          }
+        : f,
+    );
+  };
+
+  /** create (no id) or update (id) — editing is gated to `mine` in the UI.
+      Returns true when the edit switched the last capturing segment off and
+      the project fell back to full traffic (the UI toasts it). */
+  saveSegment = (
+    segment: Omit<
+      SavedSegment,
+      'id' | 'createdBy' | 'mine' | 'sessionsCount' | 'usersCount' | 'updatedAt'
+    > & { id?: number },
+  ): boolean => {
+    const now = Date.now();
+    if (segment.id != null) {
+      this.segments = this.segments.map((f) =>
+        f.id === segment.id
+          ? {
+              ...f,
+              ...segment,
+              id: f.id,
+              createdBy: f.createdBy,
+              mine: f.mine,
+              updatedAt: now,
+            }
+          : f,
+      );
+    } else {
+      const id = Math.max(0, ...this.segments.map((f) => f.id)) + 1;
+      this.segments = [
+        {
+          ...segment,
+          id,
+          createdBy: 'You',
+          mine: true,
+          // mock stats — a fresh segment scaled off its daily estimate
+          sessionsCount: segment.sessionsPerDay * 7,
+          usersCount: Math.round(segment.sessionsPerDay * 4),
+          updatedAt: now,
+        },
+        ...this.segments,
+      ];
+    }
+    return this.fallBackIfEmpty();
+  };
+
+  deleteSegment = (id: number): boolean => {
+    this.segments = this.segments.filter((f) => f.id !== id);
+    this.origins = this.origins.filter((o) => o !== id);
+    return this.fallBackIfEmpty();
+  };
+  rename = (id: number, name: string) => { this.names[id] = name; };
+  hide = (id: number, reason: string, tags: string[] = []) => {
+    if (!this.hidden.includes(id)) this.hidden.push(id);
+    this.dismissReasons[id] = reason;
+    this.dismissTags[id] = tags;
+  };
+  unhide = (id: number) => {
+    this.hidden = this.hidden.filter((x) => x !== id);
+    delete this.dismissReasons[id];
+    delete this.dismissTags[id];
+  };
+  /** Two-way critical toggle used by the detail page and the list's teaching
+      modal. Marking is my personal layer ONLY (Mehdi 07-07) — it never sets
+      the project-wide flag, and re-marking something un-flagged earlier does
+      not restore it. Unmarking clears my layer always, and lifts the project
+      flag only where one exists — that removal carries the reason so the
+      agent can learn what wasn't actually critical. */
+}
+
+/** A journey tag: the name the agent applies, and the plain-words description
+ *  it matches a session's journey against. Same shape whichever list it is in
+ *  — the settings table's source column is provenance only. */
+export type JourneyTag = { name: string; description: string };
+
+/** The journey tags OpenReplay ships with (Mehdi 07-27): high-level on purpose
+ *  ("applicable to 80-90% of websites"). This is the SEED for
+ *  issuesStore.predefinedTags, which the customer can rename and remove
+ *  (Mehdi 07-28); customers add their own on top in Preferences > Agents. */
+export const PREDEFINED_JOURNEY_TAGS: JourneyTag[] = [
+  { name: 'Navigation', description: 'The user browses across pages or sections without a transactional goal.' },
+  { name: 'Onboarding', description: 'First-run steps: signup, initial setup, tutorials or welcome flows.' },
+  { name: 'Checkout', description: 'The user moves through a cart or order flow toward placing an order.' },
+  { name: 'Payment', description: 'Entering or confirming payment details, or completing a charge.' },
+  { name: 'Form submission', description: 'Filling and submitting any form, including multi-step ones.' },
+  { name: 'Workflow completed', description: 'A multi-step task reaches its intended end state.' },
+  { name: 'Drop off', description: 'The user abandons a flow before reaching its end state.' },
+  { name: 'Back and forth', description: 'Repeated switching between the same pages or steps, suggesting hesitation.' },
+  { name: 'Error encountered', description: 'The session hits a visible error state, message or broken page.' },
+  { name: 'Frustration', description: 'Rage clicks, dead clicks or rapid repeated actions on the same element.' },
+];
