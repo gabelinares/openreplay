@@ -114,11 +114,15 @@ module.exports = {
 
       if (colors.dark) {
         // Process flat dark colors
+        // A dark key names the same token as its light twin, so it maps across
+        // verbatim. This used to run key.replace('dark-', ''), which no key in the
+        // block is shaped for (none are prefixed `dark-`) but which did rewrite
+        // `active-dark-blue` to `active-blue` — so the pair's second entry silently
+        // overwrote the first, and --color-active-dark-blue fell through to its
+        // near-white light value. Invisible while the two shared one value.
         Object.entries(colors.dark).forEach(([key, value]) => {
           if (typeof value !== 'object') {
-            // Find the corresponding light mode key
-            const lightKey = key.replace('dark-', '');
-            darkModeVars[`--color-${lightKey}`] = value;
+            darkModeVars[`--color-${key}`] = value;
           }
         });
 
