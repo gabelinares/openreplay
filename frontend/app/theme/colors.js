@@ -87,6 +87,10 @@ module.exports = {
     white: 'rgb(23, 23, 23)',
     black: '#fff',
     teal: 'rgb(81, 162, 255)',
+    /* the pressed/hover accent. Never overridden, so it stayed #2331A8 — a navy
+       that runs 1.8:1 on a dark page, as colorLinkHover and colorPrimaryActive
+       both. Against a light-blue base accent the pressed step goes lighter. */
+    'teal-dark': 'rgb(130, 190, 255)',
     /* orange-dark (#C26822) is unreadable on a dark surface */
     'orange-dark': '#EFA765',
     main: 'rgb(81, 162, 255)',
