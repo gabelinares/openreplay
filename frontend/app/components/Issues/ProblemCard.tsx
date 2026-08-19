@@ -1,5 +1,6 @@
 import React from 'react';
 import { Tooltip, Avatar, Input, Button, Popover, Tag } from 'antd';
+import type { AvatarProps } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import { AlertTriangle, X } from 'lucide-react';
 import { Icon } from 'UI';
@@ -64,13 +65,19 @@ export function AiSummary({
 /* Impact as a horizontal three-level connected meter — one rounded pill split
    into three parts, lit by level. Shared by the issues list and the detail
    header so the two never drift. */
-export function ImpactGauge({ value }: { value: number }) {
+export function ImpactGauge({
+  value,
+  withLabel = false,
+}: {
+  value: number;
+  withLabel?: boolean;
+}) {
   const level = impactLevel(value);
   const filled = IMPACT_FILLED[level];
   const color = IMPACT_COLOR[level];
-  return (
+  const bars = (
     <span
-      className="inline-flex"
+      className="inline-flex shrink-0"
       style={{
         width: 38,
         height: 3,
@@ -96,16 +103,43 @@ export function ImpactGauge({ value }: { value: number }) {
       ))}
     </span>
   );
+  if (!withLabel) return bars;
+  /* Named as well as drawn, so it reads the way the category beside it does:
+     a bare meter is the only thing on that line asking to be decoded. */
+  return (
+    <span className="inline-flex items-center" style={{ gap: 6 }}>
+      <span className="text-sm" style={{ color: 'var(--color-gray-darkest)' }}>
+        {level}
+      </span>
+      {bars}
+    </span>
+  );
 }
 
 /* Category as the teal circle + icon used on the Cards list (MetricListItem):
    an antd Avatar with the tealx-lightest fill and a tealx icon. */
-export function CategoryLabel({ cat }: { cat: CategoryName }) {
+export function CategoryLabel({
+  cat,
+  compact = false,
+}: {
+  cat: CategoryName;
+  compact?: boolean;
+}) {
   const Ic = CAT_ICON[cat];
+  /* `compact` pulls the glyph and its word together: the 32px avatar carries
+     8px of its own padding around a 16px icon, so a further 8px gap read as a
+     gap between two separate things rather than one label. A 24px circle and
+     4px does not (Gabriel 08-19). Default is untouched for the issues list.
+     Annotated, because a bare `24 | 'default'` union defeats antd's overload
+     resolution and the error surfaces unhelpfully on the icon prop. */
+  const avatarSize: AvatarProps['size'] = compact ? 24 : 'default';
   return (
-    <span className="inline-flex items-center" style={{ gap: 8 }}>
+    <span
+      className="inline-flex items-center shrink-0"
+      style={{ gap: compact ? 4 : 8 }}
+    >
       <Avatar
-        size="default"
+        size={avatarSize}
         className="bg-tealx-lightest"
         icon={<Ic size={16} strokeWidth={2} style={{ color: '#3EAAAF' }} />}
       />

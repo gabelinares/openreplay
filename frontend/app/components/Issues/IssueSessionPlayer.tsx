@@ -1229,15 +1229,29 @@ function IssueSessionPlayer() {
               {/* 1 · the issue — labelled "ISSUE" so the issue title is never
                   confused with this session's variation below */}
               <div className="flex flex-col gap-2.5">
-                <span
-                  className="text-xs font-semibold uppercase"
-                  style={{
-                    color: 'var(--color-gray-medium)',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  Issue
-                </span>
+                {/* The label line carries the classification: "ISSUE", then
+                    what kind, then how hard it bites, pushed to the right
+                    edge. Both are named, so neither asks to be decoded, and
+                    the title below gets the full width to itself instead of a
+                    third row underneath it (Gabriel 08-19). Critical is not
+                    here; it lives in the header. */}
+                <div className="flex items-center gap-3">
+                  <span
+                    className="text-xs font-semibold uppercase shrink-0"
+                    style={{
+                      color: 'var(--color-gray-medium)',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    Issue
+                  </span>
+                  <CategoryLabel cat={issue.cat} compact />
+                  <Tooltip title={`${impactLevel(issue.impact)} impact`}>
+                    <span className="ml-auto inline-flex items-center cursor-default">
+                      <ImpactGauge value={issue.impact} withLabel />
+                    </span>
+                  </Tooltip>
+                </div>
                 <span
                   className="font-semibold"
                   style={{
@@ -1248,21 +1262,6 @@ function IssueSessionPlayer() {
                 >
                   {issue.head}
                 </span>
-                {/* Category and impact, held apart by space rather than by
-                    pipes: this row was the one Mehdi pointed at when he said
-                    the vertical separators are everywhere. Critical is not
-                    here; it lives in the header (Gabriel 08-19). */}
-                <div
-                  className="flex items-center gap-4 flex-wrap"
-                  style={{ color: 'var(--color-gray-medium)' }}
-                >
-                  <CategoryLabel cat={issue.cat} />
-                  <Tooltip title={`${impactLevel(issue.impact)} impact`}>
-                    <span className="inline-flex items-center cursor-default">
-                      <ImpactGauge value={issue.impact} />
-                    </span>
-                  </Tooltip>
-                </div>
               </div>
 
               {/* 2 · this session — just the variation title (this session's
