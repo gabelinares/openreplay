@@ -933,16 +933,23 @@ function IssueSessionPlayer() {
       )}
 
       {/* header: session info + issue name, with Activity / Issue tabs.
-          Fifty pixels and no bottom rule, both taken from the session header
-          (`PlayerBlockHeader`: `lg:h-[50px]`, and a border COLOUR with no
-          width). It separates from what follows by tone, not by a stroke. */}
+          Fifty pixels from the session header (`PlayerBlockHeader`), and the
+          bottom rule from the Spot player header, which is a bare `border-b`
+          and so gray-light via `* { border-color }` in main.css. This is THE
+          divider between header and page and it stays; what went was the four
+          other strokes around it (Gabriel 08-19). */}
       {!isFullScreen && (
-        <div className="flex items-center gap-3 px-2 h-[50px] shrink-0 w-full bg-white">
+        <div className="flex items-center gap-2 px-2 h-[50px] shrink-0 w-full bg-white border-b">
           <Tooltip title={issue ? `Back to “${issue.head}”` : 'Back to issues'}>
             <Button type="text" size="small" icon={<ArrowLeft size={15} />} onClick={back} className="px-2">
               Back to issue
             </Button>
           </Tooltip>
+          {/* Full-bleed and gray-lighter, copied from `PlayerBlockHeader`'s
+              divider beside Back. Full height reads as a column edge; the
+              floating `h-6` pill that used to sit here read as a tick mark,
+              which is the kind Mehdi was counting. */}
+          <div className="w-px h-full bg-gray-lighter" />
           {/* One line, as on the session page: this session's VARIATION of the
               issue, then when it happened, then everything else behind "More".
               The second line used to carry the parent issue, but "Back to

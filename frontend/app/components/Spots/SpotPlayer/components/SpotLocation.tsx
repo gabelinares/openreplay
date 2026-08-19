@@ -19,17 +19,12 @@ function SpotLocation({ onPageTone = false }: { onPageTone?: boolean }) {
   )?.location;
   const displayUrl =
     currUrl.length > 170 ? `${currUrl.slice(0, 170)}...` : currUrl;
-  /* On the page tone the strip and the replay surround share a colour, so the
-     hairline has to carry the boundary on its own and takes gray-light. This is
-     the one stroke between the header and the replay, the same count the
-     session page runs. */
+  /* The header above now carries the one strong rule (gray-light), so on the
+     page tone this stays the quiet gray-lighter hairline: it ends the chrome
+     without reading as a second line under the first. */
   return (
     <div
-      className={
-        onPageTone
-          ? 'w-full border-b border-gray-light'
-          : 'w-full bg-white border-b border-gray-lighter'
-      }
+      className={`w-full border-b border-gray-lighter${onPageTone ? '' : ' bg-white'}`}
     >
       <div className="flex w-fit items-center cursor-pointer color-gray-medium text-sm p-1">
         <Link2 className="mx-2" size={16} />
