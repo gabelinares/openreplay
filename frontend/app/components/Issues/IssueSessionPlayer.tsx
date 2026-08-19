@@ -857,9 +857,6 @@ function IssueSessionPlayer() {
       ),
     );
   const { isFullScreen } = spotPlayerStore;
-  const Divider = () => (
-    <div className="h-6 border-l mx-1" style={{ borderColor: 'var(--color-gray-light)' }} />
-  );
 
   const CatIc = issue ? CAT_ICON[issue.cat] : null;
   const morePopover = (
@@ -923,47 +920,45 @@ function IssueSessionPlayer() {
     </div>
   );
 
+  /* The overlay takes the app's own page tone (--color-gray-lightest, what
+     `reset.css` puts on the body) rather than white. The session page never
+     paints over it, which is why its location strip reads as a strip and its
+     header needs no rule to sit apart from one. Painting this white flattened
+     all of that into one white sheet, and every boundary then had to be drawn
+     as a line (Mehdi 08-19: "there are too many lines"). */
   const content = (
-    <div className="fixed inset-0 bg-white flex flex-col overflow-hidden" style={{ zIndex: 2147482000 }}>
+    <div className="fixed inset-0 bg-gray-lightest flex flex-col overflow-hidden" style={{ zIndex: 2147482000 }}>
       {isFullScreen && (
         <EscapeButton onClose={() => spotPlayerStore.setIsFullScreen(false)} />
       )}
 
-      {/* header: session info + issue name, with Activity / Issue tabs */}
+      {/* header: session info + issue name, with Activity / Issue tabs.
+          Fifty pixels and no bottom rule, both taken from the session header
+          (`PlayerBlockHeader`: `lg:h-[50px]`, and a border COLOUR with no
+          width). It separates from what follows by tone, not by a stroke. */}
       {!isFullScreen && (
-        <div className="flex items-center gap-1 px-2 py-2.5 w-full bg-white border-b" style={{ borderColor: 'var(--color-gray-light)' }}>
+        <div className="flex items-center gap-3 px-2 h-[50px] shrink-0 w-full bg-white">
           <Tooltip title={issue ? `Back to “${issue.head}”` : 'Back to issues'}>
             <Button type="text" size="small" icon={<ArrowLeft size={15} />} onClick={back} className="px-2">
               Back to issue
             </Button>
           </Tooltip>
-          <Divider />
-          {/* Lead with this session's VARIATION of the issue (what the card was
-              titled by); the parent issue + who/when sit on the line below, and
-              the environment specs live behind "More". */}
-          <div className="leading-tight min-w-0 flex-1">
-            <div className="flex items-center gap-2 min-w-0">
-              {issue && <HeaderCriticalToggle issue={issue} />}
-              <Tooltip title={variation}>
-                <span
-                  className="font-medium truncate"
-                  style={{ color: 'var(--color-gray-darkest)', maxWidth: 480 }}
-                >
-                  {variation ?? 'Session replay'}
-                </span>
-              </Tooltip>
-            </div>
-            <div className="flex items-center gap-1 lg:gap-2 text-black/50 text-sm">
-              {issue && (
-                <>
-                  <Tooltip title={`Part of issue: ${issue.head}`}>
-                    <span className="truncate" style={{ maxWidth: 320 }}>
-                      {issue.head}
-                    </span>
-                  </Tooltip>
-                  <span>·</span>
-                </>
-              )}
+          {/* One line, as on the session page: this session's VARIATION of the
+              issue, then when it happened, then everything else behind "More".
+              The second line used to carry the parent issue, but "Back to
+              issue" names it and the Issue panel leads with it, so that was the
+              third place it appeared. The critical marker is gone for the same
+              reason: the panel already carries it (Mehdi 08-19). */}
+          <div className="min-w-0 flex-1 flex items-center gap-2">
+            <Tooltip title={variation}>
+              <span
+                className="font-medium truncate"
+                style={{ color: 'var(--color-gray-darkest)', maxWidth: 480 }}
+              >
+                {variation ?? 'Session replay'}
+              </span>
+            </Tooltip>
+            <div className="flex items-center gap-2 shrink-0 text-black/50 text-sm">
               <span className="whitespace-nowrap">{date}</span>
               <span>·</span>
               <Popover
@@ -978,59 +973,62 @@ function IssueSessionPlayer() {
           </div>
 
           {/* right cluster — sourced from the session replay subheader:
-              Share (copy-at-time), Highlight, overflow, queue controls, tabs */}
-          <div className="ml-auto flex items-center gap-2 shrink-0">
-            <Popover
-              trigger="click"
-              placement="bottomRight"
-              zIndex={2147483647}
-              content={
-                <div style={{ width: 248 }}>
-                  <SessionCopyLink time={spotPlayerStore.time} />
-                </div>
-              }
-            >
-              <Tooltip title="Share session" placement="bottom">
-                <Button size="small" icon={<ShareAltOutlined />} />
-              </Tooltip>
-            </Popover>
+              Share (copy-at-time), Highlight, overflow, queue controls, tabs.
+              The three groups used to be fenced off by vertical rules; the
+              session subheader fences nothing, so they are held apart by a
+              wider gap instead (gap-4 between groups, gap-1 within). */}
+          <div className="ml-auto flex items-center gap-4 shrink-0">
+            <div className="flex items-center gap-1">
+              <Popover
+                trigger="click"
+                placement="bottomRight"
+                zIndex={2147483647}
+                content={
+                  <div style={{ width: 248 }}>
+                    <SessionCopyLink time={spotPlayerStore.time} />
+                  </div>
+                }
+              >
+                <Tooltip title="Share session" placement="bottom">
+                  <Button size="small" icon={<ShareAltOutlined />} />
+                </Tooltip>
+              </Popover>
 
-            <HighlightButton onClick={() => message.info('Highlight this moment')} />
+              <HighlightButton onClick={() => message.info('Highlight this moment')} />
 
-            <Dropdown
-              placement="bottomRight"
-              menu={{
-                items: [
-                  {
-                    key: 'bookmark',
-                    label: (
-                      <div className="flex items-center gap-2">
-                        {bookmarked ? (
-                          <BookmarkCheck size={16} strokeWidth={1.5} />
-                        ) : (
-                          <Bookmark size={16} strokeWidth={1.5} />
-                        )}
-                        <span>{bookmarked ? 'Bookmarked' : 'Bookmark'}</span>
-                      </div>
-                    ),
-                    onClick: toggleBookmark,
-                  },
-                  {
-                    key: 'dl',
-                    label: (
-                      <div className="flex items-center gap-2">
-                        <File size={16} strokeWidth={1.5} />
-                        <span>Download video</span>
-                      </div>
-                    ),
-                  },
-                ],
-              }}
-            >
-              <Button icon={<MoreOutlined />} size="small" />
-            </Dropdown>
-
-            <Divider />
+              <Dropdown
+                placement="bottomRight"
+                menu={{
+                  items: [
+                    {
+                      key: 'bookmark',
+                      label: (
+                        <div className="flex items-center gap-2">
+                          {bookmarked ? (
+                            <BookmarkCheck size={16} strokeWidth={1.5} />
+                          ) : (
+                            <Bookmark size={16} strokeWidth={1.5} />
+                          )}
+                          <span>{bookmarked ? 'Bookmarked' : 'Bookmark'}</span>
+                        </div>
+                      ),
+                      onClick: toggleBookmark,
+                    },
+                    {
+                      key: 'dl',
+                      label: (
+                        <div className="flex items-center gap-2">
+                          <File size={16} strokeWidth={1.5} />
+                          <span>Download video</span>
+                        </div>
+                      ),
+                    },
+                  ],
+                }}
+              >
+                <Button icon={<MoreOutlined />} size="small" />
+              </Dropdown>
+            </div>
 
             {/* queue controls — prev / autoplay / next across this issue's sessions */}
             <div className="flex items-center gap-1">
@@ -1071,8 +1069,6 @@ function IssueSessionPlayer() {
               </Tooltip>
             </div>
 
-            <Divider />
-
             <Tabs
               className="w-fit! border-b-0!"
               tabs={[
@@ -1105,7 +1101,7 @@ function IssueSessionPlayer() {
       {/* body: player column (shrinks) + right sidebar */}
       <div className="flex flex-1 min-h-0 w-full">
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          <SpotLocation />
+          <SpotLocation onPageTone />
           <div className={cn('w-full min-h-0 flex-1', isFullScreen ? '' : 'relative')}>
             <SpotVideoContainer
               videoURL={sessionVideo}
@@ -1145,8 +1141,11 @@ function IssueSessionPlayer() {
           ) : null}
 
           {/* timeline + issue indicators overlaid (player untouched). Sits
-              above the blue progress bar (zIndex) so it always reads clearly. */}
-          <div className="relative">
+              above the blue progress bar (zIndex) so it always reads clearly.
+              White, continuous with the controls below it, so the tone change
+              falls between the replay and the control bar as it does on the
+              session page. */}
+          <div className="relative bg-white">
             <SpotTimeline />
             <div
               className="pointer-events-none absolute inset-0"
@@ -1209,10 +1208,9 @@ function IssueSessionPlayer() {
             className="flex flex-col shrink-0 min-h-0 border-l bg-white"
             style={{ width: SIDEBAR_W, borderColor: 'var(--color-gray-light)' }}
           >
-            <div
-              className="flex items-center justify-between p-3 border-b"
-              style={{ borderColor: 'var(--color-gray-light)' }}
-            >
+            {/* No rule under the title: the session player's own side panel
+                (the events header) draws none either, it just leaves space. */}
+            <div className="flex items-center justify-between pl-4 pr-3 pt-4 pb-3">
               <span className="font-medium text-lg">Issue</span>
               <Button type="text" size="small" onClick={() => setTab(null)}>
                 <CloseOutlined />
@@ -1241,18 +1239,19 @@ function IssueSessionPlayer() {
                 >
                   {issue.head}
                 </span>
+                {/* Category, impact, critical. Held apart by space rather than
+                    by pipes: this row was the one Mehdi pointed at when he
+                    said the vertical separators are everywhere. */}
                 <div
-                  className="flex items-center gap-2.5 flex-wrap"
+                  className="flex items-center gap-4 flex-wrap"
                   style={{ color: 'var(--color-gray-medium)' }}
                 >
                   <CategoryLabel cat={issue.cat} />
-                  <span style={{ color: 'var(--color-gray-light)' }}>|</span>
                   <Tooltip title={`${impactLevel(issue.impact)} impact`}>
                     <span className="inline-flex items-center cursor-default">
                       <ImpactGauge value={issue.impact} />
                     </span>
                   </Tooltip>
-                  <span style={{ color: 'var(--color-gray-light)' }}>|</span>
                   <HeaderCriticalToggle issue={issue} />
                 </div>
               </div>
