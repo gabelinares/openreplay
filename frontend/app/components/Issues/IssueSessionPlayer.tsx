@@ -945,18 +945,19 @@ function IssueSessionPlayer() {
               Back to issue
             </Button>
           </Tooltip>
-          {/* Full-bleed and gray-lighter, copied from `PlayerBlockHeader`'s
-              divider beside Back. Full height reads as a column edge; the
-              floating `h-6` pill that used to sit here read as a tick mark,
-              which is the kind Mehdi was counting. */}
-          <div className="w-px h-full bg-gray-lighter" />
+          {/* Spot's divider, verbatim: `h-full rounded-xl border-l` at 1px,
+              so gray-light and full-bleed. Spot draws exactly two of these,
+              here and before the tabs, and nowhere else. */}
+          <div className="h-full rounded-xl border-l mr-2" style={{ width: 1 }} />
           {/* One line, as on the session page: this session's VARIATION of the
               issue, then when it happened, then everything else behind "More".
               The second line used to carry the parent issue, but "Back to
-              issue" names it and the Issue panel leads with it, so that was the
-              third place it appeared. The critical marker is gone for the same
-              reason: the panel already carries it (Mehdi 08-19). */}
+              issue" names it and the Issue panel leads with it, so that was
+              the third place it appeared. The critical marker leads the line:
+              it belongs to the session you are watching, not to the panel
+              (Gabriel 08-19). */}
           <div className="min-w-0 flex-1 flex items-center gap-2">
+            {issue && <HeaderCriticalToggle issue={issue} />}
             <Tooltip title={variation}>
               <span
                 className="font-medium truncate"
@@ -981,10 +982,10 @@ function IssueSessionPlayer() {
 
           {/* right cluster — sourced from the session replay subheader:
               Share (copy-at-time), Highlight, overflow, queue controls, tabs.
-              The three groups used to be fenced off by vertical rules; the
-              session subheader fences nothing, so they are held apart by a
-              wider gap instead (gap-4 between groups, gap-1 within). */}
-          <div className="ml-auto flex items-center gap-4 shrink-0">
+              Spot's arrangement: the actions run together, then ONE divider,
+              then the tabs. `self-stretch` so the divider's `h-full` has the
+              header's 50px to resolve against. */}
+          <div className="ml-auto flex items-center gap-2 shrink-0 self-stretch">
             <div className="flex items-center gap-1">
               <Popover
                 trigger="click"
@@ -1075,6 +1076,9 @@ function IssueSessionPlayer() {
                 />
               </Tooltip>
             </div>
+
+            {/* Spot's second and last divider, before the tabs */}
+            <div className="h-full rounded-xl border-l mx-2" style={{ width: 1 }} />
 
             <Tabs
               className="w-fit! border-b-0!"
@@ -1246,9 +1250,10 @@ function IssueSessionPlayer() {
                 >
                   {issue.head}
                 </span>
-                {/* Category, impact, critical. Held apart by space rather than
-                    by pipes: this row was the one Mehdi pointed at when he
-                    said the vertical separators are everywhere. */}
+                {/* Category and impact, held apart by space rather than by
+                    pipes: this row was the one Mehdi pointed at when he said
+                    the vertical separators are everywhere. Critical is not
+                    here; it lives in the header (Gabriel 08-19). */}
                 <div
                   className="flex items-center gap-4 flex-wrap"
                   style={{ color: 'var(--color-gray-medium)' }}
@@ -1259,7 +1264,6 @@ function IssueSessionPlayer() {
                       <ImpactGauge value={issue.impact} />
                     </span>
                   </Tooltip>
-                  <HeaderCriticalToggle issue={issue} />
                 </div>
               </div>
 
