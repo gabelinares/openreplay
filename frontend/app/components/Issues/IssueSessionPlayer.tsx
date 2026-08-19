@@ -939,16 +939,18 @@ function IssueSessionPlayer() {
           divider between header and page and it stays; what went was the four
           other strokes around it (Gabriel 08-19). */}
       {!isFullScreen && (
-        <div className="flex items-center gap-2 px-2 h-[50px] shrink-0 w-full bg-white border-b">
+        <div className="flex items-center px-2 h-[50px] shrink-0 w-full bg-white border-b">
           <Tooltip title={issue ? `Back to “${issue.head}”` : 'Back to issues'}>
             <Button type="text" size="small" icon={<ArrowLeft size={15} />} onClick={back} className="px-2">
               Back to issue
             </Button>
           </Tooltip>
-          {/* Spot's divider, verbatim: `h-full rounded-xl border-l` at 1px,
-              so gray-light and full-bleed. Spot draws exactly two of these,
-              here and before the tabs, and nowhere else. */}
-          <div className="h-full rounded-xl border-l mr-2" style={{ width: 1 }} />
+          {/* The Sessions divider, copied: `PlayerBlockHeader` line 99, whose
+              CSS-module twin spells it out as 1px wide, 49px tall (the header
+              less its border), 10px margins, gray-lighter. Quiet and
+              full-bleed. Sessions draws this one beside Back and none before
+              its tabs, so neither do we. */}
+          <div className="w-px h-full mx-2 bg-gray-lighter" />
           {/* One line, as on the session page: this session's VARIATION of the
               issue, then when it happened, then everything else behind "More".
               The second line used to carry the parent issue, but "Back to
@@ -982,10 +984,9 @@ function IssueSessionPlayer() {
 
           {/* right cluster — sourced from the session replay subheader:
               Share (copy-at-time), Highlight, overflow, queue controls, tabs.
-              Spot's arrangement: the actions run together, then ONE divider,
-              then the tabs. `self-stretch` so the divider's `h-full` has the
-              header's 50px to resolve against. */}
-          <div className="ml-auto flex items-center gap-2 shrink-0 self-stretch">
+              Sessions' arrangement: no dividers on this side at all, the
+              groups just run together with a gap. */}
+          <div className="ml-auto flex items-center gap-3 shrink-0">
             <div className="flex items-center gap-1">
               <Popover
                 trigger="click"
@@ -1076,9 +1077,6 @@ function IssueSessionPlayer() {
                 />
               </Tooltip>
             </div>
-
-            {/* Spot's second and last divider, before the tabs */}
-            <div className="h-full rounded-xl border-l mx-2" style={{ width: 1 }} />
 
             <Tabs
               className="w-fit! border-b-0!"
