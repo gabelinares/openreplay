@@ -29,10 +29,14 @@ function Tab({ i, tab, currentTab, changeTab, isLive, isClosed, name }: Props) {
         changeTab && !isLive ? 'cursor-pointer' : 'cursor-default',
         currentTab === tab
           ? 'border-gray-lighter border-t border-l border-r border-b-white! bg-white rounded-tl rounded-tr font-semibold'
-          : /* the inactive tabs had a pointer cursor and no hover at all, so
-               nothing told you they were targets. Lifting toward the active
-               tab's white is the hint that clicking makes this one active. */
-            'cursor-pointer border-gray-lighter border-b! border-t-transparent! border-l-transparent! border-r-transparent! hover:bg-white/50',
+          : /* Hover changes the LABEL, not the background. A pale fill is the
+               active tab's own treatment, so using it for hover made a hovered
+               tab read as a second active one — square-cornered, full-height and
+               optically larger than the tab it sat beside. `hover:text-teal` is
+               what the app's own `Tabs` component already does for the same
+               gesture, so this is its convention rather than a new one
+               (Gabriel 08-20). */
+            'cursor-pointer border-gray-lighter border-b! border-t-transparent! border-l-transparent! border-r-transparent! hover:text-teal',
       )}
     >
       <Tooltip
