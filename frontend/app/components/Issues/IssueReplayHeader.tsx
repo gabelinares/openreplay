@@ -22,6 +22,7 @@ import {
   ReplayBackButton,
   ReplayHeaderBar,
   ReplayIdentity,
+  ReplayQueueControls,
   ReplayTabStrip,
 } from 'Components/shared/ReplayChrome';
 import SessionCopyLink from 'Components/shared/SharePopup/SessionCopyLink';
@@ -220,45 +221,29 @@ function IssueReplayHeader({
             </Dropdown>
           }
           queue={
-            <>
-              <Tooltip
-                title="Previous session"
-                placement="bottom"
-                open={prevId ? undefined : false}
-              >
-                <Button
-                  size="small"
-                  shape="circle"
-                  disabled={!prevId}
-                  onClick={() => prevId && onGoSession(prevId)}
-                  icon={<LeftOutlined />}
-                />
-              </Tooltip>
-              <Tooltip title="Toggle autoplay" placement="bottom">
-                <Switch
-                  className="custom-switch"
-                  checked={autoplay}
-                  onChange={onToggleAutoplay}
-                  checkedChildren={
-                    <CaretRightOutlined className="switch-icon" />
-                  }
-                  unCheckedChildren={<PauseOutlined className="switch-icon" />}
-                />
-              </Tooltip>
-              <Tooltip
-                title="Next session"
-                placement="bottom"
-                open={nextId ? undefined : false}
-              >
-                <Button
-                  size="small"
-                  shape="circle"
-                  disabled={!nextId}
-                  onClick={() => nextId && onGoSession(nextId)}
-                  icon={<RightOutlined />}
-                />
-              </Tooltip>
-            </>
+            <ReplayQueueControls
+              onPrev={() => prevId && onGoSession(prevId)}
+              onNext={() => nextId && onGoSession(nextId)}
+              hasPrev={!!prevId}
+              hasNext={!!nextId}
+              prevLabel="Previous session"
+              nextLabel="Next session"
+              autoplay={
+                <Tooltip title="Toggle autoplay" placement="bottom">
+                  <Switch
+                    className="custom-switch"
+                    checked={autoplay}
+                    onChange={onToggleAutoplay}
+                    checkedChildren={
+                      <CaretRightOutlined className="switch-icon" />
+                    }
+                    unCheckedChildren={
+                      <PauseOutlined className="switch-icon" />
+                    }
+                  />
+                </Tooltip>
+              }
+            />
           }
         />
       }

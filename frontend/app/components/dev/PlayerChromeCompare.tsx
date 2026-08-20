@@ -6,6 +6,7 @@ import React from 'react';
 import { useStore } from 'App/mstore';
 import { Spot } from 'App/mstore/types/spot';
 import IssueReplayHeader from 'Components/Issues/IssueReplayHeader';
+import IssueSessionMore from 'Components/Issues/IssueSessionMore';
 import {
   MOCK_SESSION_POOL,
   buildSession,
@@ -359,7 +360,21 @@ function PlayerChromeCompare() {
               issue={issuesStore.all[0]}
               variation="Card declined, then retried twice"
               date="Jun 04, 2026, 10:14"
-              more={<div className="p-2 text-sm">session details</div>}
+              /* the real popover body, not a placeholder: it is a
+                 seven-row list, and a small box reading "session details" told
+                 Mehdi nothing about what he was reviewing */
+              more={
+                <IssueSessionMore
+                  issue={issuesStore.all[0]}
+                  email="jeremy.piatt@kaufmanrealty.com"
+                  browser="Chrome"
+                  os="Mac OS X"
+                  device="desktop"
+                  countryCode="US"
+                  city="Nokomis"
+                  metaList={[{ label: 'plan', value: 'paid' }]}
+                />
+              }
               onBack={() => {}}
               bookmarked={false}
               onToggleBookmark={() => {}}

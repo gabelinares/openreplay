@@ -17,6 +17,7 @@ export { default as ReplayBackButton } from './ReplayBackButton';
 export { default as ReplayDivider } from './ReplayDivider';
 export { default as ReplayIdentity } from './ReplayIdentity';
 export { default as ReplayActionCluster } from './ReplayActionCluster';
+export { default as ReplayQueueControls } from './ReplayQueueControls';
 export { default as ReplayTabStrip } from './ReplayTabStrip';
 export { default as ReplayBrowserTabs } from './ReplayBrowserTabs';
 export { default as ReplayLocationBar } from './ReplayLocationBar';

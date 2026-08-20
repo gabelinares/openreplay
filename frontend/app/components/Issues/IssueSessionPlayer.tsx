@@ -1,33 +1,16 @@
-import cn from 'classnames';
-import { createPortal } from 'react-dom';
-import { observer } from 'mobx-react-lite';
-import React from 'react';
 import {
-  ArrowLeft,
-  AlertTriangle,
-  Bookmark,
-  BookmarkCheck,
-  File,
-  User,
-  Search,
-  Play,
-  Tags,
-} from 'lucide-react';
-import {
-  MoreOutlined,
-  CloseOutlined,
-  UserSwitchOutlined,
-  InfoCircleOutlined,
-  ShareAltOutlined,
-  LeftOutlined,
-  RightOutlined,
   CaretRightOutlined,
+  CloseOutlined,
+  InfoCircleOutlined,
+  LeftOutlined,
+  MoreOutlined,
   PauseOutlined,
+  RightOutlined,
   SearchOutlined,
+  ShareAltOutlined,
+  UserSwitchOutlined,
 } from '@ant-design/icons';
-import Tabs from 'Components/Session/Tabs';
-import EventGroupWrapper from 'Components/Session_/EventsBlock/EventGroupWrapper';
-import eventsStyles from 'Components/Session_/EventsBlock/eventsBlock.module.css';
+import { SPEED_OPTIONS } from 'Player/player/Player';
 import { TYPES } from 'Types/session/event';
 import {
   Button,
@@ -40,42 +23,68 @@ import {
   Tooltip,
   message,
 } from 'antd';
-import HighlightButton from 'Components/Session_/Highlight/HighlightButton';
-import SessionCopyLink from 'Components/shared/SharePopup/SessionCopyLink';
-import 'Components/shared/AutoplayToggle/AutoplayToggle.css';
-
-import { useStore } from 'App/mstore';
-import { useHistory, useParams } from 'App/routing';
-
-import CriticalDialog from './CriticalDialog';
-import IssueReplayHeader from './IssueReplayHeader';
-import MoreCount from './MoreCount';
+import cn from 'classnames';
 import {
-  withSiteId,
-  issues as issuesRoute,
-  issue as issueDetailRoute,
-  issueSession as issueSessionRoute,
-} from 'App/routes';
-import { CountryFlag, EscapeButton, Icon } from 'UI';
+  AlertTriangle,
+  ArrowLeft,
+  Bookmark,
+  BookmarkCheck,
+  File,
+  Play,
+  Search,
+  Tags,
+  User,
+} from 'lucide-react';
+import { observer } from 'mobx-react-lite';
+import React from 'react';
+import { createPortal } from 'react-dom';
+
 import { countries } from 'App/constants';
-import { browserIcon, osIcon, deviceTypeIcon } from 'App/iconNames';
-import SessionInfoItem from 'Components/Session_/SessionInfoItem';
-import TagsRow from './TagsRow';
+import { browserIcon, deviceTypeIcon, osIcon } from 'App/iconNames';
+import { useStore } from 'App/mstore';
 import {
   CAT_ICON,
-  impactLevel,
   type Issue,
   type IssueSessionCard,
+  impactLevel,
 } from 'App/mstore/issuesStore';
-import { SegmentChip } from './segments/SegmentScope';
-
+import {
+  FullScreenButton,
+  PlayButton,
+  PlayTime,
+  PlayingState,
+} from 'App/player-ui';
+import {
+  issue as issueDetailRoute,
+  issueSession as issueSessionRoute,
+  issues as issuesRoute,
+  withSiteId,
+} from 'App/routes';
+import { useHistory, useParams } from 'App/routing';
 import {
   debounceUpdate,
   getDefaultPanelHeight,
 } from 'Components/Session/Player/ReplayPlayer/PlayerInst';
+import Tabs from 'Components/Session/Tabs';
+import EventGroupWrapper from 'Components/Session_/EventsBlock/EventGroupWrapper';
+import eventsStyles from 'Components/Session_/EventsBlock/eventsBlock.module.css';
+import HighlightButton from 'Components/Session_/Highlight/HighlightButton';
 import { SpotOverviewPanelCont } from 'Components/Session_/OverviewPanel/OverviewPanel';
+import ControlButton from 'Components/Session_/Player/Controls/ControlButton';
+import { SKIP_INTERVALS } from 'Components/Session_/Player/Controls/Controls';
+import {
+  IntervalSelector,
+  JumpBack,
+  JumpForward,
+  SpeedOptions,
+} from 'Components/Session_/Player/Controls/components/ControlsComponents';
+import SessionInfoItem from 'Components/Session_/SessionInfoItem';
 import SpotConsole from 'Components/Spots/SpotPlayer/components/Panels/SpotConsole';
 import SpotNetwork from 'Components/Spots/SpotPlayer/components/Panels/SpotNetwork';
+import SpotTimeline from 'Components/Spots/SpotPlayer/components/SpotTimeline';
+import SpotVideoContainer from 'Components/Spots/SpotPlayer/components/SpotVideoContainer';
+import spotPlayerStore from 'Components/Spots/SpotPlayer/spotPlayerStore';
+import 'Components/shared/AutoplayToggle/AutoplayToggle.css';
 import {
   ReplayActionCluster,
   ReplayBackButton,
@@ -84,36 +93,23 @@ import {
   ReplayLocationBar,
   ReplayTabStrip,
 } from 'Components/shared/ReplayChrome';
-import SpotTimeline from 'Components/Spots/SpotPlayer/components/SpotTimeline';
-import SpotVideoContainer from 'Components/Spots/SpotPlayer/components/SpotVideoContainer';
-import spotPlayerStore from 'Components/Spots/SpotPlayer/spotPlayerStore';
-import { SPEED_OPTIONS } from 'Player/player/Player';
-import {
-  IntervalSelector,
-  JumpBack,
-  JumpForward,
-  SpeedOptions,
-} from 'Components/Session_/Player/Controls/components/ControlsComponents';
-import {
-  FullScreenButton,
-  PlayButton,
-  PlayTime,
-  PlayingState,
-} from 'App/player-ui';
-import ControlButton from 'Components/Session_/Player/Controls/ControlButton';
-import { SKIP_INTERVALS } from 'Components/Session_/Player/Controls/Controls';
+import SessionCopyLink from 'Components/shared/SharePopup/SessionCopyLink';
+import { CountryFlag, EscapeButton, Icon } from 'UI';
 
-import { getMockSessionById } from './mockSessions';
+import CriticalDialog from './CriticalDialog';
+import IssueReplayHeader from './IssueReplayHeader';
+import IssueSessionMore from './IssueSessionMore';
+import MoreCount from './MoreCount';
 import { CategoryLabel, ImpactGauge } from './ProblemCard';
+import TagsRow from './TagsRow';
 import {
-  PerformancePanel,
-  GraphQLPanel,
-  StatePanel,
-  EventsPanel,
-  ProfilerPanel,
   BackendLogsPanel,
+  EventsPanel,
+  GraphQLPanel,
+  PerformancePanel,
+  ProfilerPanel,
+  StatePanel,
 } from './devPanels';
-import sessionVideo from './sessionVideo';
 import './issues.css';
 import {
   MOCK_CLICKS,
@@ -121,6 +117,9 @@ import {
   MOCK_LOGS,
   MOCK_NETWORK,
 } from './mockSessionData';
+import { getMockSessionById } from './mockSessions';
+import { SegmentChip } from './segments/SegmentScope';
+import sessionVideo from './sessionVideo';
 
 /* Full-screen session player for an issue's session — the real Spot player
    (location bar, video, timeline, controls, X-Ray / Console / Network panels)
@@ -187,7 +186,11 @@ const IssueActivity = observer(({ onClose }: { onClose: () => void }) => {
   return (
     <div
       className="h-full bg-white border-l flex flex-col"
-      style={{ minWidth: 320, width: 320, borderColor: 'var(--color-gray-light)' }}
+      style={{
+        minWidth: 320,
+        width: 320,
+        borderColor: 'var(--color-gray-light)',
+      }}
     >
       {/* header — the real session-replay EventsBlock header (default-size
           controls, same gradient + CSS module), not Spot's */}
@@ -327,7 +330,6 @@ function TagChip({ label }: { label: string }) {
   );
 }
 
-
 /* Break a journey sentence into ordered steps so it can be drawn as a path
    rather than read as prose ("they won't read it"). Splits on clause commas
    and strips leading connectors. */
@@ -435,11 +437,18 @@ const JourneyView = observer(({ card }: { card?: IssueSessionCard }) => {
                 : undefined,
             }}
           >
-            <div className="flex flex-col items-center shrink-0" style={{ width: 7 }}>
+            <div
+              className="flex flex-col items-center shrink-0"
+              style={{ width: 7 }}
+            >
               {/* lead: positions the dot level with the first line; colored
                   (except on the first step) so it connects to the rail above */}
               <span
-                style={{ height: RAIL_LEAD, width: 1, background: i === 0 ? 'transparent' : RAIL }}
+                style={{
+                  height: RAIL_LEAD,
+                  width: 1,
+                  background: i === 0 ? 'transparent' : RAIL,
+                }}
               />
               <span
                 style={{
@@ -447,11 +456,15 @@ const JourneyView = observer(({ card }: { card?: IssueSessionCard }) => {
                   height: active ? 8 : 6,
                   borderRadius: 9999,
                   background: dot,
-                  boxShadow: active ? `0 0 0 3px ${last ? 'var(--color-red-lightest)' : 'rgba(57,78,255,0.18)'}` : undefined,
+                  boxShadow: active
+                    ? `0 0 0 3px ${last ? 'var(--color-red-lightest)' : 'rgba(57,78,255,0.18)'}`
+                    : undefined,
                 }}
               />
               {!last && (
-                <span style={{ flex: 1, width: 1, minHeight: 8, background: RAIL }} />
+                <span
+                  style={{ flex: 1, width: 1, minHeight: 8, background: RAIL }}
+                />
               )}
             </div>
             <div className="py-2 flex flex-col items-start gap-2 min-w-0 flex-1">
@@ -497,9 +510,7 @@ function DetailsView({ issue }: { issue: Issue }) {
     fontSize: 15,
     lineHeight: 1.65,
   };
-  const eyebrow = (
-    text: string,
-  ) => (
+  const eyebrow = (text: string) => (
     <span
       className="text-xs font-semibold uppercase"
       style={{ color: 'var(--color-gray-medium)', letterSpacing: '0.05em' }}
@@ -621,16 +632,28 @@ const IssueDevControls = observer(
       spotPlayerStore.setIsPlaying(!spotPlayerStore.isPlaying);
     };
     const back = () =>
-      spotPlayerStore.setTime(spotPlayerStore.time - spotPlayerStore.skipInterval);
+      spotPlayerStore.setTime(
+        spotPlayerStore.time - spotPlayerStore.skipInterval,
+      );
     const forth = () =>
-      spotPlayerStore.setTime(spotPlayerStore.time + spotPlayerStore.skipInterval);
+      spotPlayerStore.setTime(
+        spotPlayerStore.time + spotPlayerStore.skipInterval,
+      );
     const toggle = (t: DevTab) => setDevTab(devTab === t ? null : t);
 
     return (
       <div className="hidden lg:flex w-full p-4 items-center gap-4 bg-white">
-        <PlayButton togglePlay={togglePlay} state={spotPlayerStore.state} iconSize={36} />
+        <PlayButton
+          togglePlay={togglePlay}
+          state={spotPlayerStore.state}
+          iconSize={36}
+        />
         <div className="px-2 py-1 bg-white rounded-sm font-semibold flex items-center gap-2">
-          <PlayTime isCustom time={spotPlayerStore.time * 1000} format="mm:ss" />
+          <PlayTime
+            isCustom
+            time={spotPlayerStore.time * 1000}
+            format="mm:ss"
+          />
           <span>/</span>
           <div>{spotPlayerStore.durationString}</div>
         </div>
@@ -638,16 +661,24 @@ const IssueDevControls = observer(
           className="rounded-sm ml-1 bg-white border-gray-lighter flex items-center"
           style={{ gap: 1 }}
         >
-          <JumpBack backTenSeconds={back} currentInterval={spotPlayerStore.skipInterval} />
+          <JumpBack
+            backTenSeconds={back}
+            currentInterval={spotPlayerStore.skipInterval}
+          />
           <IntervalSelector
             skipIntervals={SKIP_INTERVALS}
             setSkipInterval={spotPlayerStore.setSkipInterval}
             currentInterval={spotPlayerStore.skipInterval}
           />
-          <JumpForward forthTenSeconds={forth} currentInterval={spotPlayerStore.skipInterval} />
+          <JumpForward
+            forthTenSeconds={forth}
+            currentInterval={spotPlayerStore.skipInterval}
+          />
         </div>
         <SpeedOptions
-          toggleSpeed={(s: number) => spotPlayerStore.setPlaybackRate(SPEED_OPTIONS[s])}
+          toggleSpeed={(s: number) =>
+            spotPlayerStore.setPlaybackRate(SPEED_OPTIONS[s])
+          }
           disabled={false}
           speed={spotPlayerStore.playbackRate}
         />
@@ -786,7 +817,8 @@ function IssueSessionPlayer() {
     const startHeight = panelHeight;
     const onMove = (ev: MouseEvent) => {
       const diff = startHeight - (ev.clientY - startY);
-      const max = diff > window.innerHeight / 1.5 ? window.innerHeight / 1.5 : diff;
+      const max =
+        diff > window.innerHeight / 1.5 ? window.innerHeight / 1.5 : diff;
       setPanelHeight(Math.max(50, max));
       debounceUpdate(Math.max(50, max));
     };
@@ -809,64 +841,16 @@ function IssueSessionPlayer() {
 
   const CatIc = issue ? CAT_ICON[issue.cat] : null;
   const morePopover = (
-    <div className="text-left bg-white">
-      {issue && CatIc && (
-        <SessionInfoItem
-          comp={<CatIc size={16} strokeWidth={2} style={{ color: '#3EAAAF' }} />}
-          label="Category"
-          value={issue.cat}
-        />
-      )}
-      <SessionInfoItem
-        comp={
-          <User size={16} strokeWidth={2} style={{ color: 'var(--color-gray-medium)' }} />
-        }
-        label="User"
-        value={email}
-      />
-      <SessionInfoItem
-        comp={<CountryFlag country={countryCode} />}
-        label={countries[countryCode] || countryCode || 'Unknown'}
-        value={city}
-      />
-      <SessionInfoItem icon={browserIcon(browser)} label={browser} value="v144.0.0" />
-      <SessionInfoItem icon={osIcon(os)} label={os} value="10.15.7" />
-      <SessionInfoItem
-        icon={deviceTypeIcon(device)}
-        label={device}
-        value="1440 × 900"
-        isLast={metaList.length === 0}
-      />
-      {/* User metadata — customer-defined, can be many (Mehdi: up to 10/15+), so
-          it is ONE more row in this list rather than a block with its own grammar
-          below it. The split two-tone MetaItem pill was the only tag on the page
-          that read as two chips glued together; these are single-tone, the key
-          quiet and the value dark, and the row folds its overflow behind "+N"
-          instead of wrapping into a ragged block (Gabriel 08-11, OR-3665). */}
-      {metaList.length > 0 && (
-        <SessionInfoItem
-          comp={
-            <Tags size={16} strokeWidth={2} style={{ color: 'var(--color-gray-medium)' }} />
-          }
-          label="Metadata"
-          isLast
-          value={
-            // A fixed cell so the row can measure and fold — left to grow, six
-            // pills would drag the popover off the screen. 280 rather than 200 so
-            // two average pairs usually fit before the "+N" (Gabriel 08-11).
-            //
-            // color-gray-darkest resets what this cell would otherwise impose:
-            // SessionInfoItem's value column is gray-medium (#888) and MetaItem's
-            // key takes its colour by inheritance, so the identical component came
-            // out washed here and dark (#333) in the sessions list. Reusing a
-            // component means not restyling it through its container either.
-            <div className="color-gray-darkest" style={{ width: 280 }}>
-              <TagsRow tags={metaList} />
-            </div>
-          }
-        />
-      )}
-    </div>
+    <IssueSessionMore
+      issue={issue}
+      email={email}
+      browser={browser}
+      os={os}
+      device={device}
+      countryCode={countryCode}
+      city={city}
+      metaList={metaList}
+    />
   );
 
   /* The overlay takes the app's own page tone (--color-gray-lightest, what
@@ -876,7 +860,10 @@ function IssueSessionPlayer() {
      all of that into one white sheet, and every boundary then had to be drawn
      as a line (Mehdi 08-19: "there are too many lines"). */
   const content = (
-    <div className="fixed inset-0 bg-gray-lightest flex flex-col overflow-hidden" style={{ zIndex: 2147482000 }}>
+    <div
+      className="fixed inset-0 bg-gray-lightest flex flex-col overflow-hidden"
+      style={{ zIndex: 2147482000 }}
+    >
       {isFullScreen && (
         <EscapeButton onClose={() => spotPlayerStore.setIsFullScreen(false)} />
       )}
@@ -909,9 +896,16 @@ function IssueSessionPlayer() {
           {/* the one stroke in the whole header region: the bar above draws
               none, so this hairline closes the white chrome against the stage */}
           <ReplayLocationBar
-            url={spotPlayerStore.getClosestLocation(spotPlayerStore.time)?.location}
+            url={
+              spotPlayerStore.getClosestLocation(spotPlayerStore.time)?.location
+            }
           />
-          <div className={cn('w-full min-h-0 flex-1', isFullScreen ? '' : 'relative')}>
+          <div
+            className={cn(
+              'w-full min-h-0 flex-1',
+              isFullScreen ? '' : 'relative',
+            )}
+          >
             <SpotVideoContainer
               videoURL={sessionVideo}
               checkReady={() => Promise.resolve(true)}
@@ -936,7 +930,10 @@ function IssueSessionPlayer() {
                   <SpotConsole onClose={() => setDevTab(null)} />
                 )}
                 {devTab === 'network' && (
-                  <SpotNetwork onClose={() => setDevTab(null)} panelHeight={panelHeight} />
+                  <SpotNetwork
+                    onClose={() => setDevTab(null)}
+                    panelHeight={panelHeight}
+                  />
                 )}
                 {devTab === 'overview' && <X_Ray />}
                 {devTab === 'performance' && <PerformancePanel />}

@@ -31,7 +31,19 @@ function ReplayBrowserTabs({ isLive }: { isLive?: boolean }) {
   if (!(tabs instanceof Set) || tabs.size <= 1) return null;
 
   return (
-    <div className="w-full px-4 flex items-center shrink-0 bg-white">
+    /* Height and `items-end` are the whole point of this row, and I had left
+       both out. `Tab` positions itself with `self-end` and a -2px bottom margin
+       so it sits ON the row's bottom rule with air above it — that air is what
+       makes it read as a browser tab rather than a chip. In the old `Subheader`
+       the height came for free from the tools cluster sitting beside the tabs;
+       moving the tools up into the header bar collapsed this row to the tab's
+       own height and the gap vanished with it.
+       Mehdi named exactly this on 08-19: "it's a tab but it's not clear it's a
+       tab because it's very close to the header." */
+    <div
+      className="w-full px-4 flex items-end shrink-0 bg-white border-b border-gray-lighter"
+      style={{ height: 36 }}
+    >
       <SessionTabs isLive={isLive} />
     </div>
   );
