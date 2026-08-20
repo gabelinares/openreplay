@@ -71,7 +71,12 @@ export default function ReplayHeaderBar({
     <div
       className={cn(
         'flex items-center px-2 shrink-0 w-full bg-white',
-        'border-b border-gray-light',
+        /* `border-b-gray-light`, NOT `border-gray-light`: `general.css:179`
+           redeclares the latter as `border: solid thin ...`, which beats
+           Tailwind's colour-only utility and puts a 1px line on all FOUR sides.
+           The side-specific spelling is colour-only. `gray-lighter` has no such
+           redeclaration, which is why only this token bites. */
+        'border-b border-b-gray-light',
         hidden && 'hidden',
       )}
       style={{ height: REPLAY_HEADER_HEIGHT }}

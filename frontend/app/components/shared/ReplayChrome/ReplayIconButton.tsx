@@ -7,6 +7,10 @@ interface Props {
   title: string;
   onClick?: () => void;
   disabled?: boolean;
+  /** on/off state for the buttons that are toggles. Tinted orange when on,
+   *  which is the colour that control already had as a switch — recognisable
+   *  rather than a new accent. */
+  active?: boolean;
   /** opens a menu on click (the overflow button) */
   menu?: MenuProps;
   /** opens a panel on click (share) */
@@ -40,6 +44,7 @@ export default function ReplayIconButton({
   title,
   onClick,
   disabled,
+  active,
   menu,
   popover,
   popupZIndex,
@@ -51,6 +56,16 @@ export default function ReplayIconButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={title}
+      aria-pressed={active === undefined ? undefined : active}
+      style={
+        active
+          ? {
+              color: 'var(--color-orange)',
+              borderColor: 'var(--color-orange)',
+              background: 'var(--color-orange-lightest)',
+            }
+          : undefined
+      }
     />
   );
 

@@ -3,9 +3,9 @@ import cn from 'classnames';
 import {
   BookmarkCheck,
   Bookmark as BookmarkIcn,
-  Check,
   File,
   Keyboard,
+  ListFilter,
   Vault,
 } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
@@ -41,9 +41,10 @@ import QueueControls from './QueueControls';
  * show only on a multi-tab session.
  *
  * The logic here is moved verbatim, not rewritten. The one behavioural change is
- * that the "Search Events Only" switch becomes a menu item: it was a labelled
- * antd Switch sitting in the bar, and a labelled control cannot live in a fixed
- * 50px single line.
+ * that the "Search Events Only" switch becomes a compact icon TOGGLE beside the
+ * other actions. It was a labelled antd Switch sitting in the bar, which a fixed
+ * 50px single line has no room for; it spent one round as a menu item, which was
+ * worse — a mode reading as a checked list row. It keeps its orange.
  */
 function SessionToolsCluster({
   setActiveTab,
@@ -168,42 +169,7 @@ function SessionToolsCluster({
       disabled: !enabledIntegration,
       onClick: handleOpenIssueModal,
     },
-    {
-      key: '1',
-      label: (
-        <div className="flex items-center gap-2">
-          <Keyboard size={16} strokeWidth={1} />
-          <span>{t('Keyboard Shortcuts')}</span>
-        </div>
-      ),
-      onClick: showKbHelp,
-    },
   ];
-
-  /* Was a labelled Switch in the bar. It is conditional on the search that
-     opened this session having had event filters, so it also came and went,
-     changing the bar's width as it did. */
-  if (uiPlayerStore.showSearchEventsSwitchButton) {
-    dropdownItems.push({
-      key: '6',
-      label: (
-        <div className="flex items-center gap-2">
-          <Check
-            size={16}
-            strokeWidth={1}
-            style={{
-              opacity: uiPlayerStore.showOnlySearchEvents ? 1 : 0,
-            }}
-          />
-          <span>{t('Search Events Only')}</span>
-        </div>
-      ),
-      onClick: () =>
-        uiPlayerStore.setShowOnlySearchEvents(
-          !uiPlayerStore.showOnlySearchEvents,
-        ),
-    });
-  }
 
   if (account.hasVideoExport) {
     dropdownItems.push({
@@ -218,6 +184,20 @@ function SessionToolsCluster({
       disabled: !account.hasExportPermission,
     });
   }
+
+  /* grouped the way Spot's and issue replay's menus are: what this session IS,
+     then a rule, then Keyboard Shortcuts last */
+  dropdownItems.push({ type: 'divider' as const });
+  dropdownItems.push({
+    key: '1',
+    label: (
+      <div className="flex items-center gap-2">
+        <Keyboard size={16} strokeWidth={1} />
+        <span>{t('Keyboard Shortcuts')}</span>
+      </div>
+    ),
+    onClick: showKbHelp,
+  });
 
   return (
     <div className={cn(hasIframe ? 'opacity-50 pointer-events-none' : '')}>
@@ -239,7 +219,26 @@ function SessionToolsCluster({
           />
         }
         highlight={
-          <HighlightButton onClick={() => setActiveTab('HIGHLIGHT')} />
+          <>
+            <HighlightButton onClick={() => setActiveTab('HIGHLIGHT')} />
+            {/* Beside the other actions rather than buried in the overflow menu,
+                where it read as an odd checked row taking a whole line for a
+                control that is really a mode. Same 24px button as its
+                neighbours, and orange when on — the colour it already had as a
+                switch, so it stays recognisable (Gabriel 08-20). */}
+            {uiPlayerStore.showSearchEventsSwitchButton && (
+              <ReplayIconButton
+                title={t('Search Events Only')}
+                active={uiPlayerStore.showOnlySearchEvents}
+                icon={<ListFilter size={15} strokeWidth={2} />}
+                onClick={() =>
+                  uiPlayerStore.setShowOnlySearchEvents(
+                    !uiPlayerStore.showOnlySearchEvents,
+                  )
+                }
+              />
+            )}
+          </>
         }
         overflow={
           <ReplayIconButton

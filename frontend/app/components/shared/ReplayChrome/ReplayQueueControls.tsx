@@ -44,7 +44,11 @@ export default function ReplayQueueControls({
   autoplay,
 }: Props) {
   return (
-    <div className="flex items-center gap-1">
+    /* No gap between the arrows and the switch: the `p-1` on each arrow already
+       supplies 4px of breathing room per side, and adding the container's gap on
+       top pushed the switch a visible distance away from the controls it belongs
+       to (Gabriel 08-20). The padding stays — it is the arrows' hit area. */
+    <div className="flex items-center">
       <div
         onClick={hasPrev ? onPrev : undefined}
         className={cn('p-1 group rounded-full', {
@@ -73,7 +77,7 @@ export default function ReplayQueueControls({
 
       <div
         onClick={hasNext ? onNext : undefined}
-        className={cn('p-1 group ml-1 rounded-full', {
+        className={cn('p-1 group rounded-full', {
           'pointer-events-none opacity-50': !hasNext,
           'cursor-pointer': hasNext,
         })}

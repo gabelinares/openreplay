@@ -33,7 +33,6 @@ import {
 import { Avatar, Icon } from 'UI';
 
 import { TABS, Tab } from '../consts';
-import spotPlayerStore from '../spotPlayerStore';
 import AccessModal from './AccessModal';
 
 const spotLink = spotsList();
@@ -61,6 +60,7 @@ function SpotPlayerHeader({
   browserVersion,
   resolution,
   platform,
+  pageUrl,
 }: {
   activeTab: Tab | null;
   setActiveTab: (tab: Tab | null) => void;
@@ -70,6 +70,12 @@ function SpotPlayerHeader({
   browserVersion: string | null;
   resolution: string | null;
   platform: string | null;
+  /** the page the recording is on. A prop like every other fact this header
+   *  shows, rather than a reach into `spotPlayerStore`: the header has no other
+   *  reason to know that store exists, and the chrome review has to be able to
+   *  render it without seeding a global singleton — seeding one crashed the whole
+   *  page, because `setEvents` dereferences `location.navTiming`. */
+  pageUrl?: string | null;
 }) {
   const { t } = useTranslation();
   const { spotStore, userStore } = useStore();
@@ -82,10 +88,6 @@ function SpotPlayerHeader({
   const history = useHistory();
   const [accessOpen, setAccessOpen] = React.useState(false);
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
-  const loc = spotPlayerStore.getClosestLocation(
-    spotPlayerStore.time,
-  )?.location;
-  const currentUrl = loc === 'loading' ? null : loc;
 
   const onCopy = () => {
     copy(window.location.href);
@@ -167,7 +169,7 @@ function SpotPlayerHeader({
       browserVersion={browserVersion ?? undefined}
       os={platform ?? undefined}
       resolution={resolution ?? ''}
-      url={currentUrl}
+      url={pageUrl}
     />
   );
 

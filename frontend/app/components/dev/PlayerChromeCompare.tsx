@@ -134,7 +134,7 @@ function Body({
       </div>
       {sidebar > 0 && (
         <div
-          className="bg-white border-l border-gray-light flex items-start justify-center pt-3 text-xs shrink-0"
+          className="bg-white border-l border-l-gray-light flex items-start justify-center pt-3 text-xs shrink-0"
           style={{ width: sidebar, color: 'var(--color-gray-medium)' }}
         >
           side panel {sidebar}px
@@ -258,6 +258,7 @@ function PlayerChromeCompare() {
          - the Search Events Only item only exists when the search that opened the
            session had event filters. Turn that on. */
       customFieldStore.list = [{ key: 'plan' }, { key: 'tier' }] as any;
+
       uiPlayerStore.setSearchEventsSwitchButton(true);
       uiPlayerStore.setShowOnlySearchEvents(true);
       spotStore.currentSpot = new Spot({
@@ -301,13 +302,14 @@ function PlayerChromeCompare() {
           className="text-sm max-w-3xl"
           style={{ color: 'var(--color-gray-medium)' }}
         >
-          One bar at a fixed 50px, separating from the stage by tone with no
-          rule under it. One full-bleed divider, after Back. Icon-only actions
-          in one fixed order, all 24px, no dividers on that side. The tab strip
-          and the URL strip appear together or not at all, and on the ordinary
-          single-tab session neither appears: the page is a row in More instead.
-          Both strips sit inside the column that narrows when the side panel
-          opens.
+          One bar at a fixed 50px, closed by a single rule in the same grey as
+          the side panel's own edge, so the two read as one frame and the panel
+          begins exactly on that line. One full-bleed divider, after Back.
+          Icon-only actions in one fixed order, all 24px, no dividers on that
+          side. The tab strip and the URL strip appear together or not at all,
+          and on the ordinary single-tab session neither appears: the page is a
+          row in More instead. Both strips sit inside the column that narrows
+          when the side panel opens.
         </p>
         <p className="text-sm" style={{ color: 'var(--color-gray-medium)' }}>
           Both sides are built from the real components. The before panels
@@ -373,6 +375,7 @@ function PlayerChromeCompare() {
               resolution="1470x956"
               platform="Mac Arm64"
               browserVersion="148.0.0.0"
+              pageUrl={MOCK_URL}
             />
             <Body sidebar={320} />
           </PlayerContext.Provider>
@@ -419,6 +422,8 @@ function PlayerChromeCompare() {
                   countryCode="US"
                   city="Nokomis"
                   metaList={[{ label: 'plan', value: 'paid' }]}
+                  /* the page, since issue replay draws no URL strip */
+                  url={MOCK_URL}
                 />
               }
               onBack={() => {}}

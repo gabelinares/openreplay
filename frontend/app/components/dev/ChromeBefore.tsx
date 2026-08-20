@@ -70,7 +70,11 @@ const SpotDivider = ({ cls = 'mx-2' }: { cls?: string }) => (
   <div className={`h-full rounded-xl border-l ${cls}`} style={{ width: 1 }} />
 );
 
-/** issue: `h-6 border-l border-gray-light mx-1` — the floating tick */
+/** issue: `h-6 border-l border-gray-light mx-1` — the floating tick.
+    Kept verbatim, bug included: `general.css:179` redeclares
+    `.border-gray-light` as `border: solid thin`, so this renders in production as
+    a 1px BOX rather than a left edge, and the header bar below carries a box for
+    the same reason. Part of why that header reads as busy. */
 const IssueDivider = () => (
   <div className="h-6 border-l border-gray-light mx-1" />
 );

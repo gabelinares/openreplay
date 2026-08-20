@@ -179,6 +179,9 @@ function SpotPlayer() {
   };
 
   const { isFullScreen } = spotPlayerStore;
+  const spotLocation = spotPlayerStore.getClosestLocation(
+    spotPlayerStore.time,
+  )?.location;
   // 2nd player option
   // const base64toblob = (str: string) => {
   //   const byteCharacters = atob(str);
@@ -223,6 +226,11 @@ function SpotPlayer() {
         resolution={spotPlayerStore.resolution}
         platform={spotPlayerStore.platform}
         browserVersion={spotPlayerStore.browserVersion}
+        pageUrl={
+          /* `getClosestLocation` returns a 'loading' sentinel before the mob
+             file parses, rather than nothing */
+          spotLocation === 'loading' ? null : spotLocation
+        }
       />
       <div className="w-full h-full flex">
         <div className="w-full h-full flex flex-col justify-between">
