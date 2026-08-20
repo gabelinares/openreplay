@@ -5,7 +5,6 @@ import {
   Bookmark as BookmarkIcn,
   File,
   Keyboard,
-  ListFilter,
   Vault,
 } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
@@ -202,6 +201,44 @@ function SessionToolsCluster({
   return (
     <div className={cn(hasIframe ? 'opacity-50 pointer-events-none' : '')}>
       <ReplayActionCluster
+        toggles={
+          /* Its own group: this is the only control here that holds a state
+             rather than doing something once, and sitting among the actions made
+             it look like a button stuck in a pressed state.
+             The tooltip carries the state, because the orange alone says "on"
+             without saying on for what — off invites, on reports. */
+          uiPlayerStore.showSearchEventsSwitchButton ? (
+            <ReplayIconButton
+              title={
+                uiPlayerStore.showOnlySearchEvents
+                  ? t('Showing only search events')
+                  : t('Show only search events')
+              }
+              active={uiPlayerStore.showOnlySearchEvents}
+              icon={
+                /* the app's OWN funnel, not a fresh lucide glyph: the sprite
+                   already carries one and `frontend/CLAUDE.md` says reuse before
+                   importing. Filled when on, outline when off, so the state
+                   reads by SHAPE as well as by the orange — `ListFilter` was
+                   neither, and read as a sort control. */
+                <Icon
+                  name={
+                    uiPlayerStore.showOnlySearchEvents
+                      ? 'funnel-fill'
+                      : 'funnel'
+                  }
+                  color="inherit"
+                  size={15}
+                />
+              }
+              onClick={() =>
+                uiPlayerStore.setShowOnlySearchEvents(
+                  !uiPlayerStore.showOnlySearchEvents,
+                )
+              }
+            />
+          ) : undefined
+        }
         share={
           <ReplayIconButton
             title={t('Share Session')}
@@ -219,26 +256,7 @@ function SessionToolsCluster({
           />
         }
         highlight={
-          <>
-            <HighlightButton onClick={() => setActiveTab('HIGHLIGHT')} />
-            {/* Beside the other actions rather than buried in the overflow menu,
-                where it read as an odd checked row taking a whole line for a
-                control that is really a mode. Same 24px button as its
-                neighbours, and orange when on — the colour it already had as a
-                switch, so it stays recognisable (Gabriel 08-20). */}
-            {uiPlayerStore.showSearchEventsSwitchButton && (
-              <ReplayIconButton
-                title={t('Search Events Only')}
-                active={uiPlayerStore.showOnlySearchEvents}
-                icon={<ListFilter size={15} strokeWidth={2} />}
-                onClick={() =>
-                  uiPlayerStore.setShowOnlySearchEvents(
-                    !uiPlayerStore.showOnlySearchEvents,
-                  )
-                }
-              />
-            )}
-          </>
+          <HighlightButton onClick={() => setActiveTab('HIGHLIGHT')} />
         }
         overflow={
           <ReplayIconButton

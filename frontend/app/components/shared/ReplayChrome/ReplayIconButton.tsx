@@ -57,6 +57,11 @@ export default function ReplayIconButton({
       disabled={disabled}
       aria-label={title}
       aria-pressed={active === undefined ? undefined : active}
+      /* only for the plain buttons: a mouse press must not move focus here, or
+         antd leaves the button tinted blue afterwards and a toggle then reads as
+         two states at once. Menus and popovers keep the default, since antd's
+         trigger needs it. Keyboard focus is untouched either way. */
+      onMouseDown={menu || popover ? undefined : (e) => e.preventDefault()}
       style={
         active
           ? {

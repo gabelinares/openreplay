@@ -1,6 +1,12 @@
 import React from 'react';
 
 interface Props {
+  /** controls that hold a STATE rather than doing something once — the
+   *  search-events filter is the only one so far. Their own group, ahead of the
+   *  actions, because they change what you are looking at rather than acting on
+   *  the recording, and mixing the two made the odd one out look like a button
+   *  that had got stuck on (Gabriel 08-20). */
+  toggles?: React.ReactNode;
   /** share the moment. Three implementations existed for this one verb: a modal
    *  (session), a popover (issue), and a silent clipboard write with a toast
    *  (Spot). The slot does not care which lands here, but there should be one. */
@@ -30,6 +36,7 @@ interface Props {
    Access") and it is most of why its bar read as different software (Gabriel
    08-20). Labels also cannot fit a fixed 50px single-line bar. */
 export default function ReplayActionCluster({
+  toggles,
   share,
   highlight,
   overflow,
@@ -39,6 +46,7 @@ export default function ReplayActionCluster({
 
   return (
     <div className="flex items-center gap-3 shrink-0">
+      {toggles && <div className="flex items-center gap-1">{toggles}</div>}
       {/* rendered as named slots rather than a mapped array: they are fixed
           positions, so they need no keys and cannot be reordered by accident */}
       {hasActs && (
