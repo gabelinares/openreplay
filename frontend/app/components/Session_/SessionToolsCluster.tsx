@@ -218,18 +218,17 @@ function SessionToolsCluster({
               icon={
                 /* the app's OWN funnel, not a fresh lucide glyph: the sprite
                    already carries one and `frontend/CLAUDE.md` says reuse before
-                   importing. Filled when on, outline when off, so the state
-                   reads by SHAPE as well as by the orange — `ListFilter` was
-                   neither, and read as a sort control. */
-                <Icon
-                  name={
-                    uiPlayerStore.showOnlySearchEvents
-                      ? 'funnel-fill'
-                      : 'funnel'
-                  }
-                  color="inherit"
-                  size={15}
-                />
+                   importing.
+
+                   Outline in BOTH states. It was filled when on, which gave the
+                   state a shape cue as well as a colour one — but nothing else in
+                   the app uses fill to mean state. The filled glyphs that do
+                   exist (`play-fill`, `caret-down-fill`, `check-circle-fill`) are
+                   shapes that are solid by nature, not the on-half of a pair. A
+                   pattern invented in one button is a pattern nobody reads, so
+                   the orange and the tooltip carry the state alone
+                   (Gabriel 08-20). */
+                <Icon name="funnel" color="inherit" size={15} />
               }
               onClick={() =>
                 uiPlayerStore.setShowOnlySearchEvents(
