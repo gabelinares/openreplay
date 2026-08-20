@@ -54,7 +54,13 @@ function stubContext(tabs: string[]) {
     tabs: new Set(tabs),
     currentTab: tabs[0],
     closedTabs: [],
-    tabNames: {} as Record<string, string>,
+    /* real page titles: `Tab` falls back to "Tab N" without them, and the strip
+       then reads nothing like the one in production */
+    tabNames: {
+      'tab-1': 'Checkout - Acme',
+      'tab-2': 'Cart - Acme',
+      'tab-3': 'Payment provider',
+    } as Record<string, string>,
   };
   return {
     store: { get: () => state },
@@ -201,7 +207,7 @@ function Pair({
 }
 
 function PlayerChromeCompare() {
-  const { sessionStore, spotStore } = useStore();
+  const { sessionStore, spotStore, issuesStore } = useStore();
   const [ready, setReady] = React.useState(false);
   const [tab, setTab] = React.useState<'activity' | 'issue' | null>(null);
 
@@ -262,9 +268,11 @@ function PlayerChromeCompare() {
           spacing of its own.
         </p>
         <p className="text-sm" style={{ color: 'var(--color-gray-medium)' }}>
-          After panels are the real components. Before panels are frozen
-          snapshots of the previous markup, so they stay put as the real ones
-          change.
+          Both sides are built from the real components. The before panels
+          restate only the old container markup — the bars, the dividers, the
+          paddings — and mount the same `BackLink`, `UserCard`, `SessionTabs`,
+          `Avatar` and `Tabs` the old headers did, all of which still exist
+          because mobile replay and live still use them.
         </p>
       </header>
 
@@ -273,8 +281,10 @@ function PlayerChromeCompare() {
         blurb="Two stacked bars became one. The tools moved up into the identity bar, which left the second bar holding a single tab chip — so it is now conditional on the session actually having more than one tab. The far-right metadata and the labelled Search Events switch moved behind More and into the overflow menu, because neither fits a fixed single line."
       >
         <Shot kind="before" label="Session replay" strokes={3} sidebar={270}>
-          <SessionBefore />
-          <Stage sidebar={270} />
+          <PlayerContext.Provider value={single}>
+            <SessionBefore />
+            <Stage sidebar={270} />
+          </PlayerContext.Provider>
         </Shot>
         <Shot
           kind="after"
@@ -301,8 +311,10 @@ function PlayerChromeCompare() {
         blurb="The bar stops growing with its data: the second line of browser, resolution and platform moves behind More. Copy and Manage Access lose their labels and become one share popover, since both of them are sharing. Both full-height dividers on the right go."
       >
         <Shot kind="before" label="Spot" strokes={4} sidebar={320}>
-          <SpotBefore />
-          <Stage sidebar={320} />
+          <PlayerContext.Provider value={single}>
+            <SpotBefore />
+            <Stage sidebar={320} />
+          </PlayerContext.Provider>
         </Shot>
         <Shot kind="after" label="Spot" strokes={1} sidebar={320}>
           <PlayerContext.Provider value={single}>
@@ -332,13 +344,19 @@ function PlayerChromeCompare() {
           strokes={6}
           sidebar={320}
         >
-          <IssueBefore />
-          <Stage sidebar={320} />
+          <PlayerContext.Provider value={single}>
+            <IssueBefore />
+            <Stage sidebar={320} />
+          </PlayerContext.Provider>
         </Shot>
         <Shot kind="after" label="Issue replay" strokes={1} sidebar={320}>
           <PlayerContext.Provider value={single}>
             <IssueReplayHeader
-              issue={undefined}
+              /* a real issue, so the lead slot renders the real critical
+                 control. Passing undefined here showed no marker at all next to
+                 a before panel that had one, which read as "critical was
+                 removed" — the opposite of what was decided (it stays). */
+              issue={issuesStore.all[0]}
               variation="Card declined, then retried twice"
               date="Jun 04, 2026, 10:14"
               more={<div className="p-2 text-sm">session details</div>}

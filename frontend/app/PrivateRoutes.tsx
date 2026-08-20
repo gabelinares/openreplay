@@ -368,8 +368,10 @@ function PrivateRoutes() {
           path={withSiteId(ISSUE_SESSION_PATH, siteIdList)}
           element={<enhancedComponents.IssueSession />}
         />
+        {/* no site-id prefix: this is a design-env review page, scoped to no
+            project, and the prefixed form gets redirected to /sessions */}
         <Route
-          path={withSiteId(PLAYER_CHROME_PATH, siteIdList)}
+          path={PLAYER_CHROME_PATH}
           element={<enhancedComponents.PlayerChrome />}
         />
         <Route

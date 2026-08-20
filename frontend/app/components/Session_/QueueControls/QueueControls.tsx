@@ -12,11 +12,11 @@ import AutoplayToggle from 'Shared/AutoplayToggle/AutoplayToggle';
 
 const PER_PAGE = 10;
 
-interface Props extends RouteComponentProps {
-  defaultList: any;
-  latestRequestTime: any;
-  sessionIds: any;
-}
+/* `defaultList`, `latestRequestTime` and `sessionIds` used to be declared here
+   and were never read — `sessionIds` comes off the store below and shadowed the
+   prop. Declaring them made every callsite a type error, which is why rendering
+   `<QueueControls />` has been erroring since before this branch. */
+type Props = RouteComponentProps;
 
 function QueueControls(props: Props) {
   const { t } = useTranslation();
