@@ -26,7 +26,9 @@ export interface MockSessionSeed {
   sessionId: string;
   userId: string;
   userBrowser: string;
+  userBrowserVersion: string;
   userOs: string;
+  userOsVersion: string;
   userDeviceType: string;
   platform: 'web' | 'ios' | 'android';
   userCountry: string;
@@ -105,6 +107,16 @@ const SPECS: Spec[] = [
 /* Realistic user metadata — these are customer-defined in OpenReplay and there
    can be many (Mehdi: "you can have up to 10/15"). Derived deterministically
    from the spec so the demo stays stable across reloads. */
+/** what each OS reports as its version, so the popover's right column is never
+    blank. Values chosen to match what production shows. */
+const OS_VERSIONS: Record<string, string> = {
+  'Mac OS X': '10.15.7',
+  Windows: '10',
+  Linux: '',
+  Android: '14',
+  iOS: '17.5.1',
+};
+
 const META_ROLES = ['Admin', 'Member', 'Owner', 'Viewer', 'Billing'];
 const META_TIERS = ['Enterprise', 'Growth', 'Startup', 'Self-serve'];
 function hashStr(str: string): number {
@@ -132,7 +144,13 @@ function buildSeed(s: Spec): MockSessionSeed {
     sessionId: s.id,
     userId: s.user,
     userBrowser: s.browser,
+    /* Versions matter because the replay header's "More" popover is a two-column
+       list: without them the browser and OS rows render with an empty right
+       column, which production never shows. Derived from the id so the demo is
+       stable across reloads, like the rest of this file. */
+    userBrowserVersion: `${140 + (hashStr(s.id) % 14)}.0.0`,
     userOs: s.os,
+    userOsVersion: OS_VERSIONS[s.os] ?? '',
     userDeviceType: s.device,
     platform: s.platform,
     userCountry: s.country,
