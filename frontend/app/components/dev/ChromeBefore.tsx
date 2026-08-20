@@ -50,6 +50,14 @@ import SessionMetaList from 'Shared/SessionItem/SessionMetaList';
  * in `SmartAlerts/`, which this fork does not carry.
  */
 
+/* NOTE on the tab row's background: production declares none —
+   `Subheader.tsx:222` is `w-full px-4 flex items-center border-b relative`, with
+   no fill — so it inherited `body`'s `$gray-lightest` (`reset.css:11`) while the
+   active `Tab` filled itself `bg-white`. The grey behind the tabs was therefore
+   already there; it was just never written down. The location strip beside it DID
+   declare `bg-white` (`Subheader.tsx:271`), which is why that row is the lighter
+   of the two. These panels leave the tab row unpainted, as production does. */
+
 /* ---- the three divider specs that existed, verbatim ---- */
 
 /** session: `w-px h-full lg:h-12.5 mx-2 bg-gray-lighter` */
@@ -134,7 +142,7 @@ export function SessionBeforeRows() {
   return (
     <>
       {/* the second bar (Subheader.tsx:222): browser tabs left, tools right */}
-      <div className="w-full px-4 flex items-center border-b relative shrink-0 bg-white">
+      <div className="w-full px-4 flex items-center border-b relative shrink-0">
         <SessionTabs />
         <div className="ml-auto text-sm flex items-center color-gray-medium gap-2 py-1">
           <Button size="small" className="flex items-center justify-center">
@@ -321,7 +329,7 @@ export function IssueBefore() {
 export function IssueBeforeRows() {
   return (
     <>
-      <div className="w-full px-4 flex items-center border-b relative shrink-0 bg-white">
+      <div className="w-full px-4 flex items-center border-b relative shrink-0">
         <SessionTabs />
       </div>
       <ReplayLocationBar url={URL} />

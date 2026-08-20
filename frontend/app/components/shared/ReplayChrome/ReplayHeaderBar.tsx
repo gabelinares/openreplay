@@ -39,10 +39,17 @@ interface Props {
    What the bar owns, and what products therefore cannot get wrong:
 
    - the height (50px, fixed, see above)
-   - the fill, and the fact that there is NO bottom rule. It is white on a toned
-     stage — session's checkerboard, Spot's and the issue player's
-     gray-lightest — so it separates by tone. The one line under the chrome is
-     drawn by `ReplayLocationBar` beneath it.
+   - the fill and its one bottom rule, in `gray-light` — the SAME colour as the
+     side panel's own `border-l`, so the rule and the panel edge read as one
+     frame around the body rather than two unrelated lines. The rule sits exactly
+     where the side panel starts, because the panel is the next thing after this
+     bar (Gabriel 08-20).
+
+     This bar carried no rule at all for a while, separating from the stage by
+     tone. That worked while the location strip below it was always drawn and
+     supplied a line; once the URL moved into "More" on single-tab sessions there
+     was no line anywhere, and the bar floated over the stage with the side
+     panel's top edge appearing out of nowhere beside it.
    - the single divider, after the back button, full bleed. There are none on
      the right side: session replay never drew any there and the groups read
      fine on a gap alone.
@@ -64,6 +71,7 @@ export default function ReplayHeaderBar({
     <div
       className={cn(
         'flex items-center px-2 shrink-0 w-full bg-white',
+        'border-b border-gray-light',
         hidden && 'hidden',
       )}
       style={{ height: REPLAY_HEADER_HEIGHT }}

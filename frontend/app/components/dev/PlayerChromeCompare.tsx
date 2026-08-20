@@ -320,7 +320,7 @@ function PlayerChromeCompare() {
 
       <Pair
         title="Session replay"
-        blurb="Two stacked bars became one. The tools moved up into the identity bar, which left the second bar holding a single tab chip — so it is now conditional on the session actually having more than one tab. The far-right metadata and the labelled Search Events switch moved behind More and into the overflow menu, because neither fits a fixed single line."
+        blurb="Two stacked bars became one. The tools moved up into the identity bar, which left the second bar holding a single tab chip, so it is now conditional on the session actually having more than one tab. The far-right metadata moved into More, and the labelled Search Events switch into the overflow menu, because neither fits a fixed single line. On a single-tab session the URL joins them in More, which leaves the header as the bar alone. The grey behind the tabs is not new: production declares no fill on that row, so it always inherited the page tone while the active tab filled itself white."
       >
         <Shot kind="before" label="Session replay" strokes={3} sidebar={270}>
           <PlayerContext.Provider value={single}>
@@ -342,7 +342,7 @@ function PlayerChromeCompare() {
         <Shot
           kind="after"
           label="Session replay"
-          strokes={2}
+          strokes={3}
           note="three tabs — the strip returns, exactly as Sessions shows it"
           sidebar={320}
         >
@@ -352,7 +352,7 @@ function PlayerChromeCompare() {
 
       <Pair
         title="Spot"
-        blurb="The bar stops growing with its data: the second line of browser, resolution and platform moves behind More. Copy and Manage Access lose their labels and become one share popover, since both of them are sharing. Both full-height dividers on the right go."
+        blurb="The bar stops growing with its data: browser, resolution and platform move behind More. Copy and Manage Access were the only labelled buttons in any replay header and do not fit a fixed single line, so they moved into the overflow menu beside Download and Delete. Both full-height dividers on the right go, and with no browser-tab strip Spot draws no URL strip either."
       >
         <Shot kind="before" label="Spot" strokes={4} sidebar={320}>
           <PlayerContext.Provider value={single}>
