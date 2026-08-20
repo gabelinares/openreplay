@@ -91,6 +91,13 @@ export default function ReplayIconButton({
     button
   );
 
+  /* A menu names its own items, so a tooltip reading "More" over an open
+     dropdown is two labels for one control and just covers the menu (Gabriel
+     08-20). The `aria-label` on the button stays, so the control is still named
+     for anyone not seeing it. Popovers keep their tooltip: their content is a
+     panel, not a list of names, so the hover still tells you what a click does. */
+  if (menu) return trigger;
+
   return (
     <Tooltip title={title} placement="bottom">
       {trigger}

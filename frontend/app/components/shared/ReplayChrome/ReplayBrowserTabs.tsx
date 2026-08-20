@@ -39,14 +39,18 @@ function ReplayBrowserTabs({ isLive }: { isLive?: boolean }) {
        Mehdi named exactly this on 08-19: "it's a tab but it's not clear it's a
        tab because it's very close to the header."
 
+       The gap above the tab is `pt-2`, DECLARED, not the leftover of a fixed
+       height. It was `height: 36` with the tab measuring whatever its font
+       happened to measure, so the gap was a derived number that no longer
+       matched the `px` on the sides — 8px of air on top against 16px at the
+       left. Padding on both axes means the frame around the tab is even by
+       construction and stays even if the type changes.
+
        The row also takes the PAGE tone rather than white. `Tab` fills the active
        tab with `bg-white`, so a white row underneath it left the two the same
        colour and the tab stopped reading as raised at all — the row has to be
        the recessed surface for the tab to sit on top of something. */
-    <div
-      className="w-full px-4 flex items-end shrink-0 bg-gray-lightest border-b border-gray-lighter"
-      style={{ height: 36 }}
-    >
+    <div className="w-full px-2 pt-2 flex items-end shrink-0 bg-gray-lightest border-b border-gray-lighter">
       <SessionTabs isLive={isLive} />
     </div>
   );

@@ -21,11 +21,18 @@ function Tab({ i, tab, currentTab, changeTab, isLive, isClosed, name }: Props) {
       }}
       onClick={() => changeTab?.(tab)}
       className={cn(
-        'self-end py-1 px-4 text-sm',
+        /* `pb` is one step more than `pt` on purpose: the -2px bottom margin
+           above pulls 2px of this tab below the row's rule, so equal padding
+           renders as 4px of air over the label and 2px under it. Six bottom
+           against four top comes out even on screen. */
+        'self-end pt-1 pb-1.5 px-4 text-sm',
         changeTab && !isLive ? 'cursor-pointer' : 'cursor-default',
         currentTab === tab
           ? 'border-gray-lighter border-t border-l border-r border-b-white! bg-white rounded-tl rounded-tr font-semibold'
-          : 'cursor-pointer border-gray-lighter border-b! border-t-transparent! border-l-transparent! border-r-transparent!',
+          : /* the inactive tabs had a pointer cursor and no hover at all, so
+               nothing told you they were targets. Lifting toward the active
+               tab's white is the hint that clicking makes this one active. */
+            'cursor-pointer border-gray-lighter border-b! border-t-transparent! border-l-transparent! border-r-transparent! hover:bg-white/50',
       )}
     >
       <Tooltip
