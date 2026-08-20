@@ -1,5 +1,4 @@
 import { MoreOutlined, ShareAltOutlined } from '@ant-design/icons';
-import { Button as AntButton, Dropdown, Tooltip } from 'antd';
 import cn from 'classnames';
 import {
   BookmarkCheck,
@@ -22,7 +21,10 @@ import { mobileScreen } from 'App/utils/isMobile';
 import { useModal } from 'Components/ModalContext';
 import IssueForm from 'Components/Session_/Issues/IssueForm';
 import { ShortcutGrid } from 'Components/Session_/Player/Controls/components/KeyboardHelp';
-import { ReplayActionCluster } from 'Components/shared/ReplayChrome';
+import {
+  ReplayActionCluster,
+  ReplayIconButton,
+} from 'Components/shared/ReplayChrome';
 import { Icon } from 'UI';
 
 import ShareModal from '../shared/SharePopup/SharePopup';
@@ -221,34 +223,30 @@ function SessionToolsCluster({
     <div className={cn(hasIframe ? 'opacity-50 pointer-events-none' : '')}>
       <ReplayActionCluster
         share={
-          <Tooltip title={t('Share Session')} placement="bottom">
-            <AntButton
-              size="small"
-              className="flex items-center justify-center"
-              onClick={() =>
-                openModal(
-                  <ShareModal
-                    showCopyLink
-                    hideModal={closeModal}
-                    time={store?.get().time}
-                  />,
-                  { title: t('Share Session') },
-                )
-              }
-            >
-              <ShareAltOutlined />
-            </AntButton>
-          </Tooltip>
+          <ReplayIconButton
+            title={t('Share Session')}
+            icon={<ShareAltOutlined />}
+            onClick={() =>
+              openModal(
+                <ShareModal
+                  showCopyLink
+                  hideModal={closeModal}
+                  time={store?.get().time}
+                />,
+                { title: t('Share Session') },
+              )
+            }
+          />
         }
         highlight={
           <HighlightButton onClick={() => setActiveTab('HIGHLIGHT')} />
         }
         overflow={
-          <Dropdown menu={{ items: dropdownItems }} placement="bottomRight">
-            <AntButton size="small">
-              <MoreOutlined />
-            </AntButton>
-          </Dropdown>
+          <ReplayIconButton
+            title={t('More')}
+            icon={<MoreOutlined />}
+            menu={{ items: dropdownItems }}
+          />
         }
         queue={<QueueControls />}
       />

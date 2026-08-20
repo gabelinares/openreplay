@@ -15,9 +15,14 @@ export {
 } from './ReplayHeaderBar';
 export { default as ReplayBackButton } from './ReplayBackButton';
 export { default as ReplayDivider } from './ReplayDivider';
+export { default as ReplayIconButton } from './ReplayIconButton';
 export { default as ReplayIdentity } from './ReplayIdentity';
 export { default as ReplayActionCluster } from './ReplayActionCluster';
 export { default as ReplayQueueControls } from './ReplayQueueControls';
 export { default as ReplayTabStrip } from './ReplayTabStrip';
 export { default as ReplayBrowserTabs } from './ReplayBrowserTabs';
-export { default as ReplayLocationBar } from './ReplayLocationBar';
+export {
+  default as ReplayLocationBar,
+  hasMultipleTabs,
+} from './ReplayLocationBar';
+export { default as ReplayMoreDetails } from './ReplayMoreDetails';

@@ -90,7 +90,6 @@ import {
   ReplayBackButton,
   ReplayHeaderBar,
   ReplayIdentity,
-  ReplayLocationBar,
   ReplayTabStrip,
 } from 'Components/shared/ReplayChrome';
 import SessionCopyLink from 'Components/shared/SharePopup/SessionCopyLink';
@@ -845,11 +844,17 @@ function IssueSessionPlayer() {
       issue={issue}
       email={email}
       browser={browser}
+      browserVersion="144.0.0"
       os={os}
+      osVersion="10.15.7"
       device={device}
+      resolution="1440 x 900"
       countryCode={countryCode}
       city={city}
       metaList={metaList}
+      /* issue replay has no browser-tab strip, so by the single-tab rule it
+         draws no location strip either and the page lives in here */
+      url={spotPlayerStore.getClosestLocation(spotPlayerStore.time)?.location}
     />
   );
 
@@ -893,13 +898,9 @@ function IssueSessionPlayer() {
       {/* body: player column (shrinks) + right sidebar */}
       <div className="flex flex-1 min-h-0 w-full">
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          {/* the one stroke in the whole header region: the bar above draws
-              none, so this hairline closes the white chrome against the stage */}
-          <ReplayLocationBar
-            url={
-              spotPlayerStore.getClosestLocation(spotPlayerStore.time)?.location
-            }
-          />
+          {/* No location strip here either: no browser-tab strip, so by the
+              same rule the page lives in "More" (Gabriel 08-20). The header is
+              the bar and nothing else, zero strokes before the video. */}
           <div
             className={cn(
               'w-full min-h-0 flex-1',

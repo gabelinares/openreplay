@@ -19,7 +19,14 @@ import {
   ReplayLocationBar,
 } from 'Components/shared/ReplayChrome';
 
-import { IssueBefore, SessionBefore, SpotBefore } from './ChromeBefore';
+import {
+  IssueBefore,
+  IssueBeforeRows,
+  SessionBefore,
+  SessionBeforeRows,
+  SpotBefore,
+  SpotBeforeRows,
+} from './ChromeBefore';
 
 /* The replay chrome review, before and after, at full width.
    Route: /player-chrome  (design env only)
@@ -98,25 +105,41 @@ class Boundary extends React.Component<
   }
 }
 
-/* The stage and the sidebar, so each panel reads as a whole screen rather than a
-   strip of chrome floating on nothing. Height is fixed rather than proportional:
-   the subject is the top of the screen, and a real 900px stage would push the
-   next panel off the page. */
-function Stage({ sidebar }: { sidebar: number }) {
+/* The body of a player: the sidebar is a SIBLING of the column holding the tab
+   strip, the location strip and the stage — which is how all three real players
+   are actually built (`PlayerContent` puts `RightBlock` beside the whole
+   `PlayerBlock`, Spot puts its sidebar beside the column with the location
+   strip). My first version put the sidebar beside the STAGE only, so the tab and
+   url rows ran full width underneath it and the sidebar started too low
+   (Gabriel 08-20). */
+function Body({
+  sidebar,
+  children,
+}: {
+  /** the open side panel's width, or 0 for closed */
+  sidebar: number;
+  /** the tab strip and location strip, which live INSIDE the shrinking column */
+  children?: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-1 min-h-0">
-      <div
-        className="flex-1 flex items-center justify-center text-xs"
-        style={{ color: 'var(--color-gray-medium)' }}
-      >
-        replay stage
+    <div className="flex flex-1 min-h-0 w-full">
+      <div className="flex flex-col flex-1 min-w-0 min-h-0">
+        {children}
+        <div
+          className="flex-1 flex items-center justify-center text-xs"
+          style={{ color: 'var(--color-gray-medium)' }}
+        >
+          replay stage
+        </div>
       </div>
-      <div
-        className="bg-white border-l border-gray-light flex items-start justify-center pt-3 text-xs shrink-0"
-        style={{ width: sidebar, color: 'var(--color-gray-medium)' }}
-      >
-        sidebar {sidebar}px
-      </div>
+      {sidebar > 0 && (
+        <div
+          className="bg-white border-l border-gray-light flex items-start justify-center pt-3 text-xs shrink-0"
+          style={{ width: sidebar, color: 'var(--color-gray-medium)' }}
+        >
+          side panel {sidebar}px
+        </div>
+      )}
     </div>
   );
 }
@@ -208,7 +231,13 @@ function Pair({
 }
 
 function PlayerChromeCompare() {
-  const { sessionStore, spotStore, issuesStore } = useStore();
+  const {
+    sessionStore,
+    spotStore,
+    issuesStore,
+    customFieldStore,
+    uiPlayerStore,
+  } = useStore();
   const [ready, setReady] = React.useState(false);
   const [tab, setTab] = React.useState<'activity' | 'issue' | null>(null);
 
@@ -222,6 +251,15 @@ function PlayerChromeCompare() {
     const seed = MOCK_SESSION_POOL[0];
     runInAction(() => {
       sessionStore.current = buildSession(seed);
+      /* Two things the design env leaves empty, so neither was visible and both
+         read as "not done" (Gabriel 08-20):
+         - custom fields come from the backend, and `SessionIdentity` only shows a
+           Metadata row for keys the project has declared. Declare two.
+         - the Search Events Only item only exists when the search that opened the
+           session had event filters. Turn that on. */
+      customFieldStore.list = [{ key: 'plan' }, { key: 'tier' }] as any;
+      uiPlayerStore.setSearchEventsSwitchButton(true);
+      uiPlayerStore.setShowOnlySearchEvents(true);
       spotStore.currentSpot = new Spot({
         id: 'mock-spot',
         name: 'Checkout fails on the payment step',
@@ -237,18 +275,19 @@ function PlayerChromeCompare() {
 
   if (!ready) return null;
 
-  const sessionAfter = (ctx: any) => (
+  const sessionAfter = (ctx: any, multiTab: boolean) => (
     <PlayerContext.Provider value={ctx}>
       <PlayerBlockHeader
         activeTab=""
         setActiveTab={() => {}}
         tabs={{ EVENTS: 'Activity', CLICKMAP: 'Click map', INSPECTOR: 'Tag' }}
       />
-      {/* the same conditional the real player renders: the strip appears only
-          when the session genuinely has more than one tab */}
-      <ReplayBrowserTabs />
-      <ReplayLocationBar url={MOCK_URL} />
-      <Stage sidebar={320} />
+      {/* the strips sit inside the column that shrinks when the panel opens,
+          exactly as the real players build them */}
+      <Body sidebar={320}>
+        <ReplayBrowserTabs />
+        <ReplayLocationBar url={MOCK_URL} visible={multiTab} />
+      </Body>
     </PlayerContext.Provider>
   );
 
@@ -264,9 +303,11 @@ function PlayerChromeCompare() {
         >
           One bar at a fixed 50px, separating from the stage by tone with no
           rule under it. One full-bleed divider, after Back. Icon-only actions
-          in one fixed order, no dividers on that side. The location strip
-          carries the only line. Every product fills the same slots and sets no
-          spacing of its own.
+          in one fixed order, all 24px, no dividers on that side. The tab strip
+          and the URL strip appear together or not at all, and on the ordinary
+          single-tab session neither appears: the page is a row in More instead.
+          Both strips sit inside the column that narrows when the side panel
+          opens.
         </p>
         <p className="text-sm" style={{ color: 'var(--color-gray-medium)' }}>
           Both sides are built from the real components. The before panels
@@ -284,7 +325,9 @@ function PlayerChromeCompare() {
         <Shot kind="before" label="Session replay" strokes={3} sidebar={270}>
           <PlayerContext.Provider value={single}>
             <SessionBefore />
-            <Stage sidebar={270} />
+            <Body sidebar={270}>
+              <SessionBeforeRows />
+            </Body>
           </PlayerContext.Provider>
         </Shot>
         <Shot
@@ -294,7 +337,7 @@ function PlayerChromeCompare() {
           note="single-tab session, which is every session today"
           sidebar={320}
         >
-          {sessionAfter(single)}
+          {sessionAfter(single, false)}
         </Shot>
         <Shot
           kind="after"
@@ -303,7 +346,7 @@ function PlayerChromeCompare() {
           note="three tabs — the strip returns, exactly as Sessions shows it"
           sidebar={320}
         >
-          {sessionAfter(multi)}
+          {sessionAfter(multi, true)}
         </Shot>
       </Pair>
 
@@ -314,7 +357,9 @@ function PlayerChromeCompare() {
         <Shot kind="before" label="Spot" strokes={4} sidebar={320}>
           <PlayerContext.Provider value={single}>
             <SpotBefore />
-            <Stage sidebar={320} />
+            <Body sidebar={320}>
+              <SpotBeforeRows />
+            </Body>
           </PlayerContext.Provider>
         </Shot>
         <Shot kind="after" label="Spot" strokes={1} sidebar={320}>
@@ -329,8 +374,7 @@ function PlayerChromeCompare() {
               platform="Mac Arm64"
               browserVersion="148.0.0.0"
             />
-            <ReplayLocationBar url={MOCK_URL} />
-            <Stage sidebar={320} />
+            <Body sidebar={320} />
           </PlayerContext.Provider>
         </Shot>
       </Pair>
@@ -347,7 +391,9 @@ function PlayerChromeCompare() {
         >
           <PlayerContext.Provider value={single}>
             <IssueBefore />
-            <Stage sidebar={320} />
+            <Body sidebar={320}>
+              <IssueBeforeRows />
+            </Body>
           </PlayerContext.Provider>
         </Shot>
         <Shot kind="after" label="Issue replay" strokes={1} sidebar={320}>
@@ -387,8 +433,7 @@ function PlayerChromeCompare() {
               setTab={setTab}
               time={0}
             />
-            <ReplayLocationBar url={MOCK_URL} />
-            <Stage sidebar={320} />
+            <Body sidebar={320} />
           </PlayerContext.Provider>
         </Shot>
       </Pair>

@@ -8,8 +8,14 @@ import {
   ShareAltOutlined,
   UserSwitchOutlined,
 } from '@ant-design/icons';
-import { Button, Dropdown, Popover, Switch, Tooltip, message } from 'antd';
-import { AlertTriangle, Bookmark, BookmarkCheck, File } from 'lucide-react';
+import { Button, Switch, Tooltip, message } from 'antd';
+import {
+  AlertTriangle,
+  Bookmark,
+  BookmarkCheck,
+  File,
+  Keyboard,
+} from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
 
@@ -21,6 +27,7 @@ import {
   ReplayActionCluster,
   ReplayBackButton,
   ReplayHeaderBar,
+  ReplayIconButton,
   ReplayIdentity,
   ReplayQueueControls,
   ReplayTabStrip,
@@ -114,6 +121,7 @@ interface Props {
   setTab: (t: SideTab) => void;
   /** playhead position, so a shared link lands on this moment */
   time: number;
+  onShowShortcuts?: () => void;
 }
 
 function IssueReplayHeader({
@@ -133,6 +141,7 @@ function IssueReplayHeader({
   tab,
   setTab,
   time,
+  onShowShortcuts,
 }: Props) {
   /* The bar owns its 50px height, its fill, the single full-bleed divider after
      Back, the gaps, and the fact that it draws NO bottom rule: it is white on
@@ -166,20 +175,16 @@ function IssueReplayHeader({
       actions={
         <ReplayActionCluster
           share={
-            <Popover
-              trigger="click"
-              placement="bottomRight"
-              zIndex={POPUP_Z}
-              content={
+            <ReplayIconButton
+              title="Share session"
+              icon={<ShareAltOutlined />}
+              popupZIndex={POPUP_Z}
+              popover={
                 <div style={{ width: 248 }}>
                   <SessionCopyLink time={time} />
                 </div>
               }
-            >
-              <Tooltip title="Share session" placement="bottom">
-                <Button size="small" icon={<ShareAltOutlined />} />
-              </Tooltip>
-            </Popover>
+            />
           }
           highlight={
             <HighlightButton
@@ -187,8 +192,9 @@ function IssueReplayHeader({
             />
           }
           overflow={
-            <Dropdown
-              placement="bottomRight"
+            <ReplayIconButton
+              title="More"
+              icon={<MoreOutlined />}
               menu={{
                 items: [
                   {
@@ -214,11 +220,21 @@ function IssueReplayHeader({
                       </div>
                     ),
                   },
+                  { type: 'divider' as const },
+                  {
+                    /* every player's overflow carries this now (Gabriel 08-20) */
+                    key: 'kb',
+                    label: (
+                      <div className="flex items-center gap-2">
+                        <Keyboard size={16} strokeWidth={1.5} />
+                        <span>Keyboard shortcuts</span>
+                      </div>
+                    ),
+                    onClick: onShowShortcuts,
+                  },
                 ],
               }}
-            >
-              <Button icon={<MoreOutlined />} size="small" />
-            </Dropdown>
+            />
           }
           queue={
             <ReplayQueueControls

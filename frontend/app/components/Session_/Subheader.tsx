@@ -7,6 +7,7 @@ import WarnBadge from 'Components/Session_/WarnBadge';
 import {
   ReplayBrowserTabs,
   ReplayLocationBar,
+  hasMultipleTabs,
 } from 'Components/shared/ReplayChrome';
 
 /* What is left of the session player's second bar.
@@ -59,7 +60,14 @@ function SubHeader() {
         onVMode={onVMode}
       />
       <ReplayBrowserTabs />
-      <ReplayLocationBar url={currentLocation} />
+      {/* the URL strip appears only where the tab strip does, i.e. only on a
+          session with more than one tab. On the ordinary single-tab session the
+          page is a row in the header's "More" popover instead, and the header is
+          then the bar and nothing else (Gabriel 08-20). */}
+      <ReplayLocationBar
+        url={currentLocation}
+        visible={hasMultipleTabs(store.get().tabs)}
+      />
     </>
   );
 }

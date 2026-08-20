@@ -11,7 +11,6 @@ import {
 import PhoneHorizontalWarn from 'Components/Session/Player/SharedComponents/PhoneHorizontal';
 import { SpotOverviewPanelCont } from 'Components/Session_/OverviewPanel/OverviewPanel';
 import withPermissions from 'Components/hocs/withPermissions';
-import { ReplayLocationBar } from 'Components/shared/ReplayChrome';
 import { EscapeButton, Loader } from 'UI';
 
 import AccessError from './components/AccessError';
@@ -180,9 +179,6 @@ function SpotPlayer() {
   };
 
   const { isFullScreen } = spotPlayerStore;
-  const spotLocation = spotPlayerStore.getClosestLocation(
-    spotPlayerStore.time,
-  )?.location;
   // 2nd player option
   // const base64toblob = (str: string) => {
   //   const byteCharacters = atob(str);
@@ -230,13 +226,9 @@ function SpotPlayer() {
       />
       <div className="w-full h-full flex">
         <div className="w-full h-full flex flex-col justify-between">
-          {/* `getClosestLocation` returns a 'loading' sentinel rather than
-              nothing before the mob file parses; the shared bar renders nothing
-              for an empty url, so translate the sentinel here instead of
-              teaching the shared atom about Spot's store. */}
-          <ReplayLocationBar
-            url={spotLocation === 'loading' ? null : spotLocation}
-          />
+          {/* No location strip: Spot has no browser-tab strip, and the rule is
+              that the URL strip only appears where the tab strip does. The page
+              is a row in the header's "More" popover instead (Gabriel 08-20). */}
           <div className={cn('w-full h-full', isFullScreen ? '' : 'relative')}>
             <MobilePlayerOverlay
               isPlaying={spotPlayerStore.isPlaying}

@@ -121,7 +121,18 @@ export function SessionBefore() {
           />
         </div>
       </div>
+    </>
+  );
+}
 
+/* The rows that sat INSIDE the shrinking column, not across the full width:
+   production renders `Subheader` inside `PlayerBlock`, which is the sibling of
+   `RightBlock`. So the second bar and the location strip both narrowed when the
+   side panel opened, and the panel started directly under the 50px identity bar.
+   Kept separate so the review page can place them correctly. */
+export function SessionBeforeRows() {
+  return (
+    <>
       {/* the second bar (Subheader.tsx:222): browser tabs left, tools right */}
       <div className="w-full px-4 flex items-center border-b relative shrink-0 bg-white">
         <SessionTabs />
@@ -138,7 +149,6 @@ export function SessionBefore() {
           </div>
         </div>
       </div>
-
       <ReplayLocationBar url={URL} />
     </>
   );
@@ -211,9 +221,14 @@ export function SpotBefore() {
           ]}
         />
       </div>
-      <ReplayLocationBar url={URL} />
     </>
   );
+}
+
+/** Spot drew its location strip inside the column beside the sidebar too
+    (`SpotPlayer.tsx:230`). */
+export function SpotBeforeRows() {
+  return <ReplayLocationBar url={URL} />;
 }
 
 /* ================= ISSUE REPLAY, BEFORE (production) ================= */
@@ -296,12 +311,19 @@ export function IssueBefore() {
           />
         </div>
       </div>
+    </>
+  );
+}
 
-      {/* the inherited session second bar (PlayerBlock.tsx:28 -> Subheader) */}
+/** Production's issue player inherits the session `Subheader` through
+    `PlayerContent` -> `PlayerBlock`, so its second bar and location strip sat
+    inside the shrinking column, below a side panel that started at the header. */
+export function IssueBeforeRows() {
+  return (
+    <>
       <div className="w-full px-4 flex items-center border-b relative shrink-0 bg-white">
         <SessionTabs />
       </div>
-
       <ReplayLocationBar url={URL} />
     </>
   );

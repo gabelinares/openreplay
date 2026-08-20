@@ -3,15 +3,18 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModal } from 'App/components/Modal';
+import { PlayerContext } from 'App/components/Session/playerContext';
 import { countries } from 'App/constants';
 import { IFRAME } from 'App/constants/storageKeys';
 import { formatTimeOrDate } from 'App/date';
-import { browserIcon, deviceTypeIcon, osIcon } from 'App/iconNames';
 import { useStore } from 'App/mstore';
 import { capitalize } from 'App/utils';
-import SessionInfoItem from 'Components/Session_/SessionInfoItem';
-import { ReplayIdentity } from 'Components/shared/ReplayChrome';
-import { Avatar, CountryFlag, DbIPNotice, Icon, Tooltip } from 'UI';
+import {
+  ReplayIdentity,
+  ReplayMoreDetails,
+  hasMultipleTabs,
+} from 'Components/shared/ReplayChrome';
+import { Avatar, Icon, Tooltip } from 'UI';
 
 import MetaItem from 'Shared/SessionItem/MetaItem';
 import UserSessionsModal from 'Shared/UserSessionsModal';
@@ -43,6 +46,8 @@ function SessionIdentity({
 }) {
   const { t } = useTranslation();
   const { settingsStore, sessionStore, customFieldStore } = useStore();
+  const { store } = React.useContext(PlayerContext);
+  const { location: currentLocation = '' } = store?.get?.() ?? {};
   const session = sessionStore.current;
   const { timezone } = settingsStore.sessionSettings;
 
@@ -86,70 +91,33 @@ function SessionIdentity({
       <span>{t('Resolution N/A')}</span>
     );
 
+  /* The URL only gets a row here when the strip above is NOT drawn, which is the
+     ordinary single-tab session (Gabriel 08-20). Both decisions read the same
+     predicate, so the page can never be in both places or neither. */
+  const showLocationStrip = hasMultipleTabs(store?.get?.()?.tabs);
+
   const more = (
-    <div className="text-left bg-white">
-      <SessionInfoItem
-        comp={<CountryFlag country={userCountry} height={11} />}
-        label={countries[userCountry] || t('Unknown')}
-        value={
-          <span
-            className="inline-flex items-center"
-            style={{ whiteSpace: 'nowrap' }}
-          >
-            {userCity && <span className="mr-1">{userCity},</span>}
-            {userState && <span className="mr-1">{userState}</span>}
-            <DbIPNotice className="ml-1" />
-          </span>
-        }
-      />
-      {userBrowser && (
-        <SessionInfoItem
-          icon={browserIcon(userBrowser)}
-          label={userBrowser}
-          value={userBrowserVersion ? `v${userBrowserVersion}` : ''}
-        />
-      )}
-      {userOs && (
-        <SessionInfoItem
-          icon={osIcon(userOs)}
-          label={safeOs}
-          value={userOsVersion}
-        />
-      )}
-      <SessionInfoItem
-        icon={deviceTypeIcon(userDeviceType)}
-        label={capitalize(userDeviceType)}
-        value={dimension}
-        isLast={!revId && metaList.length === 0}
-      />
-      {revId && (
-        <SessionInfoItem
-          icon="info"
-          label="Rev ID:"
-          value={revId}
-          isLast={metaList.length === 0}
-        />
-      )}
-      {/* the customer's own metadata, as one more row in this list rather than a
-          block with its own grammar — the same shape the issue player uses */}
-      {metaList.length > 0 && (
-        <SessionInfoItem
-          icon="tags"
-          label={t('Metadata')}
-          isLast
-          value={
-            <div
-              className="flex flex-wrap gap-1 color-gray-darkest"
-              style={{ width: 280 }}
-            >
-              {metaList.map((m) => (
-                <MetaItem key={m.label} label={m.label} value={m.value} />
-              ))}
-            </div>
-          }
-        />
-      )}
-    </div>
+    <ReplayMoreDetails
+      user={userDisplayName}
+      countryCode={userCountry}
+      city={[userCity, userState].filter(Boolean).join(', ')}
+      browser={userBrowser}
+      browserVersion={userBrowserVersion}
+      os={safeOs}
+      osVersion={userOsVersion}
+      device={capitalize(userDeviceType)}
+      resolution={dimension}
+      url={showLocationStrip ? null : currentLocation}
+      metadata={
+        metaList.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {metaList.map((m) => (
+              <MetaItem key={m.label} label={m.label} value={m.value} />
+            ))}
+          </div>
+        ) : undefined
+      }
+    />
   );
 
   const location =

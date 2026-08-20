@@ -4,6 +4,8 @@ import React from 'react';
 import SessionTabs from 'Components/Session/Player/SharedComponents/SessionTabs';
 import { PlayerContext } from 'Components/Session/playerContext';
 
+import { hasMultipleTabs } from './ReplayLocationBar';
+
 /* The browser-tab strip, as a second bar that only exists when there is
    something to put in it.
 
@@ -22,13 +24,9 @@ import { PlayerContext } from 'Components/Session/playerContext';
 function ReplayBrowserTabs({ isLive }: { isLive?: boolean }) {
   const { store } = React.useContext(PlayerContext);
 
-  /* `SessionTabs` defaults this to `new Set('back-compat')`, which is a set of
-     nine CHARACTERS rather than one tab — so a bare `size > 1` on the store's
-     value would show the strip on every session whose store has not filled in
-     yet. Default to empty here and let a real Set be the only thing that
-     opens it. */
-  const tabs: Set<string> = store?.get?.()?.tabs ?? new Set<string>();
-  if (!(tabs instanceof Set) || tabs.size <= 1) return null;
+  /* one predicate, shared with the location strip, so the two rows cannot
+     disagree about whether this session has a browsing context worth showing */
+  if (!hasMultipleTabs(store?.get?.()?.tabs)) return null;
 
   return (
     /* Height and `items-end` are the whole point of this row, and I had left
@@ -39,9 +37,14 @@ function ReplayBrowserTabs({ isLive }: { isLive?: boolean }) {
        moving the tools up into the header bar collapsed this row to the tab's
        own height and the gap vanished with it.
        Mehdi named exactly this on 08-19: "it's a tab but it's not clear it's a
-       tab because it's very close to the header." */
+       tab because it's very close to the header."
+
+       The row also takes the PAGE tone rather than white. `Tab` fills the active
+       tab with `bg-white`, so a white row underneath it left the two the same
+       colour and the tab stopped reading as raised at all — the row has to be
+       the recessed surface for the tab to sit on top of something. */
     <div
-      className="w-full px-4 flex items-end shrink-0 bg-white border-b border-gray-lighter"
+      className="w-full px-4 flex items-end shrink-0 bg-gray-lightest border-b border-gray-lighter"
       style={{ height: 36 }}
     >
       <SessionTabs isLive={isLive} />
