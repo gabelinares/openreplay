@@ -1,18 +1,25 @@
-import React, { useContext } from 'react';
-import { PlayerContext } from 'App/components/Session/playerContext';
-import { observer } from 'mobx-react-lite';
-import { Switch, Tooltip, message } from 'antd';
 import { CaretRightOutlined, PauseOutlined } from '@ant-design/icons';
-import './AutoplayToggle.css';
+import { Switch, Tooltip, message } from 'antd';
+import { observer } from 'mobx-react-lite';
+import React, { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { PlayerContext } from 'App/components/Session/playerContext';
+
+import './AutoplayToggle.css';
 
 const AutoplayToggle: React.FC = () => {
   const { t } = useTranslation();
   const { player, store } = useContext(PlayerContext);
-  const { autoplay } = store.get();
+  /* `store.get()` unguarded took the whole replay header down wherever the
+     player context has not been built yet — the chrome review route mounts the
+     real headers before any playback engine exists, and that is where it showed
+     up. The context's own default is `{ player: undefined, store: undefined }`,
+     so this was always reachable. */
+  const { autoplay } = store?.get?.() ?? {};
 
   const handleToggle = () => {
-    player.toggleAutoplay();
+    player?.toggleAutoplay?.();
     if (!autoplay) {
       message.success(t('Autoplay is ON'));
     } else {
@@ -25,7 +32,7 @@ const AutoplayToggle: React.FC = () => {
       <Switch
         className="custom-switch"
         onChange={handleToggle}
-        checked={autoplay}
+        checked={!!autoplay}
         checkedChildren={<CaretRightOutlined className="switch-icon" />}
         unCheckedChildren={<PauseOutlined className="switch-icon" />}
       />

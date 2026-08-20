@@ -209,7 +209,10 @@ const Router: React.FC = () => {
     location.pathname.includes('/assist/') ||
     location.pathname.includes('multiview') ||
     location.pathname.includes('/view-spot/') ||
-    location.pathname.includes('/spots/');
+    location.pathname.includes('/spots/') ||
+    // design env only: the replay-chrome review needs the full width, since the
+    // thing being reviewed is the full width of a player's top bar
+    location.pathname.includes('/player-chrome');
   if (isIframe) {
     return (
       <IFrameRoutes isJwt={isJwt} isLoggedIn={isLoggedIn} loading={loading} />
