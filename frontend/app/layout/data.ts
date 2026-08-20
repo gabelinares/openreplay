@@ -14,7 +14,8 @@ export interface MenuItem {
   leading?: any;
   isEnterprise?: boolean;
   isAdmin?: boolean;
-  tag?: { label: string; color: string; border?: boolean };
+  /* `color` is an antd preset name; omit it to get the brand pill (see MenuContent) */
+  tag?: { label: string; color?: string; border?: boolean };
 }
 
 interface Category {
@@ -113,7 +114,6 @@ export const categories: (t: TFunction) => Category[] = (t) => [
         icon: 'scan-pulse',
         tag: {
           label: t('New'),
-          color: '#394DFE',
         },
         children: [
           { label: t('Issues'), key: MENU.ISSUES },
@@ -182,7 +182,6 @@ export const categories: (t: TFunction) => Category[] = (t) => [
         icon: 'memory',
         tag: {
           label: t('New'),
-          color: '#394DFE',
         },
         children: [
           { label: 'People', key: MENU.USERS },

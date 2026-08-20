@@ -34,6 +34,13 @@ module.exports = {
   blue: '#366CD9',
   blue2: '#0076FF',
   'active-blue': '#F6F7FF',
+  /* the selected pill in a Segmented control: a raised surface on the track.
+     Named for the role, not the value, so dark mode can raise instead of lighten. */
+  'control-selected-bg': '#FFFFFF',
+  /* the brand-tinted <Tag> surface (the "New" nav pill). antd derives a filled Tag's
+     background from a custom hex by forcing hsl.l=0.95, which ignores the theme and
+     paints a near-white pill on a dark sidebar, so the surface is a token instead. */
+  'tag-brand-bg': '#EBEDFE',
   'active-dark-blue': '#E2E4F6',
   'bg-blue': '#e3e6ff',
   'active-blue-border': '#D0D4F2',
@@ -80,6 +87,10 @@ module.exports = {
     white: 'rgb(23, 23, 23)',
     black: '#fff',
     teal: 'rgb(81, 162, 255)',
+    /* the pressed/hover accent. Never overridden, so it stayed #2331A8 — a navy
+       that runs 1.8:1 on a dark page, as colorLinkHover and colorPrimaryActive
+       both. Against a light-blue base accent the pressed step goes lighter. */
+    'teal-dark': 'rgb(130, 190, 255)',
     /* orange-dark (#C26822) is unreadable on a dark surface */
     'orange-dark': '#EFA765',
     main: 'rgb(81, 162, 255)',
@@ -92,8 +103,9 @@ module.exports = {
     amber: 'rgb(123, 51, 6)',
     'amber-medium': 'rgb(187, 77, 0)',
     'red-lightest': 'rgb(70, 8, 9)',
-    'indigo-lightest': 'rgb(49, 44, 133)',
-    indigo: 'rgb(97, 95, 255)',
+    'indigo-lightest': 'rgb(39, 53, 80)',
+    /* rgb(97, 95, 255) is 3.5:1 on a dark surface — under AA as label text */
+    indigo: 'rgb(147, 145, 255)',
     'red-light': 'rgb(130, 24, 26)',
 
     'gray-light-shade': 'rgb(64, 64, 64)',
@@ -106,14 +118,18 @@ module.exports = {
     'gray-darkest': 'rgb(245, 245, 245)',
     'gray-light-blue': 'rgb(98, 116, 142)',
     'gray-border': '#888',
+    /* raised, not lightened: the Segmented pill lifts off the rgb(38,38,38) track.
+       (It used to reach for gray-darkest, which inverts to near-white here.) */
+    'control-selected-bg': 'rgb(51, 51, 51)',
+    'tag-brand-bg': 'rgb(40, 42, 60)',
 
-    'active-blue': 'rgb(93, 14, 192)',
-    'active-dark-blue': 'rgb(93, 14, 192)',
-    'bg-blue': 'rgb(49, 44, 133)',
-    'active-blue-border': 'rgb(67, 45, 215)',
+    'active-blue': 'rgb(34, 47, 68)',
+    'active-dark-blue': 'rgb(44, 60, 87)',
+    'bg-blue': 'rgb(50, 67, 98)',
+    'active-blue-border': 'rgb(51, 69, 97)',
     tealx: 'rgb(0, 213, 190)',
-    'tealx-light': 'rgb(11, 79, 74)',
-    'tealx-light-border': 'rgb(0, 95, 90)',
+    'tealx-light': 'rgb(27, 51, 48)',
+    'tealx-light-border': 'rgb(42, 74, 70)',
 
     'light-blue-bg': 'rgb(16, 78, 100)',
     'disabled-text': 'rgba(255, 255, 255, 0.38)',

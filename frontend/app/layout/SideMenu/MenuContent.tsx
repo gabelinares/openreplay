@@ -14,6 +14,22 @@ interface Props {
 
 const tagClass = 'text-xs ml-2! mr-0! px-1! py-0!';
 
+/* The nav's brand pill ("New"). antd derives a filled Tag's background from a custom
+   hex by forcing hsl.l = 0.95 — theme-blind, so a dark sidebar got a near-white pill.
+   Driving both halves from tokens keeps the light pill identical and lets dark tint. */
+const brandTagStyle: React.CSSProperties = {
+  background: 'var(--color-tag-brand-bg)',
+  color: 'var(--color-teal)',
+  border: 'none',
+};
+
+/* A nav tag carries no colour of its own: preset-coloured tags stay antd's, the rest
+   take the brand pill above. */
+const tagProps = (tag: any) =>
+  tag.color
+    ? { color: tag.color, className: tagClass }
+    : { style: brandTagStyle, className: tagClass };
+
 export default function MenuContent({
   menu,
   isMenuItemActive,
@@ -112,9 +128,8 @@ export default function MenuContent({
                   <Text>{it.label}</Text>
                   {it.tag && (
                     <Tag
-                      color={it.tag.color}
                       variant={it.tag.border ? 'outlined' : 'filled'}
-                      className={tagClass}
+                      {...tagProps(it.tag)}
                     >
                       {it.tag.label}
                     </Tag>
@@ -142,9 +157,8 @@ export default function MenuContent({
                         <span>{child.label}</span>
                         {child.tag && (
                           <Tag
-                            color={child.tag.color}
                             variant={child.tag.border ? 'outlined' : 'filled'}
-                            className={tagClass}
+                            {...tagProps(child.tag)}
                           >
                             {child.tag.label}
                           </Tag>
@@ -176,9 +190,8 @@ export default function MenuContent({
                 <span>{it.label}</span>
                 {it.tag && (
                   <Tag
-                    color={it.tag.color}
                     variant={it.tag.border ? 'outlined' : 'filled'}
-                    className={tagClass}
+                    {...tagProps(it.tag)}
                   >
                     {it.tag.label}
                   </Tag>

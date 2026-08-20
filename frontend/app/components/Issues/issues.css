@@ -69,22 +69,24 @@
    Display buttons (antd default size="small"). Scoped to the issues toolbar so
    the Sessions date picker is untouched. */
 /* The shared component renders this as an antd text button, whose hover paints a
-   gray fill. Lock the outlined-default look (white bg, gray border) so it can't
-   leak in, then match the default button's exact blue hover. !important is
-   needed to beat antd's higher-specificity text-variant hover rule. */
+   gray fill. Lock the outlined-default look (container bg, gray border) so it can't
+   leak in, then match the default button's blue hover. !important is needed to beat
+   antd's higher-specificity text-variant hover rule.
+   Every value is a token: these were literals (#fff / #d9d9d9 / rgba(0,0,0,.88) /
+   rgb(21,93,252)), which painted a white pill with black text on the dark page. */
 .issues-date-range .btn-card-period-range,
 .issues-date-range .btn-card-period-range:hover,
 .issues-date-range .btn-card-period-range:focus,
 .issues-date-range .btn-card-period-range:focus-visible {
-  background: #fff !important;
-  border: 1px solid #d9d9d9 !important;
+  background: var(--color-white) !important;
+  border: 1px solid var(--color-gray-light) !important;
   border-radius: 6px !important;
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.016) !important;
-  color: rgba(0, 0, 0, 0.88) !important;
+  color: var(--color-gray-darkest) !important;
 }
 .issues-date-range .btn-card-period-range:hover {
-  border-color: rgb(21, 93, 252) !important;
-  color: rgb(21, 93, 252) !important;
+  border-color: var(--color-main) !important;
+  color: var(--color-main) !important;
 }
 /* Use the same lucide chevron-down as the Tags / Display buttons instead of
    antd's DownOutlined. A mask filled with currentColor makes it inherit the

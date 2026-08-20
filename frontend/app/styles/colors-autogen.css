@@ -20,6 +20,7 @@
 .fill-tealx-light-border { fill: var(--color-tealx-light-border) }
 .fill-tealx-lightest { fill: var(--color-tealx-lightest) }
 .fill-orange { fill: var(--color-orange) }
+.fill-orange-lightest { fill: var(--color-orange-lightest) }
 .fill-yellow { fill: var(--color-yellow) }
 .fill-yellow2 { fill: var(--color-yellow2) }
 .fill-orange-dark { fill: var(--color-orange-dark) }
@@ -34,6 +35,8 @@
 .fill-blue { fill: var(--color-blue) }
 .fill-blue2 { fill: var(--color-blue2) }
 .fill-active-blue { fill: var(--color-active-blue) }
+.fill-control-selected-bg { fill: var(--color-control-selected-bg) }
+.fill-tag-brand-bg { fill: var(--color-tag-brand-bg) }
 .fill-active-dark-blue { fill: var(--color-active-dark-blue) }
 .fill-bg-blue { fill: var(--color-bg-blue) }
 .fill-active-blue-border { fill: var(--color-active-blue-border) }
@@ -86,6 +89,7 @@
 .hover-fill-tealx-light-border:hover svg { fill: var(--color-tealx-light-border) }
 .hover-fill-tealx-lightest:hover svg { fill: var(--color-tealx-lightest) }
 .hover-fill-orange:hover svg { fill: var(--color-orange) }
+.hover-fill-orange-lightest:hover svg { fill: var(--color-orange-lightest) }
 .hover-fill-yellow:hover svg { fill: var(--color-yellow) }
 .hover-fill-yellow2:hover svg { fill: var(--color-yellow2) }
 .hover-fill-orange-dark:hover svg { fill: var(--color-orange-dark) }
@@ -100,6 +104,8 @@
 .hover-fill-blue:hover svg { fill: var(--color-blue) }
 .hover-fill-blue2:hover svg { fill: var(--color-blue2) }
 .hover-fill-active-blue:hover svg { fill: var(--color-active-blue) }
+.hover-fill-control-selected-bg:hover svg { fill: var(--color-control-selected-bg) }
+.hover-fill-tag-brand-bg:hover svg { fill: var(--color-tag-brand-bg) }
 .hover-fill-active-dark-blue:hover svg { fill: var(--color-active-dark-blue) }
 .hover-fill-bg-blue:hover svg { fill: var(--color-bg-blue) }
 .hover-fill-active-blue-border:hover svg { fill: var(--color-active-blue-border) }
@@ -154,6 +160,7 @@
 .color-tealx-light-border { color: var(--color-tealx-light-border) }
 .color-tealx-lightest { color: var(--color-tealx-lightest) }
 .color-orange { color: var(--color-orange) }
+.color-orange-lightest { color: var(--color-orange-lightest) }
 .color-yellow { color: var(--color-yellow) }
 .color-yellow2 { color: var(--color-yellow2) }
 .color-orange-dark { color: var(--color-orange-dark) }
@@ -168,6 +175,8 @@
 .color-blue { color: var(--color-blue) }
 .color-blue2 { color: var(--color-blue2) }
 .color-active-blue { color: var(--color-active-blue) }
+.color-control-selected-bg { color: var(--color-control-selected-bg) }
+.color-tag-brand-bg { color: var(--color-tag-brand-bg) }
 .color-active-dark-blue { color: var(--color-active-dark-blue) }
 .color-bg-blue { color: var(--color-bg-blue) }
 .color-active-blue-border { color: var(--color-active-blue-border) }
@@ -222,6 +231,7 @@
 .hover-tealx-light-border:hover { color: var(--color-tealx-light-border) }
 .hover-tealx-lightest:hover { color: var(--color-tealx-lightest) }
 .hover-orange:hover { color: var(--color-orange) }
+.hover-orange-lightest:hover { color: var(--color-orange-lightest) }
 .hover-yellow:hover { color: var(--color-yellow) }
 .hover-yellow2:hover { color: var(--color-yellow2) }
 .hover-orange-dark:hover { color: var(--color-orange-dark) }
@@ -236,6 +246,8 @@
 .hover-blue:hover { color: var(--color-blue) }
 .hover-blue2:hover { color: var(--color-blue2) }
 .hover-active-blue:hover { color: var(--color-active-blue) }
+.hover-control-selected-bg:hover { color: var(--color-control-selected-bg) }
+.hover-tag-brand-bg:hover { color: var(--color-tag-brand-bg) }
 .hover-active-dark-blue:hover { color: var(--color-active-dark-blue) }
 .hover-bg-blue:hover { color: var(--color-bg-blue) }
 .hover-active-blue-border:hover { color: var(--color-active-blue-border) }
@@ -290,6 +302,7 @@
 .border-tealx-light-border { border-color: var(--color-tealx-light-border) }
 .border-tealx-lightest { border-color: var(--color-tealx-lightest) }
 .border-orange { border-color: var(--color-orange) }
+.border-orange-lightest { border-color: var(--color-orange-lightest) }
 .border-yellow { border-color: var(--color-yellow) }
 .border-yellow2 { border-color: var(--color-yellow2) }
 .border-orange-dark { border-color: var(--color-orange-dark) }
@@ -304,6 +317,8 @@
 .border-blue { border-color: var(--color-blue) }
 .border-blue2 { border-color: var(--color-blue2) }
 .border-active-blue { border-color: var(--color-active-blue) }
+.border-control-selected-bg { border-color: var(--color-control-selected-bg) }
+.border-tag-brand-bg { border-color: var(--color-tag-brand-bg) }
 .border-active-dark-blue { border-color: var(--color-active-dark-blue) }
 .border-bg-blue { border-color: var(--color-bg-blue) }
 .border-active-blue-border { border-color: var(--color-active-blue-border) }
@@ -358,6 +373,7 @@
 .bg-tealx-light-border { background-color: var(--color-tealx-light-border) }
 .bg-tealx-lightest { background-color: var(--color-tealx-lightest) }
 .bg-orange { background-color: var(--color-orange) }
+.bg-orange-lightest { background-color: var(--color-orange-lightest) }
 .bg-yellow { background-color: var(--color-yellow) }
 .bg-yellow2 { background-color: var(--color-yellow2) }
 .bg-orange-dark { background-color: var(--color-orange-dark) }
@@ -372,6 +388,8 @@
 .bg-blue { background-color: var(--color-blue) }
 .bg-blue2 { background-color: var(--color-blue2) }
 .bg-active-blue { background-color: var(--color-active-blue) }
+.bg-control-selected-bg { background-color: var(--color-control-selected-bg) }
+.bg-tag-brand-bg { background-color: var(--color-tag-brand-bg) }
 .bg-active-dark-blue { background-color: var(--color-active-dark-blue) }
 .bg-bg-blue { background-color: var(--color-bg-blue) }
 .bg-active-blue-border { background-color: var(--color-active-blue-border) }
