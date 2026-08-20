@@ -21,22 +21,26 @@ function Tab({ i, tab, currentTab, changeTab, isLive, isClosed, name }: Props) {
       }}
       onClick={() => changeTab?.(tab)}
       className={cn(
-        /* `pb` is one step more than `pt` on purpose: the -2px bottom margin
-           above pulls 2px of this tab below the row's rule, so equal padding
-           renders as 4px of air over the label and 2px under it. Six bottom
-           against four top comes out even on screen. */
-        'self-end pt-1 pb-1.5 px-4 text-sm',
+        /* 12px across, 6px down as rendered. It was 16 across against 4 down,
+           a 4:1 ratio that read as a wide flat sliver.
+           `pb` stays one step above `pt` because the -2px bottom margin above
+           pulls 2px of this tab below the row's rule, so equal padding would
+           render as 6px over the label and 4px under it. */
+        'self-end pt-1.5 pb-2 px-3 text-sm',
         changeTab && !isLive ? 'cursor-pointer' : 'cursor-default',
         currentTab === tab
           ? 'border-gray-lighter border-t border-l border-r border-b-white! bg-white rounded-tl rounded-tr font-semibold'
-          : /* Hover changes the LABEL, not the background. A pale fill is the
-               active tab's own treatment, so using it for hover made a hovered
-               tab read as a second active one — square-cornered, full-height and
-               optically larger than the tab it sat beside. `hover:text-teal` is
-               what the app's own `Tabs` component already does for the same
-               gesture, so this is its convention rather than a new one
-               (Gabriel 08-20). */
-            'cursor-pointer border-gray-lighter border-b! border-t-transparent! border-l-transparent! border-r-transparent! hover:text-teal',
+          : /* Hover is a subtle white fill with the same rounded top as the
+               active tab, and NO outline. `bg-clip-padding` is what keeps it a
+               pixel smaller: the transparent t/l/r borders stay, and clipping
+               the fill to the padding box insets it by exactly that 1px, so a
+               hovered tab sits just inside where the active one sits rather
+               than matching or exceeding it.
+               An earlier pass recoloured the label instead. That was neither
+               asked for nor right: it borrowed `hover:text-teal` from the
+               SEGMENTED side tabs, which are a different control (Gabriel
+               08-20). */
+            'cursor-pointer border-gray-lighter border-b! border-t-transparent! border-l-transparent! border-r-transparent! rounded-tl rounded-tr bg-clip-padding hover:bg-white/60',
       )}
     >
       <Tooltip
