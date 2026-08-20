@@ -19,7 +19,6 @@ export { default as ReplayIconButton } from './ReplayIconButton';
 export { default as ReplayIdentity } from './ReplayIdentity';
 export { default as ReplayActionCluster } from './ReplayActionCluster';
 export { default as ReplayQueueControls } from './ReplayQueueControls';
-export { default as ReplayStateToggle } from './ReplayStateToggle';
 export { default as ReplayTabStrip } from './ReplayTabStrip';
 export { default as ReplayBrowserTabs } from './ReplayBrowserTabs';
 export {

@@ -23,7 +23,6 @@ import { ShortcutGrid } from 'Components/Session_/Player/Controls/components/Key
 import {
   ReplayActionCluster,
   ReplayIconButton,
-  ReplayStateToggle,
 } from 'Components/shared/ReplayChrome';
 import { Icon } from 'UI';
 
@@ -209,19 +208,26 @@ function SessionToolsCluster({
              The tooltip carries the state, because the orange alone says "on"
              without saying on for what — off invites, on reports. */
           uiPlayerStore.showSearchEventsSwitchButton ? (
-            <ReplayStateToggle
-              on={uiPlayerStore.showOnlySearchEvents}
-              strong={uiPlayerStore.showOnlySearchEvents}
-              color="var(--color-orange)"
+            <ReplayIconButton
               title={
                 uiPlayerStore.showOnlySearchEvents
                   ? t('Showing only search events')
                   : t('Show only search events')
               }
+              active={uiPlayerStore.showOnlySearchEvents}
               icon={
-                /* the app's OWN funnel, outline in both states: nothing here
-                   uses fill to mean state, and the filled glyphs that exist are
-                   solid by nature rather than the on-half of a pair */
+                /* the app's OWN funnel, not a fresh lucide glyph: the sprite
+                   already carries one and `frontend/CLAUDE.md` says reuse before
+                   importing.
+
+                   Outline in BOTH states. It was filled when on, which gave the
+                   state a shape cue as well as a colour one — but nothing else in
+                   the app uses fill to mean state. The filled glyphs that do
+                   exist (`play-fill`, `caret-down-fill`, `check-circle-fill`) are
+                   shapes that are solid by nature, not the on-half of a pair. A
+                   pattern invented in one button is a pattern nobody reads, so
+                   the orange and the tooltip carry the state alone
+                   (Gabriel 08-20). */
                 <Icon name="funnel" color="inherit" size={15} />
               }
               onClick={() =>

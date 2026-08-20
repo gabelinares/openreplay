@@ -30,7 +30,6 @@ import {
   ReplayIconButton,
   ReplayIdentity,
   ReplayQueueControls,
-  ReplayStateToggle,
   ReplayTabStrip,
 } from 'Components/shared/ReplayChrome';
 import SessionCopyLink from 'Components/shared/SharePopup/SessionCopyLink';
@@ -67,16 +66,33 @@ const HeaderCriticalToggle = observer(({ issue }: { issue: Issue }) => {
        child throws on render and takes the whole replay header down with it.
        The list row and the detail chip already keep their dialog outside. */
     <>
-      <ReplayStateToggle
-        on={critState !== 'none'}
-        strong={critState === 'mine'}
-        color="var(--color-red)"
-        title={critTip}
-        icon={
-          <AlertTriangle size={15} strokeWidth={2} style={{ fill: 'none' }} />
-        }
-        onClick={() => setDialog(true)}
-      />
+      <Tooltip title={critTip}>
+        <Button
+          type="text"
+          size="small"
+          aria-label={critTip}
+          aria-pressed={critState !== 'none'}
+          className={`critical-toggle flex items-center justify-center shrink-0${
+            critState !== 'none' ? ' critical-on' : ''
+          }${critState === 'mine' ? ' critical-mine' : ''}`}
+          icon={
+            // same chip-color language as the list (`critical-mine` in
+            // issues.css): gray chip = agent's critical, red chip = mine —
+            // the icon itself stays the project-critical red outline
+            <AlertTriangle
+              size={15}
+              strokeWidth={2}
+              style={{
+                // none-state color is left to issues.css so the hover preview
+                // (gray → red) can take effect; inline style would win over it
+                color: critState !== 'none' ? 'var(--color-red)' : undefined,
+                fill: 'none',
+              }}
+            />
+          }
+          onClick={() => setDialog(true)}
+        />
+      </Tooltip>
       <CriticalDialog
         issueId={dialog ? issue.id : null}
         issueHead={issue.head}
