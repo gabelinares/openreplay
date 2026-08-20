@@ -89,7 +89,7 @@ function Player(props: IProps) {
 
   if (!playerContext.player) return null;
 
-  const activeTabWidth = activeTab === 'EXPORT' ? 360 : 270;
+  const activeTabWidth = activeTab === 'EXPORT' ? 360 : 320;
   const maxWidth = activeTab ? `calc(100vw - ${activeTabWidth}px)` : '100vw';
 
   const handleResize = (e: React.MouseEvent<HTMLDivElement>) => {

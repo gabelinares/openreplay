@@ -35,8 +35,12 @@ const components: any = {
   IssuesPure: lazy(() => import('Components/Issues/IssuesList')),
   IssueDetailPure: lazy(() => import('Components/Issues/IssueDetail')),
   IssueSessionPure: lazy(() => import('Components/Issues/IssueSessionPlayer')),
+  // design-env only: the three replay headers stacked, for the chrome review
+  PlayerChromePure: lazy(() => import('Components/dev/PlayerChromeCompare')),
   KaiPure: lazy(() => import('Components/Kai/KaiChat')),
-  TestAgentsPure: lazy(() => import('Components/Client/KaiSettings/StandalonePage')),
+  TestAgentsPure: lazy(
+    () => import('Components/Client/KaiSettings/StandalonePage'),
+  ),
   AuditsPure: lazy(() => import('Components/Audits/AuditsList')),
   AuditReportPure: lazy(() => import('Components/Audits/AuditReport')),
   ActivityPure: lazy(
@@ -74,6 +78,7 @@ const enhancedComponents: any = {
   Issues: withSiteIdUpdater(components.IssuesPure),
   IssueDetail: withSiteIdUpdater(components.IssueDetailPure),
   IssueSession: withSiteIdUpdater(components.IssueSessionPure),
+  PlayerChrome: withSiteIdUpdater(components.PlayerChromePure),
   Kai: withSiteIdUpdater(components.KaiPure),
   TestAgents: withSiteIdUpdater(components.TestAgentsPure),
   Audits: withSiteIdUpdater(components.AuditsPure),
@@ -125,6 +130,7 @@ const HIGHLIGHTS_PATH = routes.highlights();
 const ISSUES_PATH = routes.issues();
 const ISSUE_DETAIL_PATH = routes.issue();
 const ISSUE_SESSION_PATH = routes.issueSession();
+const PLAYER_CHROME_PATH = '/player-chrome';
 const KAI_PATH = routes.kai();
 const TEST_AGENTS_PATH = routes.testAgents();
 const AUDITS_PATH = routes.audits();
@@ -361,6 +367,10 @@ function PrivateRoutes() {
         <Route
           path={withSiteId(ISSUE_SESSION_PATH, siteIdList)}
           element={<enhancedComponents.IssueSession />}
+        />
+        <Route
+          path={withSiteId(PLAYER_CHROME_PATH, siteIdList)}
+          element={<enhancedComponents.PlayerChrome />}
         />
         <Route
           path={withSiteId(ISSUE_DETAIL_PATH, siteIdList)}

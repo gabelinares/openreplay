@@ -1,21 +1,23 @@
 import cn from 'classnames';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
-import { useHistory, useParams } from 'App/routing';
 
 import { useStore } from 'App/mstore';
+import { useHistory, useParams } from 'App/routing';
 import {
   debounceUpdate,
   getDefaultPanelHeight,
 } from 'Components/Session/Player/ReplayPlayer/PlayerInst';
+import PhoneHorizontalWarn from 'Components/Session/Player/SharedComponents/PhoneHorizontal';
 import { SpotOverviewPanelCont } from 'Components/Session_/OverviewPanel/OverviewPanel';
 import withPermissions from 'Components/hocs/withPermissions';
+import { ReplayLocationBar } from 'Components/shared/ReplayChrome';
 import { EscapeButton, Loader } from 'UI';
 
 import AccessError from './components/AccessError';
+import MobilePlayerOverlay from './components/MobileControlOverlay';
 import SpotConsole from './components/Panels/SpotConsole';
 import SpotNetwork from './components/Panels/SpotNetwork';
-import SpotLocation from './components/SpotLocation';
 import SpotPlayerControls from './components/SpotPlayerControls';
 import SpotPlayerHeader from './components/SpotPlayerHeader';
 import SpotPlayerSideBar from './components/SpotSideBar';
@@ -24,8 +26,6 @@ import SpotVideoContainer from './components/SpotVideoContainer';
 // import VideoJS from "./components/Vjs"; backup player
 import { Tab } from './consts';
 import spotPlayerStore, { PANELS } from './spotPlayerStore';
-import PhoneHorizontalWarn from 'Components/Session/Player/SharedComponents/PhoneHorizontal';
-import MobilePlayerOverlay from './components/MobileControlOverlay';
 
 function SpotPlayer() {
   const defaultHeight = getDefaultPanelHeight();
@@ -180,6 +180,9 @@ function SpotPlayer() {
   };
 
   const { isFullScreen } = spotPlayerStore;
+  const spotLocation = spotPlayerStore.getClosestLocation(
+    spotPlayerStore.time,
+  )?.location;
   // 2nd player option
   // const base64toblob = (str: string) => {
   //   const byteCharacters = atob(str);
@@ -227,7 +230,13 @@ function SpotPlayer() {
       />
       <div className="w-full h-full flex">
         <div className="w-full h-full flex flex-col justify-between">
-          <SpotLocation />
+          {/* `getClosestLocation` returns a 'loading' sentinel rather than
+              nothing before the mob file parses; the shared bar renders nothing
+              for an empty url, so translate the sentinel here instead of
+              teaching the shared atom about Spot's store. */}
+          <ReplayLocationBar
+            url={spotLocation === 'loading' ? null : spotLocation}
+          />
           <div className={cn('w-full h-full', isFullScreen ? '' : 'relative')}>
             <MobilePlayerOverlay
               isPlaying={spotPlayerStore.isPlaying}

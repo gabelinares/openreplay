@@ -1,17 +1,16 @@
-/* eslint-disable i18next/no-literal-string */
 import {
-  ArrowLeftOutlined,
   CommentOutlined,
   CopyOutlined,
   DeleteOutlined,
   DownloadOutlined,
   MoreOutlined,
-  SettingOutlined,
+  ShareAltOutlined,
   UserSwitchOutlined,
 } from '@ant-design/icons';
 import {
   Badge,
   Button,
+  Divider,
   Dropdown,
   MenuProps,
   Popover,
@@ -20,23 +19,45 @@ import {
 } from 'antd';
 import copy from 'copy-to-clipboard';
 import { observer } from 'mobx-react-lite';
-import React, { useState } from 'react';
-import { useHistory } from 'App/routing';
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'react-toastify';
 
-import Tabs from 'App/components/Session/Tabs';
+import { browserIcon, osIcon } from 'App/iconNames';
 import { useStore } from 'App/mstore';
 import { spotsList } from 'App/routes';
+import { useHistory } from 'App/routing';
 import { hashString } from 'App/types/session/session';
+import { mobileScreen } from 'App/utils/isMobile';
+import SessionInfoItem from 'Components/Session_/SessionInfoItem';
+import {
+  ReplayActionCluster,
+  ReplayBackButton,
+  ReplayHeaderBar,
+  ReplayIdentity,
+  ReplayTabStrip,
+} from 'Components/shared/ReplayChrome';
 import { Avatar, Icon } from 'UI';
 
 import { TABS, Tab } from '../consts';
 import AccessModal from './AccessModal';
-import { useTranslation } from 'react-i18next';
-import { toast } from 'react-toastify';
-import { mobileScreen } from 'App/utils/isMobile';
 
 const spotLink = spotsList();
 
+/* Spot's header, on the shared chrome. See
+   context/player-makeup-plan-2026-08-20.md.
+
+   What changed here, and all of it is the shared contract rather than a Spot
+   decision:
+
+   - the bar is 50px fixed instead of growing with its content, so the second
+     line of meta (browser version, resolution, platform) moves behind "More"
+   - "Copy" and "Manage Access" lose their labels. Spot was the only player that
+     labelled its buttons and it is most of why its bar read as different
+     software. They are now one share popover, since both of them are sharing:
+     one copies the internal link, the other governs who can open it
+   - the two full-height dividers on the right go. Nothing on that side has one
+   - the bar's own bottom rule goes; the location strip below carries the line */
 function SpotPlayerHeader({
   activeTab,
   setActiveTab,
@@ -64,7 +85,6 @@ function SpotPlayerHeader({
     : true;
   const comments = spotStore.currentSpot?.comments ?? [];
 
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const history = useHistory();
 
   const onCopy = () => {
@@ -105,170 +125,179 @@ function SpotPlayerHeader({
     }
   };
 
+  /* Everything that used to sit on the bar's second line. Built from the same
+     icon helpers and the same row component the other two players use, so the
+     popover reads identically in all three — and `osIcon` is only reached with
+     a real string, since it lowercases its argument unguarded. */
+  const more = (
+    <div className="text-left bg-white">
+      {browserVersion && (
+        <SessionInfoItem
+          icon={browserIcon('chrome')}
+          label="Chromium"
+          value={`v${browserVersion}`}
+          isLast={!platform}
+        />
+      )}
+      {platform && (
+        <SessionInfoItem
+          icon={osIcon(platform)}
+          label={platform}
+          value={resolution ?? ''}
+          isLast
+        />
+      )}
+    </div>
+  );
+
+  /* Copy-the-link and who-can-open-it, together, because both are sharing. This
+     is where Spot's two labelled buttons went. */
+  const sharePopover = (
+    <div style={{ width: 280 }}>
+      <Button
+        block
+        type="text"
+        className="flex items-center justify-start px-2"
+        icon={<CopyOutlined />}
+        onClick={onCopy}
+      >
+        {t('Copy internal link')}
+      </Button>
+      {hasShareAccess && (
+        <>
+          <Divider className="my-2" />
+          <AccessModal />
+        </>
+      )}
+    </div>
+  );
+
+  const tabs = mobileScreen ? (
+    <Button
+      size="small"
+      onClick={() =>
+        setActiveTab(activeTab === TABS.COMMENTS ? null : TABS.COMMENTS)
+      }
+    >
+      {t('Comments')}{' '}
+      {comments.length > 0 && (
+        <Badge
+          count={comments.length}
+          className="mr-2"
+          style={{ fontSize: '10px' }}
+          size="small"
+          color="#454545"
+        />
+      )}
+    </Button>
+  ) : (
+    <ReplayTabStrip
+      active={activeTab}
+      onClick={(k) => (k === activeTab ? setActiveTab(null) : setActiveTab(k))}
+      tabs={[
+        {
+          key: TABS.ACTIVITY,
+          text: t('Activity'),
+          iconComp: (
+            <div className="mr-1">
+              <UserSwitchOutlined />
+            </div>
+          ),
+        },
+        {
+          key: TABS.COMMENTS,
+          iconComp: (
+            <div className="mr-1">
+              <CommentOutlined />
+            </div>
+          ),
+          text: (
+            <div>
+              {t('Comments')}{' '}
+              {comments.length > 0 && (
+                <Badge
+                  count={comments.length}
+                  className="mr-2"
+                  style={{ fontSize: '10px' }}
+                  size="small"
+                  color="#454545"
+                />
+              )}
+            </div>
+          ),
+        },
+      ]}
+    />
+  );
+
   return (
-    <div className="flex items-center gap-1 p-2 py-1 w-full bg-white border-b">
-      <div>
-        {isLoggedIn ? (
-          <Button
-            type="text"
+    <ReplayHeaderBar
+      back={
+        isLoggedIn ? (
+          <ReplayBackButton
+            label={t('All Spots')}
             onClick={navigateToSpotsList}
-            icon={<ArrowLeftOutlined />}
-            className="px-2"
-          >
-            {t('All Spots')}
-          </Button>
+          />
         ) : (
+          /* the public, not-logged-in view: OpenReplay's own mark instead of a
+             back button, since there is no list to go back to */
           <a
             href="https://openreplay.com/platform/spot/"
             target="_blank"
             rel="noreferrer"
+            className="shrink-0"
           >
             <Button
               type="text"
-              className="orSpotBranding flex gap-1 items-center py-2"
+              className="orSpotBranding flex gap-1 items-center"
             >
               <Icon name="orSpot" size={28} />
-              <div className="flex flex-col justify-start text-start">
-                <div className="text-lg font-semibold">{t('Spot')}</div>
-                <div className="text-disabled-text text-xs -mt-1">
+              <div className="flex flex-col justify-start text-start leading-tight">
+                <div className="font-semibold">{t('Spot')}</div>
+                <div className="text-disabled-text text-xs">
                   {t('by OpenReplay')}
                 </div>
               </div>
             </Button>
           </a>
-        )}
-      </div>
-      <div className="h-full rounded-xl border-l mr-2" style={{ width: 1 }} />
-      <div className="flex items-center gap-2">
-        <Avatar seed={hashString(user)} />
-        <div>
-          <Tooltip title={title}>
-            <div className="w-9/12 text-ellipsis truncate cursor-normal">
-              {title}
-            </div>
-          </Tooltip>
-          <div className="flex items-center gap-1 lg:gap-2 text-black/50 text-sm">
-            <div>{user}</div>
-            <div>·</div>
-            <div className="capitalize whitespace-nowrap">{date}</div>
-            {browserVersion && (
-              <>
-                <div>·</div>
-                <div className="whitespace-nowrap">
-                  Chromium v{browserVersion}
-                </div>
-              </>
-            )}
-            {resolution && (
-              <>
-                <div>·</div>
-                <div>{resolution}</div>
-              </>
-            )}
-            {platform && (
-              <>
-                <div>·</div>
-                <div className="capitalize whitespace-nowrap">{platform}</div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="ml-auto" />
-      {!mobileScreen && isLoggedIn ? (
-        <>
-          <Button
-            size="small"
-            onClick={onCopy}
-            type="default"
-            icon={<CopyOutlined />}
-          >
-            {t('Copy')}
-          </Button>
-          {hasShareAccess ? (
-            <Popover trigger="click" content={<AccessModal />}>
-              <Button
-                size="small"
-                icon={<SettingOutlined />}
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-              >
-                {t('Manage Access')}
-              </Button>
-            </Popover>
-          ) : null}
-          <Dropdown
-            menu={{ items, onClick: onMenuClick }}
-            placement="bottomRight"
-          >
-            <Button icon={<MoreOutlined />} size="small" />
-          </Dropdown>
-          <div
-            className="h-full rounded-xl border-l mx-2"
-            style={{ width: 1 }}
-          />
-        </>
-      ) : null}
-      {mobileScreen ? (
-        <Button
-          size="small"
-          onClick={() =>
-            setActiveTab(activeTab === TABS.COMMENTS ? null : TABS.COMMENTS)
-          }
-        >
-          {t('Comments')}{' '}
-          {comments.length > 0 && (
-            <Badge
-              count={comments.length}
-              className="mr-2"
-              style={{ fontSize: '10px' }}
-              size="small"
-              color="#454545"
-            />
-          )}
-        </Button>
-      ) : (
-        <Tabs
-          className="w-fit! border-b-0!"
-          tabs={[
-            {
-              key: TABS.ACTIVITY,
-              text: t('Activity'),
-              iconComp: (
-                <div className="mr-1">
-                  <UserSwitchOutlined />
-                </div>
-              ),
-            },
-            {
-              key: TABS.COMMENTS,
-              iconComp: (
-                <div className="mr-1">
-                  <CommentOutlined />
-                </div>
-              ),
-              text: (
-                <div>
-                  {t('Comments')}{' '}
-                  {comments.length > 0 && (
-                    <Badge
-                      count={comments.length}
-                      className="mr-2"
-                      style={{ fontSize: '10px' }}
-                      size="small"
-                      color="#454545"
-                    />
-                  )}
-                </div>
-              ),
-            },
-          ]}
-          active={activeTab}
-          onClick={(k) =>
-            k === activeTab ? setActiveTab(null) : setActiveTab(k)
-          }
+        )
+      }
+      identity={
+        <ReplayIdentity
+          lead={<Avatar seed={hashString(user)} />}
+          primary={title}
+          primaryTooltip={title}
+          meta={[user, <span className="capitalize">{date}</span>]}
+          more={more}
         />
-      )}
-    </div>
+      }
+      actions={
+        !mobileScreen && isLoggedIn ? (
+          <ReplayActionCluster
+            share={
+              <Popover
+                trigger="click"
+                content={sharePopover}
+                placement="bottomRight"
+              >
+                <Tooltip title={t('Share Spot')} placement="bottom">
+                  <Button size="small" icon={<ShareAltOutlined />} />
+                </Tooltip>
+              </Popover>
+            }
+            overflow={
+              <Dropdown
+                menu={{ items, onClick: onMenuClick }}
+                placement="bottomRight"
+              >
+                <Button icon={<MoreOutlined />} size="small" />
+              </Dropdown>
+            }
+          />
+        ) : undefined
+      }
+      tabs={tabs}
+    />
   );
 }
 

@@ -25,13 +25,9 @@ function PlayerBlock(props: IProps) {
   const shouldShowSubHeader = !fullscreen && !fullView;
   return (
     <div className={cn(styles.playerBlock, 'flex flex-col', 'overflow-hidden')}>
-      {shouldShowSubHeader ? (
-        <SubHeader
-          setActiveTab={setActiveTab}
-          sessionId={sessionId}
-          jiraConfig={jiraConfig}
-        />
-      ) : null}
+      {/* the tools that used to live here moved up into the header bar; what is
+          left is the conditional browser-tab strip and the location strip */}
+      {shouldShowSubHeader ? <SubHeader /> : null}
       <Player
         setActiveTab={setActiveTab}
         activeTab={activeTab}

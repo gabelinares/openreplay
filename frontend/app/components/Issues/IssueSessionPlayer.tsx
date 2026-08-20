@@ -48,6 +48,7 @@ import { useStore } from 'App/mstore';
 import { useHistory, useParams } from 'App/routing';
 
 import CriticalDialog from './CriticalDialog';
+import IssueReplayHeader from './IssueReplayHeader';
 import MoreCount from './MoreCount';
 import {
   withSiteId,
@@ -75,7 +76,14 @@ import {
 import { SpotOverviewPanelCont } from 'Components/Session_/OverviewPanel/OverviewPanel';
 import SpotConsole from 'Components/Spots/SpotPlayer/components/Panels/SpotConsole';
 import SpotNetwork from 'Components/Spots/SpotPlayer/components/Panels/SpotNetwork';
-import SpotLocation from 'Components/Spots/SpotPlayer/components/SpotLocation';
+import {
+  ReplayActionCluster,
+  ReplayBackButton,
+  ReplayHeaderBar,
+  ReplayIdentity,
+  ReplayLocationBar,
+  ReplayTabStrip,
+} from 'Components/shared/ReplayChrome';
 import SpotTimeline from 'Components/Spots/SpotPlayer/components/SpotTimeline';
 import SpotVideoContainer from 'Components/Spots/SpotPlayer/components/SpotVideoContainer';
 import spotPlayerStore from 'Components/Spots/SpotPlayer/spotPlayerStore';
@@ -319,65 +327,6 @@ function TagChip({ label }: { label: string }) {
   );
 }
 
-/* Critical control for the header — the exact issue-list control (triangle:
-   red outline = a description matched, tinted fill = one of MINE did). It
-   reports state and opens the shared CriticalDialog, exactly like the list row
-   and the detail chip, because criticality is derived from descriptions now
-   (Mehdi 07-28) and no surface sets it directly. Kept in sync via issuesStore. */
-const HeaderCriticalToggle = observer(({ issue }: { issue: Issue }) => {
-  const { issuesStore } = useStore();
-  const [dialog, setDialog] = React.useState(false);
-  const critState = issuesStore.critState(issue.id);
-  const matched = issuesStore.matchedRules(issue.id);
-  const critTip =
-    issuesStore.notCritical[issue.id] != null
-      ? 'Not critical for you'
-      : critState === 'mine'
-        ? 'Matches your description'
-        : critState === 'team'
-          ? `Matches ${matched[0]?.createdBy}’s description`
-          : 'Describe what’s critical';
-  return (
-    /* the dialog is a SIBLING of the tooltip, never its second child: antd's
-       trigger runs React.Children.only over whatever Tooltip wraps, so a second
-       child throws on render and takes the whole replay header down with it.
-       The list row and the detail chip already keep their dialog outside. */
-    <>
-      <Tooltip title={critTip}>
-        <Button
-          type="text"
-          size="small"
-          aria-label={critTip}
-          aria-pressed={critState !== 'none'}
-          className={`critical-toggle flex items-center justify-center shrink-0${
-            critState !== 'none' ? ' critical-on' : ''
-          }${critState === 'mine' ? ' critical-mine' : ''}`}
-          icon={
-            // same chip-color language as the list (`critical-mine` in
-            // issues.css): gray chip = agent's critical, red chip = mine —
-            // the icon itself stays the project-critical red outline
-            <AlertTriangle
-              size={15}
-              strokeWidth={2}
-              style={{
-                // none-state color is left to issues.css so the hover preview
-                // (gray → red) can take effect; inline style would win over it
-                color: critState !== 'none' ? 'var(--color-red)' : undefined,
-                fill: 'none',
-              }}
-            />
-          }
-          onClick={() => setDialog(true)}
-        />
-      </Tooltip>
-      <CriticalDialog
-        issueId={dialog ? issue.id : null}
-        issueHead={issue.head}
-        onClose={() => setDialog(false)}
-      />
-    </>
-  );
-});
 
 /* Break a journey sentence into ordered steps so it can be drawn as a path
    rather than read as prose ("they won't read it"). Splits on clause commas
@@ -932,185 +881,36 @@ function IssueSessionPlayer() {
         <EscapeButton onClose={() => spotPlayerStore.setIsFullScreen(false)} />
       )}
 
-      {/* header: session info + issue name, with Activity / Issue tabs.
-          Fifty pixels from the session header (`PlayerBlockHeader`), and the
-          bottom rule from the Spot player header, which is a bare `border-b`
-          and so gray-light via `* { border-color }` in main.css. This is THE
-          divider between header and page and it stays; what went was the four
-          other strokes around it (Gabriel 08-19). */}
-      {!isFullScreen && (
-        <div className="flex items-center px-2 h-[50px] shrink-0 w-full bg-white border-b">
-          <Tooltip title={issue ? `Back to “${issue.head}”` : 'Back to issues'}>
-            <Button type="text" size="small" icon={<ArrowLeft size={15} />} onClick={back} className="px-2">
-              Back to issue
-            </Button>
-          </Tooltip>
-          {/* The Sessions divider, copied: `PlayerBlockHeader` line 99, whose
-              CSS-module twin spells it out as 1px wide, 49px tall (the header
-              less its border), 10px margins, gray-lighter. Quiet and
-              full-bleed. Sessions draws this one beside Back and none before
-              its tabs, so neither do we. */}
-          <div className="w-px h-full mx-2 bg-gray-lighter" />
-          {/* One line, as on the session page: this session's VARIATION of the
-              issue, then when it happened, then everything else behind "More".
-              The second line used to carry the parent issue, but "Back to
-              issue" names it and the Issue panel leads with it, so that was
-              the third place it appeared. The critical marker leads the line:
-              it belongs to the session you are watching, not to the panel
-              (Gabriel 08-19). */}
-          <div className="min-w-0 flex-1 flex items-center gap-2">
-            {issue && <HeaderCriticalToggle issue={issue} />}
-            <Tooltip title={variation}>
-              <span
-                className="font-medium truncate"
-                style={{ color: 'var(--color-gray-darkest)', maxWidth: 480 }}
-              >
-                {variation ?? 'Session replay'}
-              </span>
-            </Tooltip>
-            <div className="flex items-center gap-2 shrink-0 text-black/50 text-sm">
-              <span className="whitespace-nowrap">{date}</span>
-              <span>·</span>
-              <Popover
-                content={morePopover}
-                trigger="hover"
-                placement="bottom"
-                zIndex={2147483647}
-              >
-                <span className="link cursor-pointer">More</span>
-              </Popover>
-            </div>
-          </div>
-
-          {/* right cluster — sourced from the session replay subheader:
-              Share (copy-at-time), Highlight, overflow, queue controls, tabs.
-              Sessions' arrangement: no dividers on this side at all, the
-              groups just run together with a gap. */}
-          <div className="ml-auto flex items-center gap-3 shrink-0">
-            <div className="flex items-center gap-1">
-              <Popover
-                trigger="click"
-                placement="bottomRight"
-                zIndex={2147483647}
-                content={
-                  <div style={{ width: 248 }}>
-                    <SessionCopyLink time={spotPlayerStore.time} />
-                  </div>
-                }
-              >
-                <Tooltip title="Share session" placement="bottom">
-                  <Button size="small" icon={<ShareAltOutlined />} />
-                </Tooltip>
-              </Popover>
-
-              <HighlightButton onClick={() => message.info('Highlight this moment')} />
-
-              <Dropdown
-                placement="bottomRight"
-                menu={{
-                  items: [
-                    {
-                      key: 'bookmark',
-                      label: (
-                        <div className="flex items-center gap-2">
-                          {bookmarked ? (
-                            <BookmarkCheck size={16} strokeWidth={1.5} />
-                          ) : (
-                            <Bookmark size={16} strokeWidth={1.5} />
-                          )}
-                          <span>{bookmarked ? 'Bookmarked' : 'Bookmark'}</span>
-                        </div>
-                      ),
-                      onClick: toggleBookmark,
-                    },
-                    {
-                      key: 'dl',
-                      label: (
-                        <div className="flex items-center gap-2">
-                          <File size={16} strokeWidth={1.5} />
-                          <span>Download video</span>
-                        </div>
-                      ),
-                    },
-                  ],
-                }}
-              >
-                <Button icon={<MoreOutlined />} size="small" />
-              </Dropdown>
-            </div>
-
-            {/* queue controls — prev / autoplay / next across this issue's sessions */}
-            <div className="flex items-center gap-1">
-              <Tooltip
-                title="Previous session"
-                placement="bottom"
-                open={prevId ? undefined : false}
-              >
-                <Button
-                  size="small"
-                  shape="circle"
-                  disabled={!prevId}
-                  onClick={() => prevId && goSession(prevId)}
-                  icon={<LeftOutlined />}
-                />
-              </Tooltip>
-              <Tooltip title="Toggle autoplay" placement="bottom">
-                <Switch
-                  className="custom-switch"
-                  checked={autoplay}
-                  onChange={toggleAutoplay}
-                  checkedChildren={<CaretRightOutlined className="switch-icon" />}
-                  unCheckedChildren={<PauseOutlined className="switch-icon" />}
-                />
-              </Tooltip>
-              <Tooltip
-                title="Next session"
-                placement="bottom"
-                open={nextId ? undefined : false}
-              >
-                <Button
-                  size="small"
-                  shape="circle"
-                  disabled={!nextId}
-                  onClick={() => nextId && goSession(nextId)}
-                  icon={<RightOutlined />}
-                />
-              </Tooltip>
-            </div>
-
-            <Tabs
-              className="w-fit! border-b-0!"
-              tabs={[
-                {
-                  key: 'activity',
-                  text: 'Activity',
-                  iconComp: (
-                    <div className="mr-1">
-                      <UserSwitchOutlined />
-                    </div>
-                  ),
-                },
-                {
-                  key: 'issue',
-                  text: 'Issue',
-                  iconComp: (
-                    <div className="mr-1">
-                      <InfoCircleOutlined />
-                    </div>
-                  ),
-                },
-              ]}
-              active={tab}
-              onClick={(k: any) => (k === tab ? setTab(null) : setTab(k))}
-            />
-          </div>
-        </div>
-      )}
+      {/* the header is its own component so all three players' headers can be
+          mounted side by side on the comparison route, and so Nikita mirrors a
+          component into SmartAlerts rather than a block of JSX */}
+      <IssueReplayHeader
+        hidden={isFullScreen}
+        issue={issue}
+        variation={variation}
+        date={date}
+        more={morePopover}
+        onBack={back}
+        bookmarked={bookmarked}
+        onToggleBookmark={toggleBookmark}
+        prevId={prevId}
+        nextId={nextId}
+        onGoSession={goSession}
+        autoplay={autoplay}
+        onToggleAutoplay={toggleAutoplay}
+        tab={tab}
+        setTab={setTab}
+        time={spotPlayerStore.time}
+      />
 
       {/* body: player column (shrinks) + right sidebar */}
       <div className="flex flex-1 min-h-0 w-full">
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          <SpotLocation onPageTone />
+          {/* the one stroke in the whole header region: the bar above draws
+              none, so this hairline closes the white chrome against the stage */}
+          <ReplayLocationBar
+            url={spotPlayerStore.getClosestLocation(spotPlayerStore.time)?.location}
+          />
           <div className={cn('w-full min-h-0 flex-1', isFullScreen ? '' : 'relative')}>
             <SpotVideoContainer
               videoURL={sessionVideo}

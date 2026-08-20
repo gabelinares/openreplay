@@ -1,9 +1,6 @@
-import { Switch } from 'antd';
-import cn from 'classnames';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'App/routing';
 
 import { PlayerContext } from 'App/components/Session/playerContext';
 import { IFRAME } from 'App/constants/storageKeys';
@@ -13,22 +10,38 @@ import {
   sessions as sessionsRoute,
   withSiteId,
 } from 'App/routes';
-import Tabs from 'Components/Session/Tabs';
-import { BackLink, Link } from 'UI';
+import { useNavigate } from 'App/routing';
+import SessionIdentity from 'Components/Session_/SessionIdentity';
+import SessionToolsCluster from 'Components/Session_/SessionToolsCluster';
+import {
+  ReplayBackButton,
+  ReplayHeaderBar,
+  ReplayTabStrip,
+} from 'Components/shared/ReplayChrome';
+import { Link } from 'UI';
 
-import SessionMetaList from 'Shared/SessionItem/SessionMetaList';
-
-import UserCard from './EventsBlock/UserCard';
 import stl from './playerBlockHeader.module.css';
 
 const SESSIONS_ROUTE = sessionsRoute();
 
+/* Session replay's header, on the shared chrome
+   (context/player-makeup-plan-2026-08-20.md).
+ *
+ * This was already the closest of the three to right — one fixed 50px line,
+ * separating from the stage by tone rather than a rule — which is why Mehdi
+ * pointed at this page as the clean reference. What it gains here is the tools
+ * cluster, which used to live on a second bar below (`Subheader`), and that is
+ * what lets the second bar disappear on a single-tab session.
+ *
+ * What it gives up: the custom `BackLink` on its sprite icon, its inlined
+ * divider, `UserCard`, and the `SessionMetaList` that sat on the far right. All
+ * four are now the shared versions, so Spot and issue replay get the same ones.
+ */
 function PlayerBlockHeader(props: any) {
   const { t } = useTranslation();
   const [hideBack, setHideBack] = React.useState(false);
-  const { uiPlayerStore } = useStore();
   const { player, store } = React.useContext(PlayerContext);
-  const { customFieldStore, projectsStore, sessionStore } = useStore();
+  const { projectsStore, sessionStore } = useStore();
   const session = sessionStore.current;
   const { sessionPath } = sessionStore;
   const siteId = projectsStore.siteId!;
@@ -36,20 +49,13 @@ function PlayerBlockHeader(props: any) {
     width = 0,
     height = 0,
     showEvents = false,
-  } = store?.get?.() || {
-    width: 0,
-    height: 0,
-    showEvents: false,
-  };
-  const metaList = customFieldStore.list.map((i: any) => i.key);
+  } = store?.get?.() || { width: 0, height: 0, showEvents: false };
   const navigate = useNavigate();
   const { fullscreen, closedLive = false, setActiveTab, activeTab } = props;
 
   React.useEffect(() => {
     const iframe = localStorage.getItem(IFRAME) || false;
     setHideBack(!!iframe && iframe === 'true');
-
-    if (metaList.length === 0) customFieldStore.fetchList();
   }, []);
 
   const backHandler = () => {
@@ -68,96 +74,66 @@ function PlayerBlockHeader(props: any) {
     }
   };
 
-  const { sessionId, live, metadata } = session;
-  const _metaList = Object.keys(metadata || {})
-    .filter((i) => metaList.includes(i))
-    .map((key) => {
-      const value = metadata[key];
-      return { label: key, value };
-    });
+  const { sessionId, live } = session;
 
-  const TABS = Object.keys(props.tabs).map((tab) => ({
+  const TABS = Object.keys(props.tabs ?? {}).map((tab) => ({
     text: props.tabs[tab],
     key: tab,
   }));
 
   return (
-    <div
-      className={cn(
-        'bg-white border-b-gray-lighter lg:h-[50px] lg:pb-0 flex justify-between',
-        { hidden: fullscreen },
-      )}
-    >
-      <div className="flex w-full items-center">
-        {!hideBack && (
-          <div
-            className="flex items-center h-full cursor-pointer group"
-            onClick={backHandler}
-          >
-            {/* @ts-ignore TODO */}
-            <BackLink label={t('Back')} className="h-full ml-2" />
-            <div className={'w-px h-full lg:h-12.5 mx-2 bg-gray-lighter'} />
-          </div>
-        )}
-        <UserCard width={width} height={height} />
-
-        <div
-          className={cn('ml-auto flex items-center h-full', {
-            hidden: closedLive,
-          })}
-        >
-          {live && !hideBack && (
-            <>
-              <div className={cn(stl.liveSwitchButton, 'pr-4')}>
-                <Link to={withSiteId(liveSessionRoute(sessionId), siteId)}>
-                  {t('This Session is Now Continuing Live')}
-                </Link>
-              </div>
-              {_metaList.length > 0 && <div className={stl.divider} />}
-            </>
-          )}
-
-          {_metaList.length > 0 && (
-            <SessionMetaList horizontal metaList={_metaList} maxLength={2} />
-          )}
-        </div>
-        {uiPlayerStore.showSearchEventsSwitchButton ? (
-          <div className="px-2 relative flex items-center border-r border-r-gray-lighter">
-            <Switch
-              checked={uiPlayerStore.showOnlySearchEvents}
-              onChange={uiPlayerStore.setShowOnlySearchEvents}
-              style={{
-                background: uiPlayerStore.showOnlySearchEvents
-                  ? '#f0a930'
-                  : 'rgba(0, 0, 0, 0.25)',
-              }}
-            />
-            <span className="ml-2 whitespace-nowrap">
-              {t('Search Events Only')}
-            </span>
-          </div>
-        ) : null}
-      </div>
-      <div
-        className="px-2 relative hidden lg:block"
-        style={{ minWidth: activeTab === 'EXPORT' ? '360px' : '270px' }}
-      >
-        <Tabs
-          tabs={TABS}
-          active={activeTab}
-          onClick={(tab) => {
-            if (activeTab === tab) {
-              setActiveTab('');
-              player.toggleEvents();
-            } else {
-              setActiveTab(tab);
-              !showEvents && player.toggleEvents();
-            }
-          }}
-          border={false}
+    <ReplayHeaderBar
+      hidden={fullscreen}
+      back={
+        hideBack ? undefined : (
+          <ReplayBackButton label={t('Back')} onClick={backHandler} />
+        )
+      }
+      identity={
+        <SessionIdentity
+          width={width}
+          height={height}
+          /* a session that is still running says so in the meta run. It used to
+             be a floating link on the far right with a divider of its own
+             beside it, which was two of session replay's strokes. */
+          live={
+            live && !hideBack ? (
+              <Link
+                to={withSiteId(liveSessionRoute(sessionId), siteId)}
+                className={stl.liveSwitchButton}
+              >
+                {t('This Session is Now Continuing Live')}
+              </Link>
+            ) : undefined
+          }
         />
-      </div>
-    </div>
+      }
+      actions={
+        closedLive ? undefined : (
+          <SessionToolsCluster setActiveTab={setActiveTab} />
+        )
+      }
+      tabs={
+        TABS.length > 0 ? (
+          <ReplayTabStrip
+            tabs={TABS}
+            active={activeTab}
+            onClick={(tab) => {
+              /* the side panel and the player's own event tracking are the same
+                 switch here — kept exactly as it was, since dropping it would
+                 leave the panel open over a player that had stopped feeding it */
+              if (activeTab === tab) {
+                setActiveTab('');
+                player.toggleEvents();
+              } else {
+                setActiveTab(tab);
+                if (!showEvents) player.toggleEvents();
+              }
+            }}
+          />
+        ) : undefined
+      }
+    />
   );
 }
 

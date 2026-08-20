@@ -75,7 +75,7 @@ function PlayerContent({
         style={
           activeTab && !fullscreen
             ? {
-                maxWidth: `calc(100% - ${activeTab === 'EXPORT' ? '360px' : '270px'})`,
+                maxWidth: `calc(100% - ${activeTab === 'EXPORT' ? '360px' : '320px'})`,
               }
             : undefined
         }
